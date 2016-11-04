@@ -32,7 +32,7 @@ values."
      (colors :variables
              colors-enable-nyan-cat-progress-bar t)
      emacs-lisp
-     eyebrowse
+     ;; eyebrowse
      html
      (git :variables
           git-enable-github-support t)
@@ -60,7 +60,8 @@ values."
    ;; wrapped in a layer. If you need some configuration for these
    ;; packages then consider to create a layer, you can also put the
    ;; configuration in `dotspacemacs/config'.
-   dotspacemacs-additional-packages '()
+   dotspacemacs-additional-packages '(key-chord
+                                      )
    ;; show relative line number
    dotspacemacs-line-numbers 'relative
    ;; A list of packages and/or extensions that will not be install and loaded.
@@ -273,7 +274,7 @@ layers configuration. You are free to put any user code."
   ;; non-leader shortcuts
   ;; Map H to go to the beginning of line in normal mode
   ;; (define-key evil-normal-state-map (kbd "H") (kbd "^")) ; H goes to beginning of the line
-  (define-key evil-normal-state-map (kbd "H") 'evil-beginning-of-line)
+  (define-key evil-normal-state-map (kbd "H") 'evil-first-non-blank)
   ;; Mapping keybinding to another keybinding
   ;; Map L to go to the end of line in normal mode
   (define-key evil-normal-state-map (kbd "L") 'evil-end-of-line)
@@ -282,10 +283,17 @@ layers configuration. You are free to put any user code."
   (define-key evil-normal-state-map (kbd "j") 'evil-next-visual-line)
   (define-key evil-normal-state-map (kbd "k") 'evil-previous-visual-line)
 
+  ;; -------------------- REMAPPING THE ESC KEY WITH KEYCHORD ------------------
+  (require 'key-chord)
+  (key-chord-mode 1)
+  (key-chord-define evil-insert-state-map  "jj" 'evil-normal-state)
+  (key-chord-define evil-insert-state-map  "jk" 'evil-normal-state)
+  (key-chord-define evil-insert-state-map  "kk" 'evil-normal-state)
+
   ;; Remember the cursor position of files when reopening them
-  (setq save-place-file "~/.emacs.d/private/saveplace")
-  (setq-default save-place t)
-  (require 'saveplace)
+  ;; (setq save-place-file "~/.emacs.d/private/saveplace")
+  ;; (setq-default save-place t)
+  ;; (require 'saveplace)
 
   (turn-on-fci-mode)
 
@@ -330,7 +338,7 @@ layers configuration. You are free to put any user code."
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (auctex-latexmk yapfify xterm-color ws-butler window-numbering which-key web-mode volatile-highlights vi-tilde-fringe uuidgen use-package toc-org tagedit sublime-themes spacemacs-theme spaceline solarized-theme smeargle slim-mode shell-pop scss-mode sass-mode reveal-in-osx-finder restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters quelpa pyvenv pytest pyenv-mode py-isort pug-mode popwin pip-requirements persp-mode pcre2el pbcopy paradox osx-trash osx-dictionary orgit org-projectile org-present org-pomodoro org-plus-contrib org-download org-bullets open-junk-file neotree mwim multi-term move-text monokai-theme molokai-theme mmm-mode markdown-toc magit-gitflow macrostep lorem-ipsum live-py-mode linum-relative link-hint less-css-mode launchctl info+ indent-guide ido-vertical-mode hy-mode hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers highlight-indentation help-fns+ helm-themes helm-swoop helm-pydoc helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag graphviz-dot-mode grandshell-theme google-translate golden-ratio gnuplot gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ gh-md flyspell-correct-helm flycheck-ycmd flycheck-pos-tip flx-ido fill-column-indicator farmhouse-theme fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help emmet-mode elisp-slime-nav dumb-jump disaster diff-hl cython-mode company-ycmd company-web company-statistics company-quickhelp company-c-headers company-auctex company-anaconda column-enforce-mode color-identifiers-mode cmake-mode clean-aindent-mode clang-format auto-yasnippet auto-highlight-symbol auto-dictionary auto-compile apropospriate-theme aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line ac-ispell))))
+    (key-chord vimrc-mode dactyl-mode powerline spinner org alert log4e gntp markdown-mode hydra parent-mode hide-comnt projectile haml-mode gitignore-mode fringe-helper git-gutter+ flyspell-correct flycheck pkg-info epl flx magit magit-popup git-commit with-editor smartparens iedit anzu evil goto-chg undo-tree highlight diminish ycmd request-deferred request deferred web-completion-data pos-tip company bind-map bind-key yasnippet packed auctex anaconda-mode pythonic f dash s helm avy helm-core async auto-complete popup package-build auctex-latexmk yapfify xterm-color ws-butler window-numbering which-key web-mode volatile-highlights vi-tilde-fringe uuidgen use-package toc-org tagedit sublime-themes spacemacs-theme spaceline solarized-theme smeargle slim-mode shell-pop scss-mode sass-mode reveal-in-osx-finder restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters quelpa pyvenv pytest pyenv-mode py-isort pug-mode popwin pip-requirements persp-mode pcre2el pbcopy paradox osx-trash osx-dictionary orgit org-projectile org-present org-pomodoro org-plus-contrib org-download org-bullets open-junk-file neotree mwim multi-term move-text monokai-theme molokai-theme mmm-mode markdown-toc magit-gitflow macrostep lorem-ipsum live-py-mode linum-relative link-hint less-css-mode launchctl info+ indent-guide ido-vertical-mode hy-mode hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers highlight-indentation help-fns+ helm-themes helm-swoop helm-pydoc helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag graphviz-dot-mode grandshell-theme google-translate golden-ratio gnuplot gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ gh-md flyspell-correct-helm flycheck-ycmd flycheck-pos-tip flx-ido fill-column-indicator farmhouse-theme fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help emmet-mode elisp-slime-nav dumb-jump disaster diff-hl cython-mode company-ycmd company-web company-statistics company-quickhelp company-c-headers company-auctex company-anaconda column-enforce-mode color-identifiers-mode cmake-mode clean-aindent-mode clang-format auto-yasnippet auto-highlight-symbol auto-dictionary auto-compile apropospriate-theme aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line ac-ispell))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.

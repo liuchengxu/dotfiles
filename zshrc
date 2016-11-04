@@ -83,6 +83,14 @@ source $ZSH/oh-my-zsh.sh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-alias gcc5="/usr/local/Cellar/gcc/5.3.0/bin/gcc-5"
-alias g++5="/usr/local/Cellar/gcc/5.3.0/bin/g++-5"
 export PATH="/usr/local/sbin:$PATH"
+case "$TERM" in
+    xterm)
+        export TERM=xterm-256color
+        ;;
+    screen)
+        export TERM=screen-256color
+        ;;
+esac
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
