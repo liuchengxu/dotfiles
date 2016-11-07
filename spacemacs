@@ -18,6 +18,7 @@ values."
    ;; of a list then all discovered layers will be installed.
    dotspacemacs-configuration-layers
    '(
+     vimscript
      ;; ----------------------------------------------------------------
      ;; Example of useful layers you may want to use right away.
      ;; Uncomment some layer names and press <SPC f e R> (Vim style) or
@@ -297,16 +298,16 @@ layers configuration. You are free to put any user code."
 
   (turn-on-fci-mode)
 
-  (defgroup org-attach nil
-    "Options concerning entry attachments in Org-mode."
-    :tag "Org Attach"
-    :group 'org)
-  (defcustom org-attach-directory "~/org-attach-directory"
-    "The directory where attachments are stored.
-     If this is a relative path, it will be interpreted relative to the directory
-     where the Org file lives."
-    :group 'org-attach-directory
-    :type 'directory)
+  ;; (defgroup org-attach nil
+  ;;   "Options concerning entry attachments in Org-mode."
+  ;;   :tag "Org Attach"
+  ;;   :group 'org)
+  ;; (defcustom org-attach-directory "~/org-attach-directory"
+  ;;   "The directory where attachments are stored.
+  ;;    If this is a relative path, it will be interpreted relative to the directory
+  ;;    where the Org file lives."
+  ;;   :group 'org-attach-directory
+  ;;   :type 'directory)
 
   ;; (global-flycheck-mode t)
 
