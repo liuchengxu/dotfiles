@@ -1,0 +1,48 @@
+set hlsearch
+set ignorecase 
+set smartcase
+set showmode
+set ruler
+set scrolloff=3
+set history=10000
+
+" built in search looks better
+nnoremap / :action Find<CR>
+" but preserve ideavim search
+nnoremap <Space>/ /
+
+" clear the search buffer when hitting return
+nnoremap <Space>sc :nohlsearch<CR>
+
+nnoremap <Space>fs :w<CR>
+
+" Quit normal mode
+nmap <Space>q  :q<CR>
+nmap <Space>Q  :qa!<CR>
+" Move half page faster
+nmap <Space>d  <C-d>
+nmap <Space>u  <C-u>
+" Insert mode shortcut
+inoremap <C-h> <Left>
+inoremap <C-j> <Down>
+inoremap <C-k> <Up>
+inoremap <C-l> <Right>
+inoremap <C-a> <Home>
+inoremap <C-e> <End>
+inoremap <C-d> <Delete>
+" Quit insert mode
+inoremap jj <Esc>
+inoremap jk <Esc>
+inoremap kk <Esc>
+" Quit visual mode
+vnoremap v <Esc>
+" Move to the start of line
+nnoremap H ^
+" Move to the end of line
+nnoremap L $
+" Redo
+nnoremap U <C-r>
+" Yank to the end of line
+nnoremap Y y$
+" Auto indent pasted text
+nnoremap p p=`]<C-o>

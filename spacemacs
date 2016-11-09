@@ -234,6 +234,9 @@ user code."
   (setq tramp-ssh-controlmaster-options
         "-o ControlMaster=auto -o ControlPath='tramp.%%C' -o ControlPersist=no")
 
+  (setq python-shell-interpreter "~/anaconda3/bin/python")
+  ;; (setq python-shell-exec-path "~/anaconda3/bin")
+
   ;; auto delete-trailing-whitespace when saving buffer
   (dotspacemacs-whitespace-cleanup 'trailing)
 
@@ -262,6 +265,8 @@ layers configuration. You are free to put any user code."
   (setq evil-normal-state-cursor '("orange" box))
   (setq evil-insert-state-cursor '("green" bar))
   (setq evil-visual-state-cursor '("gray" box))
+
+
 
 
   ;; Remapping

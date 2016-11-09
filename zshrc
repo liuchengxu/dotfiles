@@ -54,7 +54,6 @@ plugins=(git z vi-mode osx colored-man-pages)
 # User configuration
 
 export PATH=$HOME/bin:/usr/local/bin:$PATH
-export PATH=$HOME/anaconda3/bin:$PATH
 # export MANPATH="/usr/local/man:$MANPATH"
 
 source $ZSH/oh-my-zsh.sh
@@ -84,6 +83,7 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 export PATH="/usr/local/sbin:$PATH"
+export PATH=$HOME/anaconda3/bin:$PATH
 case "$TERM" in
     xterm)
         export TERM=xterm-256color
