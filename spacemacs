@@ -226,7 +226,9 @@ values."
   "Initialization function for user code.
 It is called immediately after `dotspacemacs/init'.  You are free to put any
 user code."
-
+  ;; (setenv "PATH" ":/Users/xlc/anaconda3/bin")
+  ;; (setenv "PATH" (concat ".:/usr/texbin:/opt/local/bin" (getenv "PATH")))
+  (setenv exec-path (concat ".:/Users/xlc/anaconda3/bin" (getenv "PATH")))
   ;; solution for initialization delay
   (setq exec-path-from-shell-arguments '("-l"))
   ;; https://github.com/syl20bnr/spacemacs/issues/2705

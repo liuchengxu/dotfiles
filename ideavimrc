@@ -1,27 +1,30 @@
 set hlsearch
-set ignorecase 
+set incsearch
+set ignorecase
 set smartcase
 set showmode
-set ruler
+set number
+set relativenumber
 set scrolloff=3
-set history=10000
+set history=100000
 
-" built in search looks better
-nnoremap / :action Find<CR>
-" but preserve ideavim search
-nnoremap <Space>/ /
+" easy system clipboard copy/paste
+nnoremap y "*y
+nnoremap p "*p
 
-" clear the search buffer when hitting return
+" clear the highlighted search result
 nnoremap <Space>sc :nohlsearch<CR>
 
 nnoremap <Space>fs :w<CR>
 
 " Quit normal mode
-nmap <Space>q  :q<CR>
-nmap <Space>Q  :qa!<CR>
+nnoremap <Space>q  :q<CR>
+nnoremap <Space>Q  :qa!<CR>
+
 " Move half page faster
-nmap <Space>d  <C-d>
-nmap <Space>u  <C-u>
+nnoremap <Space>d  <C-d>
+nnoremap <Space>u  <C-u>
+
 " Insert mode shortcut
 inoremap <C-h> <Left>
 inoremap <C-j> <Down>
@@ -30,19 +33,55 @@ inoremap <C-l> <Right>
 inoremap <C-a> <Home>
 inoremap <C-e> <End>
 inoremap <C-d> <Delete>
+
 " Quit insert mode
 inoremap jj <Esc>
 inoremap jk <Esc>
 inoremap kk <Esc>
+
 " Quit visual mode
 vnoremap v <Esc>
+
 " Move to the start of line
 nnoremap H ^
+
 " Move to the end of line
 nnoremap L $
+
 " Redo
 nnoremap U <C-r>
+
 " Yank to the end of line
 nnoremap Y y$
+
 " Auto indent pasted text
 nnoremap p p=`]<C-o>
+
+" Window operation
+nnoremap <Space>ww <C-W>w
+nnoremap <Space>wd <C-W>c
+nnoremap <Space>wj <C-W>j
+nnoremap <Space>wk <C-W>k
+nnoremap <Space>wh <C-W>h
+nnoremap <Space>wl <C-W>l
+nnoremap <Space>ws <C-W>s
+nnoremap <Space>w- <C-W>s
+nnoremap <Space>wv <C-W>v
+nnoremap <Space>w\| <C-W>v
+
+" Tab operation
+nnoremap <Space>tn gt
+nnoremap <Space>tp gT
+
+" built in search looks better
+nnoremap / :action Find<CR>
+" but preserve ideavim search
+nnoremap <Space>/ /
+
+nnoremap <Space>gc :action GotoClass<CR>
+nnoremap <Space>ga :action GotoAction<CR>
+
+nnoremap <Space>sfp :action ShowFilePath<CR>
+nnoremap <Space>spm :action ShowPopupMenu<CR>
+
+
