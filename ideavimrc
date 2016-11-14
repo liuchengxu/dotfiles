@@ -7,10 +7,7 @@ set number
 set relativenumber
 set scrolloff=3
 set history=100000
-
-" easy system clipboard copy/paste
-nnoremap y "*y
-nnoremap p "*p
+set clipboard+=unnamed
 
 " clear the highlighted search result
 nnoremap <Space>sc :nohlsearch<CR>
@@ -54,9 +51,6 @@ nnoremap U <C-r>
 " Yank to the end of line
 nnoremap Y y$
 
-" Auto indent pasted text
-nnoremap p p=`]<C-o>
-
 " Window operation
 nnoremap <Space>ww <C-W>w
 nnoremap <Space>wd <C-W>c
@@ -70,8 +64,8 @@ nnoremap <Space>wv <C-W>v
 nnoremap <Space>w\| <C-W>v
 
 " Tab operation
-nnoremap <Space>tn gt
-nnoremap <Space>tp gT
+nnoremap tn gt
+nnoremap tp gT
 
 " built in search looks better
 nnoremap / :action Find<CR>
@@ -81,7 +75,12 @@ nnoremap <Space>/ /
 nnoremap <Space>gc :action GotoClass<CR>
 nnoremap <Space>ga :action GotoAction<CR>
 
-nnoremap <Space>sfp :action ShowFilePath<CR>
-nnoremap <Space>spm :action ShowPopupMenu<CR>
+nnoremap <Space>fp :action ShowFilePath<CR>
+
+nnoremap <Space>pm :action ShowPopupMenu<CR>
+
+nnoremap <Space>;; :action CommentByLineComment<CR>
+
+nnoremap <Space>se :action SearchEverywhere<CR>
 
 
