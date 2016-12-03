@@ -29,10 +29,12 @@ values."
                       auto-completion-return-key-behavior 'complete
                       auto-completion-tab-key-behavior 'complete)
      better-defaults
-     c-c++
+     (c-c++ :variables
+            c-c++-enable-clang-support t)
      (colors :variables
              colors-enable-nyan-cat-progress-bar t)
      emacs-lisp
+     emoji
      ;; eyebrowse
      html
      (git :variables
@@ -226,9 +228,6 @@ values."
   "Initialization function for user code.
 It is called immediately after `dotspacemacs/init'.  You are free to put any
 user code."
-  ;; (setenv "PATH" ":/Users/xlc/anaconda3/bin")
-  ;; (setenv "PATH" (concat ".:/usr/texbin:/opt/local/bin" (getenv "PATH")))
-  (setenv exec-path (concat ".:/Users/xlc/anaconda3/bin" (getenv "PATH")))
   ;; solution for initialization delay
   (setq exec-path-from-shell-arguments '("-l"))
   ;; https://github.com/syl20bnr/spacemacs/issues/2705
@@ -239,11 +238,6 @@ user code."
   (setq python-shell-interpreter "~/anaconda3/bin/python")
   ;; (setq python-shell-exec-path "~/anaconda3/bin")
 
-  ;; auto delete-trailing-whitespace when saving buffer
-  (dotspacemacs-whitespace-cleanup 'trailing)
-
-  (set-variable 'python-indent-offset 4)
-  (set-variable 'python-indent-guess-indent-offset nil)
 
   (setq-default tab-width 4)
   (add-hook 'c++-mode-hook (lambda ()
@@ -267,9 +261,6 @@ layers configuration. You are free to put any user code."
   (setq evil-normal-state-cursor '("orange" box))
   (setq evil-insert-state-cursor '("green" bar))
   (setq evil-visual-state-cursor '("gray" box))
-
-
-
 
   ;; Remapping
   ;; Map <leader>d to evil-scroll-down
@@ -305,19 +296,6 @@ layers configuration. You are free to put any user code."
 
   (turn-on-fci-mode)
 
-  ;; (defgroup org-attach nil
-  ;;   "Options concerning entry attachments in Org-mode."
-  ;;   :tag "Org Attach"
-  ;;   :group 'org)
-  ;; (defcustom org-attach-directory "~/org-attach-directory"
-  ;;   "The directory where attachments are stored.
-  ;;    If this is a relative path, it will be interpreted relative to the directory
-  ;;    where the Org file lives."
-  ;;   :group 'org-attach-directory
-  ;;   :type 'directory)
-
-  ;; (global-flycheck-mode t)
-
   ;; YCMD will not work until you set ycmd-server-command correctly.
   (set-variable 'ycmd-server-command
                 '("python" "/Users/xuliucheng/.vim/bundle/YouCompleteMe/third_party/ycmd/ycmd/"))
@@ -346,7 +324,7 @@ layers configuration. You are free to put any user code."
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (key-chord vimrc-mode dactyl-mode powerline spinner org alert log4e gntp markdown-mode hydra parent-mode hide-comnt projectile haml-mode gitignore-mode fringe-helper git-gutter+ flyspell-correct flycheck pkg-info epl flx magit magit-popup git-commit with-editor smartparens iedit anzu evil goto-chg undo-tree highlight diminish ycmd request-deferred request deferred web-completion-data pos-tip company bind-map bind-key yasnippet packed auctex anaconda-mode pythonic f dash s helm avy helm-core async auto-complete popup package-build auctex-latexmk yapfify xterm-color ws-butler window-numbering which-key web-mode volatile-highlights vi-tilde-fringe uuidgen use-package toc-org tagedit sublime-themes spacemacs-theme spaceline solarized-theme smeargle slim-mode shell-pop scss-mode sass-mode reveal-in-osx-finder restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters quelpa pyvenv pytest pyenv-mode py-isort pug-mode popwin pip-requirements persp-mode pcre2el pbcopy paradox osx-trash osx-dictionary orgit org-projectile org-present org-pomodoro org-plus-contrib org-download org-bullets open-junk-file neotree mwim multi-term move-text monokai-theme molokai-theme mmm-mode markdown-toc magit-gitflow macrostep lorem-ipsum live-py-mode linum-relative link-hint less-css-mode launchctl info+ indent-guide ido-vertical-mode hy-mode hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers highlight-indentation help-fns+ helm-themes helm-swoop helm-pydoc helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag graphviz-dot-mode grandshell-theme google-translate golden-ratio gnuplot gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ gh-md flyspell-correct-helm flycheck-ycmd flycheck-pos-tip flx-ido fill-column-indicator farmhouse-theme fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help emmet-mode elisp-slime-nav dumb-jump disaster diff-hl cython-mode company-ycmd company-web company-statistics company-quickhelp company-c-headers company-auctex company-anaconda column-enforce-mode color-identifiers-mode cmake-mode clean-aindent-mode clang-format auto-yasnippet auto-highlight-symbol auto-dictionary auto-compile apropospriate-theme aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line ac-ispell))))
+    (fzf emoji-cheat-sheet-plus company-emoji key-chord vimrc-mode dactyl-mode powerline spinner org alert log4e gntp markdown-mode hydra parent-mode hide-comnt projectile haml-mode gitignore-mode fringe-helper git-gutter+ flyspell-correct flycheck pkg-info epl flx magit magit-popup git-commit with-editor smartparens iedit anzu evil goto-chg undo-tree highlight diminish ycmd request-deferred request deferred web-completion-data pos-tip company bind-map bind-key yasnippet packed auctex anaconda-mode pythonic f dash s helm avy helm-core async auto-complete popup package-build auctex-latexmk yapfify xterm-color ws-butler window-numbering which-key web-mode volatile-highlights vi-tilde-fringe uuidgen use-package toc-org tagedit sublime-themes spacemacs-theme spaceline solarized-theme smeargle slim-mode shell-pop scss-mode sass-mode reveal-in-osx-finder restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters quelpa pyvenv pytest pyenv-mode py-isort pug-mode popwin pip-requirements persp-mode pcre2el pbcopy paradox osx-trash osx-dictionary orgit org-projectile org-present org-pomodoro org-plus-contrib org-download org-bullets open-junk-file neotree mwim multi-term move-text monokai-theme molokai-theme mmm-mode markdown-toc magit-gitflow macrostep lorem-ipsum live-py-mode linum-relative link-hint less-css-mode launchctl info+ indent-guide ido-vertical-mode hy-mode hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers highlight-indentation help-fns+ helm-themes helm-swoop helm-pydoc helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag graphviz-dot-mode grandshell-theme google-translate golden-ratio gnuplot gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ gh-md flyspell-correct-helm flycheck-ycmd flycheck-pos-tip flx-ido fill-column-indicator farmhouse-theme fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help emmet-mode elisp-slime-nav dumb-jump disaster diff-hl cython-mode company-ycmd company-web company-statistics company-quickhelp company-c-headers company-auctex company-anaconda column-enforce-mode color-identifiers-mode cmake-mode clean-aindent-mode clang-format auto-yasnippet auto-highlight-symbol auto-dictionary auto-compile apropospriate-theme aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line ac-ispell))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
