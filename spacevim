@@ -1,28 +1,26 @@
-" UserInit must exists!
 function! UserInit()
-    " Put the layers you want to enable as well as extra private plugins
 
-    Layer 'fzf'
     Layer 'ycmd'
     Layer 'syntax-checking'
 
-    Layer 'emoji'
+    " Layer 'emoji'
     Layer 'goyo'
 
     Layer 'html'
+    Layer 'c-c++'
     Layer 'python'
     Layer 'markdown'
-    Layer 'c-c++'
 
-    Plug 'tpope/vim-fugitive'
-    Plug 'junegunn/vim-github-dashboard'
+    Layer 'lightline'
+    Layer 'text-align'
+    Layer 'programming'
+
+    Layer 'git'
+    Layer 'github'
 
 endfunction
 
 
-" UserConfig must exists!
 function! UserConfig()
-
-    " color gruvbox
 
 endfunction
