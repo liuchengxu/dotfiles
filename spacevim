@@ -1,9 +1,9 @@
 function! UserInit()
 
-    Layer 'ycmd'
-    Layer 'syntax-checking'
+    " Layer 'ycmd'
+    " Layer 'syntax-checking'
 
-    " Layer 'emoji'
+    Layer 'emoji'
     Layer 'goyo'
 
     Layer 'html'
@@ -15,8 +15,8 @@ function! UserInit()
     Layer 'text-align'
     Layer 'programming'
 
-    Layer 'git'
-    Layer 'github'
+    " Layer 'git'
+    " Layer 'github'
 
 endfunction
 
