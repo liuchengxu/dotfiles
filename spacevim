@@ -12,8 +12,8 @@ function! UserInit()
     Layer 'python'
     Layer 'markdown'
 
-    Layer 'lightline'
-    " Layer 'airline'
+    " Layer 'lightline'
+    Layer 'airline'
 
     Layer 'text-align'
     Layer 'programming'
