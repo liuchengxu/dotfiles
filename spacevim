@@ -11,24 +11,31 @@ function! UserInit()
     Layer 'c-c++'
     Layer 'python'
     Layer 'markdown'
+    Layer 'graphviz'
 
     " Layer 'lightline'
-    Layer 'airline'
+    " Layer 'airline'
+
+    Layer 'chinese'
 
     Layer 'text-align'
     Layer 'programming'
 
-    Layer 'latex'
-
+    " Layer 'latex'
+    " Plug 'mbbill/undotree',             { 'on': 'UndotreeToggle'   }
     Layer 'git'
     " Layer 'github'
     " Plug 'hecal3/vim-leader-guide'
-    Plug 'yegappan/mru'
+    Plug 'yuttie/comfortable-motion.vim'
+    " Plug 'blueyed/vim-diminactive'
 
 endfunction
 
 
 function! UserConfig()
+
+    autocmd FileType python nnoremap <LocalLeader>i :!isort %<CR><CR>
+    let g:pymode_python = 'python3'
     " Define prefix dictionary
     " let g:lmap =  {}
 

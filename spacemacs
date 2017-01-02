@@ -123,8 +123,8 @@ values."
    dotspacemacs-colorize-cursor-according-to-state t
    ;; Default font. `powerline-scale' allows to quickly tweak the mode-line
    ;; size to make separators look not too crappy.
-   ;; dotspacemacs-default-font '("Source Code Pro"
-   dotspacemacs-default-font '("Cousine for Powerline"
+   dotspacemacs-default-font '("Source Code Pro for Powerline"
+   ;; dotspacemacs-default-font '("Cousine for Powerline"
                                :size 13
                                ;; :weight normal
                                :weight light
@@ -252,6 +252,7 @@ layers configuration. You are free to put any user code."
 
   ;; ;; (add-to-list 'custom-theme-load-path "~/.emacs.d/private/themes/emacs")
   ;; (load-theme 'dracula t)
+  (setq powerline-default-separator 'slant)
 
   (setq evil-emacs-state-cursor '("red" box))
   (setq evil-replace-state-cursor '("red" bar))
@@ -281,6 +282,8 @@ layers configuration. You are free to put any user code."
   ;; j,k act like gj, gk
   (define-key evil-normal-state-map (kbd "j") 'evil-next-visual-line)
   (define-key evil-normal-state-map (kbd "k") 'evil-previous-visual-line)
+  ;; map ; to :
+  (define-key evil-normal-state-map (kbd ";") 'evil-ex)
 
   ;; -------------------- REMAPPING THE ESC KEY WITH KEYCHORD ------------------
   (require 'key-chord)
@@ -313,6 +316,60 @@ layers configuration. You are free to put any user code."
   (add-hook 'c++-mode-hook 'flycheck-mode)
   (add-hook 'python-mode-hook 'flycheck-mode)
 
+  ;;;;;;;;;;;;
+  ;; Scheme 
+  ;;;;;;;;;;;;
+
+  (require 'cmuscheme)
+  (setq scheme-program-name "racket")         ;; 如果用 Petite 就改成 "petite"
+
+
+  ;; bypass the interactive question and start the default interpreter
+  (defun scheme-proc ()
+    "Return the current Scheme process, starting one if necessary."
+    (unless (and scheme-buffer
+                (get-buffer scheme-buffer)
+                (comint-check-proc scheme-buffer))
+      (save-window-excursion
+        (run-scheme scheme-program-name)))
+    (or (scheme-get-process)
+        (error "No current process. See variable `scheme-buffer'")))
+
+
+  (defun scheme-split-window ()
+    (cond
+    ((= 1 (count-windows))
+      (delete-other-windows)
+      (split-window-vertically (floor (* 0.68 (window-height))))
+      (other-window 1)
+      (switch-to-buffer "*scheme*")
+      (other-window 1))
+    ((not (find "*scheme*"
+                (mapcar (lambda (w) (buffer-name (window-buffer w)))
+                        (window-list))
+                :test 'equal))
+      (other-window 1)
+      (switch-to-buffer "*scheme*")
+      (other-window -1))))
+
+
+  (defun scheme-send-last-sexp-split-window ()
+    (interactive)
+    (scheme-split-window)
+    (scheme-send-last-sexp))
+
+
+  (defun scheme-send-definition-split-window ()
+    (interactive)
+    (scheme-split-window)
+    (scheme-send-definition))
+
+  (add-hook 'scheme-mode-hook
+    (lambda ()
+      (paredit-mode 1)
+      (define-key scheme-mode-map (kbd "<f5>") 'scheme-send-last-sexp-split-window)
+      (define-key scheme-mode-map (kbd "<f6>") 'scheme-send-definition-split-window)))
+
 ;; Do not write anything past this comment. This is where Emacs will
 ;; auto-generate custom variable definitions.
 
@@ -324,7 +381,7 @@ layers configuration. You are free to put any user code."
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (fzf emoji-cheat-sheet-plus company-emoji key-chord vimrc-mode dactyl-mode powerline spinner org alert log4e gntp markdown-mode hydra parent-mode hide-comnt projectile haml-mode gitignore-mode fringe-helper git-gutter+ flyspell-correct flycheck pkg-info epl flx magit magit-popup git-commit with-editor smartparens iedit anzu evil goto-chg undo-tree highlight diminish ycmd request-deferred request deferred web-completion-data pos-tip company bind-map bind-key yasnippet packed auctex anaconda-mode pythonic f dash s helm avy helm-core async auto-complete popup package-build auctex-latexmk yapfify xterm-color ws-butler window-numbering which-key web-mode volatile-highlights vi-tilde-fringe uuidgen use-package toc-org tagedit sublime-themes spacemacs-theme spaceline solarized-theme smeargle slim-mode shell-pop scss-mode sass-mode reveal-in-osx-finder restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters quelpa pyvenv pytest pyenv-mode py-isort pug-mode popwin pip-requirements persp-mode pcre2el pbcopy paradox osx-trash osx-dictionary orgit org-projectile org-present org-pomodoro org-plus-contrib org-download org-bullets open-junk-file neotree mwim multi-term move-text monokai-theme molokai-theme mmm-mode markdown-toc magit-gitflow macrostep lorem-ipsum live-py-mode linum-relative link-hint less-css-mode launchctl info+ indent-guide ido-vertical-mode hy-mode hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers highlight-indentation help-fns+ helm-themes helm-swoop helm-pydoc helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag graphviz-dot-mode grandshell-theme google-translate golden-ratio gnuplot gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ gh-md flyspell-correct-helm flycheck-ycmd flycheck-pos-tip flx-ido fill-column-indicator farmhouse-theme fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help emmet-mode elisp-slime-nav dumb-jump disaster diff-hl cython-mode company-ycmd company-web company-statistics company-quickhelp company-c-headers company-auctex company-anaconda column-enforce-mode color-identifiers-mode cmake-mode clean-aindent-mode clang-format auto-yasnippet auto-highlight-symbol auto-dictionary auto-compile apropospriate-theme aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line ac-ispell))))
+    (paredit fzf emoji-cheat-sheet-plus company-emoji key-chord vimrc-mode dactyl-mode powerline spinner org alert log4e gntp markdown-mode hydra parent-mode hide-comnt projectile haml-mode gitignore-mode fringe-helper git-gutter+ flyspell-correct flycheck pkg-info epl flx magit magit-popup git-commit with-editor smartparens iedit anzu evil goto-chg undo-tree highlight diminish ycmd request-deferred request deferred web-completion-data pos-tip company bind-map bind-key yasnippet packed auctex anaconda-mode pythonic f dash s helm avy helm-core async auto-complete popup package-build auctex-latexmk yapfify xterm-color ws-butler window-numbering which-key web-mode volatile-highlights vi-tilde-fringe uuidgen use-package toc-org tagedit sublime-themes spacemacs-theme spaceline solarized-theme smeargle slim-mode shell-pop scss-mode sass-mode reveal-in-osx-finder restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters quelpa pyvenv pytest pyenv-mode py-isort pug-mode popwin pip-requirements persp-mode pcre2el pbcopy paradox osx-trash osx-dictionary orgit org-projectile org-present org-pomodoro org-plus-contrib org-download org-bullets open-junk-file neotree mwim multi-term move-text monokai-theme molokai-theme mmm-mode markdown-toc magit-gitflow macrostep lorem-ipsum live-py-mode linum-relative link-hint less-css-mode launchctl info+ indent-guide ido-vertical-mode hy-mode hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers highlight-indentation help-fns+ helm-themes helm-swoop helm-pydoc helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag graphviz-dot-mode grandshell-theme google-translate golden-ratio gnuplot gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ gh-md flyspell-correct-helm flycheck-ycmd flycheck-pos-tip flx-ido fill-column-indicator farmhouse-theme fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help emmet-mode elisp-slime-nav dumb-jump disaster diff-hl cython-mode company-ycmd company-web company-statistics company-quickhelp company-c-headers company-auctex company-anaconda column-enforce-mode color-identifiers-mode cmake-mode clean-aindent-mode clang-format auto-yasnippet auto-highlight-symbol auto-dictionary auto-compile apropospriate-theme aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line ac-ispell))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.

@@ -20,7 +20,7 @@ error() {
 }
 
 dir=$HOME/dotfiles
-dotfiles='bashrc bash_profile zshrc ideavimrc spacemacs spacevim tmux.conf'
+dotfiles='bashrc bash_profile zshrc ideavimrc spacemacs spacevim tmux.conf gitconfig'
 
 lnif() {
     if [ -e "$1" ]; then
