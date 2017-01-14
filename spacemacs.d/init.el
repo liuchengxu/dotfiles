@@ -46,6 +46,7 @@ values."
      org
      osx
      python
+     scheme
      ;; (ranger :variables
              ;; ranger-show-preview t
              ;; ranger-cleanup-eagerly t)
@@ -228,6 +229,10 @@ values."
   "Initialization function for user code.
 It is called immediately after `dotspacemacs/init'.  You are free to put any
 user code."
+  (setq configuration-layer--elpa-archives
+        '(("melpa-cn" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+          ("org-cn"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
+          ("gnu-cn"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")))
   ;; solution for initialization delay
   (setq exec-path-from-shell-arguments '("-l"))
   ;; https://github.com/syl20bnr/spacemacs/issues/2705
@@ -249,6 +254,8 @@ user code."
  This function is called at the very end of Spacemacs initialization after
 layers configuration. You are free to put any user code."
 
+  (fringe-mode 0)
+  ;; (setq linum-format "%d ")
 
   ;; ;; (add-to-list 'custom-theme-load-path "~/.emacs.d/private/themes/emacs")
   ;; (load-theme 'dracula t)
@@ -292,6 +299,72 @@ layers configuration. You are free to put any user code."
   (key-chord-define evil-insert-state-map  "jk" 'evil-normal-state)
   (key-chord-define evil-insert-state-map  "kk" 'evil-normal-state)
 
+  (load "~/.spacemacs.d/auctex-config.el")
+  (setq TeX-source-correlate-start-server t)
+  (defun aquamacs-set-defaults (list)
+    "Set a new default for a customization option in Aquamacs.
+  Add the value to the customization group `Aquamacs-is-more-than-Emacs'."
+
+    (mapc (lambda (elt)
+      (custom-load-symbol (car elt)) ;; does nothing for non-custom variables
+      (let* ((symbol (car elt))
+      ;; we're accessing the doc property here so
+      ;; if the symbol is an autoload symbol,
+      ;; it'll get loaded now before setting its defaults
+      ;; (e.g. standard-value), which would otherwise be
+      ;; overwritten.
+      (old-doc
+        (condition-case nil
+            (documentation-property
+            symbol
+            'variable-documentation)
+          (error "")))
+      (value (car (cdr elt)))
+      (s-value (get symbol 'standard-value))
+                  (setter (get symbol 'custom-set)))
+
+              ;; if there's a setter, use it
+              ;; note: symbol must be loaded for this to work
+              (if setter ;; if customizable and there is a special setter
+                  (funcall setter symbol value)
+                ;; otherwise, just set it
+                (set symbol value))
+
+        (set-default symbol value) ;; new in post-0.9.5
+
+              ;; To Do: consider calling `custom-theme-set-variables' for custom
+              ;; settings and create an Aquamacs theme.  This is not trivial,
+              ;; as we do not want to store a "saved variable" as opposed to a
+              ;; new default (as if it had been set with `defcustom').
+
+        ;; make sure that user customizations get
+        ;; saved to customizations.el (.emacs)
+        ;; and that this appears as the new default.
+
+        ;; since the standard-value changed, put it in the
+        ;; group
+        (put symbol 'standard-value `((quote  ,(copy-tree (eval symbol)))))
+
+        (unless (or (eq s-value (get symbol 'standard-value))
+        (get symbol 'aquamacs-original-default))
+          (put symbol 'aquamacs-original-default
+        s-value)
+          (if old-doc ;; in some cases the documentation
+        ;; might not be loaded. Can we load it somehow?
+        ;; either way, the "if" is a workaround.
+        (put symbol 'variable-documentation
+            (concat
+        old-doc
+        (format "
+  The original default (in GNU Emacs or in the package) was:
+  %s"
+          s-value))))
+          (custom-add-to-group 'Aquamacs-is-more-than-Emacs
+            symbol 'custom-variable))))
+    list))
+
+  ; (aquamacs-setup)
+
   ;; Remember the cursor position of files when reopening them
   ;; (setq save-place-file "~/.emacs.d/private/saveplace")
   ;; (setq-default save-place t)
@@ -317,11 +390,11 @@ layers configuration. You are free to put any user code."
   (add-hook 'python-mode-hook 'flycheck-mode)
 
   ;;;;;;;;;;;;
-  ;; Scheme 
+  ;; Scheme
   ;;;;;;;;;;;;
 
   (require 'cmuscheme)
-  (setq scheme-program-name "racket")         ;; 如果用 Petite 就改成 "petite"
+  (setq scheme-program-name "scheme")         ;; 如果用 Petite 就改成 "petite"
 
 
   ;; bypass the interactive question and start the default interpreter
@@ -381,7 +454,7 @@ layers configuration. You are free to put any user code."
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (paredit fzf emoji-cheat-sheet-plus company-emoji key-chord vimrc-mode dactyl-mode powerline spinner org alert log4e gntp markdown-mode hydra parent-mode hide-comnt projectile haml-mode gitignore-mode fringe-helper git-gutter+ flyspell-correct flycheck pkg-info epl flx magit magit-popup git-commit with-editor smartparens iedit anzu evil goto-chg undo-tree highlight diminish ycmd request-deferred request deferred web-completion-data pos-tip company bind-map bind-key yasnippet packed auctex anaconda-mode pythonic f dash s helm avy helm-core async auto-complete popup package-build auctex-latexmk yapfify xterm-color ws-butler window-numbering which-key web-mode volatile-highlights vi-tilde-fringe uuidgen use-package toc-org tagedit sublime-themes spacemacs-theme spaceline solarized-theme smeargle slim-mode shell-pop scss-mode sass-mode reveal-in-osx-finder restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters quelpa pyvenv pytest pyenv-mode py-isort pug-mode popwin pip-requirements persp-mode pcre2el pbcopy paradox osx-trash osx-dictionary orgit org-projectile org-present org-pomodoro org-plus-contrib org-download org-bullets open-junk-file neotree mwim multi-term move-text monokai-theme molokai-theme mmm-mode markdown-toc magit-gitflow macrostep lorem-ipsum live-py-mode linum-relative link-hint less-css-mode launchctl info+ indent-guide ido-vertical-mode hy-mode hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers highlight-indentation help-fns+ helm-themes helm-swoop helm-pydoc helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag graphviz-dot-mode grandshell-theme google-translate golden-ratio gnuplot gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ gh-md flyspell-correct-helm flycheck-ycmd flycheck-pos-tip flx-ido fill-column-indicator farmhouse-theme fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help emmet-mode elisp-slime-nav dumb-jump disaster diff-hl cython-mode company-ycmd company-web company-statistics company-quickhelp company-c-headers company-auctex company-anaconda column-enforce-mode color-identifiers-mode cmake-mode clean-aindent-mode clang-format auto-yasnippet auto-highlight-symbol auto-dictionary auto-compile apropospriate-theme aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line ac-ispell))))
+    (geiser paredit fzf emoji-cheat-sheet-plus company-emoji key-chord vimrc-mode dactyl-mode powerline spinner org alert log4e gntp markdown-mode hydra parent-mode hide-comnt projectile haml-mode gitignore-mode fringe-helper git-gutter+ flyspell-correct flycheck pkg-info epl flx magit magit-popup git-commit with-editor smartparens iedit anzu evil goto-chg undo-tree highlight diminish ycmd request-deferred request deferred web-completion-data pos-tip company bind-map bind-key yasnippet packed auctex anaconda-mode pythonic f dash s helm avy helm-core async auto-complete popup package-build auctex-latexmk yapfify xterm-color ws-butler window-numbering which-key web-mode volatile-highlights vi-tilde-fringe uuidgen use-package toc-org tagedit sublime-themes spacemacs-theme spaceline solarized-theme smeargle slim-mode shell-pop scss-mode sass-mode reveal-in-osx-finder restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters quelpa pyvenv pytest pyenv-mode py-isort pug-mode popwin pip-requirements persp-mode pcre2el pbcopy paradox osx-trash osx-dictionary orgit org-projectile org-present org-pomodoro org-plus-contrib org-download org-bullets open-junk-file neotree mwim multi-term move-text monokai-theme molokai-theme mmm-mode markdown-toc magit-gitflow macrostep lorem-ipsum live-py-mode linum-relative link-hint less-css-mode launchctl info+ indent-guide ido-vertical-mode hy-mode hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers highlight-indentation help-fns+ helm-themes helm-swoop helm-pydoc helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag graphviz-dot-mode grandshell-theme google-translate golden-ratio gnuplot gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ gh-md flyspell-correct-helm flycheck-ycmd flycheck-pos-tip flx-ido fill-column-indicator farmhouse-theme fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help emmet-mode elisp-slime-nav dumb-jump disaster diff-hl cython-mode company-ycmd company-web company-statistics company-quickhelp company-c-headers company-auctex company-anaconda column-enforce-mode color-identifiers-mode cmake-mode clean-aindent-mode clang-format auto-yasnippet auto-highlight-symbol auto-dictionary auto-compile apropospriate-theme aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line ac-ispell))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
