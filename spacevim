@@ -22,7 +22,7 @@ function! Layers()
     Layer 'graphviz'
 
     " Layer 'lightline'
-    Layer 'airline'
+    " Layer 'airline'
     " Layer 'leader-guide'
 
     Layer 'chinese'
@@ -37,24 +37,27 @@ endfunction
 
 " You can put your extra plugins here.
 function! UserInit()
-
     " let g:spacevim_leader = "-"
     " let g:spacevim_localleader = ','
     " Plug 'mbbill/undotree',             { 'on': 'UndotreeToggle'   }
-    Plug 'hecal3/vim-leader-guide'
+    " Plug 'hecal3/vim-leader-guide', { 'commit': 'bade1b9dfc5e56aaf322791fff11e350fd8681ae' }
     " Plug 'yuttie/comfortable-motion.vim'
     " Plug 'blueyed/vim-diminactive'
-    " Plug 'liuchengxu/spacemacs-theme.vim'
+    " Plug 'colepeters/spacemacs-theme.vim'
     " Plug 'altercation/vim-colors-solarized'
     " Plug 'dracula/vim'
     " Plug 'terryma/vim-expand-region'
     " Plug 'junegunn/vader.vim'
     " Plug 'morhetz/gruvbox'
     " Plug 'junegunn/seoul256.vim'
+    Plug 'justinmk/vim-sneak'
+    Plug 'mhinz/vim-grepper'
+    " Plug 'tracyone/ctrlp-leader-guide'
 
 endfunction
 
 function! UserConfig()
+
     " let g:lightline.colorscheme = 'wombat'
     " color space-vim-dark
     " color desert
@@ -62,16 +65,23 @@ function! UserConfig()
     " color gruvbox
     " color spacemacs-theme
     " color seoul256
+    " set termguicolors
     autocmd FileType python nnoremap <LocalLeader>i :!isort %<CR><CR>
     nnoremap <silent> <leader> :<c-u>LeaderGuide g:mapleader<CR>
     vnoremap <silent> <leader> :<c-u>LeaderGuideVisual g:mapleader<CR>
     " nnoremap <Leader>1 :b1<CR>
     let g:pymode_python = 'python3'
+    " let g:fml_all_sources = 1
     " color spacemacs-theme
     " if g:spacevim_nvim
         " silent! set termguicolors
         " colorscheme spacemacs-theme
     " endif
+    set termguicolors
+    " https://github.com/vim/vim/issues/993
+    " set Vim-specific sequences for RGB colors
+    let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+    let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
 
     let g:airline_powerline_fonts=1
     " Define prefix dictionary

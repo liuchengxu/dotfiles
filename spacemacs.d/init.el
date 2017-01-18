@@ -58,7 +58,7 @@ values."
      (syntax-checking :variables
                       syntax-checking-enable-tooltips t)
      version-control
-     ycmd
+     ;; ycmd
      )
    ;; List of additional packages that will be installed without being
    ;; wrapped in a layer. If you need some configuration for these
