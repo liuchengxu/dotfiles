@@ -1,6 +1,3 @@
-" You can enable the existing layers and exclude the partial plugins in a
-" certain layer.
-" The command Layer and Exlcude are vaild in the function Layers().
 function! Layers()
 
     " Default layers, recommended!
@@ -17,6 +14,7 @@ function! Layers()
 
     Layer 'html'
     Layer 'c-c++'
+    Layer 'java'
     Layer 'python'
     Layer 'markdown'
     Layer 'graphviz'
@@ -31,14 +29,11 @@ function! Layers()
 
     Layer 'text-align'
     Layer 'programming'
-    " Exclude 'liuchengxu/space-vim-dark'
 
 endfunction
 
 " You can put your extra plugins here.
 function! UserInit()
-    " let g:spacevim_leader = "-"
-    " let g:spacevim_localleader = ','
     " Plug 'mbbill/undotree',             { 'on': 'UndotreeToggle'   }
     " Plug 'hecal3/vim-leader-guide', { 'commit': 'bade1b9dfc5e56aaf322791fff11e350fd8681ae' }
     " Plug 'yuttie/comfortable-motion.vim'
@@ -50,52 +45,43 @@ function! UserInit()
     " Plug 'junegunn/vader.vim'
     " Plug 'morhetz/gruvbox'
     " Plug 'junegunn/seoul256.vim'
-    Plug 'justinmk/vim-sneak'
-    Plug 'mhinz/vim-grepper'
+    " Plug 'tomasr/molokai'
+    " Plug 'justinmk/vim-sneak'
+    " Plug 'mhinz/vim-grepper'
     " Plug 'tracyone/ctrlp-leader-guide'
+    " Plug 'Yggdroot/hiPairs'
+    " Plug 'lilydjwg/colorizer'
 
 endfunction
 
 function! UserConfig()
-
-    " let g:lightline.colorscheme = 'wombat'
-    " color space-vim-dark
-    " color desert
-    " color solarized
-    " color gruvbox
-    " color spacemacs-theme
-    " color seoul256
-    " set termguicolors
     autocmd FileType python nnoremap <LocalLeader>i :!isort %<CR><CR>
-    nnoremap <silent> <leader> :<c-u>LeaderGuide g:mapleader<CR>
-    vnoremap <silent> <leader> :<c-u>LeaderGuideVisual g:mapleader<CR>
-    " nnoremap <Leader>1 :b1<CR>
+    " nnoremap <silent> <leader> :<c-u>LeaderGuide g:mapleader<CR>
+    " vnoremap <silent> <leader> :<c-u>LeaderGuideVisual g:mapleader<CR>
     let g:pymode_python = 'python3'
-    " let g:fml_all_sources = 1
-    " color spacemacs-theme
-    " if g:spacevim_nvim
-        " silent! set termguicolors
-        " colorscheme spacemacs-theme
-    " endif
-    set termguicolors
-    " https://github.com/vim/vim/issues/993
-    " set Vim-specific sequences for RGB colors
-    let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
-    let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
 
+    if $TERM_PROGRAM =~# 'iTerm'
+        set termguicolors
+        " https://github.com/vim/vim/issues/993
+        " set Vim-specific sequences for RGB colors
+        let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+        let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+    endif
+
+    set noundofile
     let g:airline_powerline_fonts=1
     " Define prefix dictionary
-    let g:lmap =  {}
+    " let g:lmap =  {}
 
-    let g:lmap['a'] = { 'name' : '+align' }
-    let g:lmap['b'] = { 'name' : '+buffer' }
+    " let g:lmap['a'] = { 'name' : '+align' }
+    " let g:lmap['b'] = { 'name' : '+buffer' }
     " let g:lmap['c'] = { 'name' : '+comment' }
     " let g:lmap['w'] = { 'name' : '+window' }
     " let g:lmap.j = { 'name' : '+jump' }
     " Second level dictionaries:
-    let g:lmap.f = { 'name' : '+fold/files' }
-    nmap <silent> <leader>fd :e $MYVIMRC<CR>
-    let g:lmap.f.d = ['e $MYVIMRC', 'Open vimrc']
+    " let g:lmap.f = { 'name' : '+fold/files' }
+    " nmap <silent> <leader>fd :e $MYVIMRC<CR>
+    " let g:lmap.f.d = ['e $MYVIMRC', 'Open vimrc']
 
     " let g:lmap.o = { 'name' : 'Open Stuff' }
     " 'name' is a special field. It will define the name of the group.
@@ -119,14 +105,14 @@ function! UserConfig()
     " let g:lmap.f.w = ['w', 'Write file']
 
     " Create new menus not based on existing mappings:
-    let g:lmap.g = {
-                \'name' : 'Git Menu',
-                \'s' : ['Gstatus', 'Git Status'],
-                \'p' : ['Gpull',   'Git Pull'],
-                \'u' : ['Gpush',   'Git Push'],
-                \'c' : ['Gcommit', 'Git Commit'],
-                \'w' : ['Gwrite',  'Git Write'],
-                \}
+    " let g:lmap.g = {
+                " \'name' : 'Git Menu',
+                " \'s' : ['Gstatus', 'Git Status'],
+                " \'p' : ['Gpull',   'Git Pull'],
+                " \'u' : ['Gpush',   'Git Push'],
+                " \'c' : ['Gcommit', 'Git Commit'],
+                " \'w' : ['Gwrite',  'Git Write'],
+                " \}
 
     " If you use NERDCommenter:
     " let g:lmap.c = { 'name' : '+comments' }
@@ -138,4 +124,12 @@ function! UserConfig()
     " call leaderGuide#register_prefix_descriptions("<Space>", "g:lmap")
     " nnoremap <silent> <leader> :<c-u>LeaderGuide '<Space>'<CR>
     " vnoremap <silent> <leader> :<c-u>LeaderGuideVisual '<Space>'<CR>
+      let g:hiPairs_hl_matchPair = {
+              \                  'term'    : 'underline,bold',
+              \                  'cterm'   : 'underline,bold',
+              \                  'ctermfg' : 'green',
+              \                  'ctermbg' : 'NONE',
+              \                  'gui'     : 'underline,bold',
+              \                  'guifg'   : 'green',
+              \                  'guibg'   : 'NONE' }
 endfunction

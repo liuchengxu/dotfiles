@@ -1,3 +1,5 @@
+let mapleader=' '
+
 set hlsearch
 set incsearch
 set ignorecase
@@ -7,20 +9,20 @@ set number
 set relativenumber
 set scrolloff=3
 set history=100000
-set clipboard+=unnamed
+set clipboard=unnamed
 
 " clear the highlighted search result
-nnoremap <Space>sc :nohlsearch<CR>
+nnoremap <Leader>sc :nohlsearch<CR>
 
-nnoremap <Space>fs :w<CR>
+nnoremap <Leader>fs :w<CR>
 
 " Quit normal mode
-nnoremap <Space>q  :q<CR>
-nnoremap <Space>Q  :qa!<CR>
+nnoremap <Leader>q  :q<CR>
+nnoremap <Leader>Q  :qa!<CR>
 
 " Move half page faster
-nnoremap <Space>d  <C-d>
-nnoremap <Space>u  <C-u>
+nnoremap <Leader>d  <C-d>
+nnoremap <Leader>u  <C-u>
 
 " Insert mode shortcut
 inoremap <C-h> <Left>
@@ -52,16 +54,16 @@ nnoremap U <C-r>
 nnoremap Y y$
 
 " Window operation
-nnoremap <Space>ww <C-W>w
-nnoremap <Space>wd <C-W>c
-nnoremap <Space>wj <C-W>j
-nnoremap <Space>wk <C-W>k
-nnoremap <Space>wh <C-W>h
-nnoremap <Space>wl <C-W>l
-nnoremap <Space>ws <C-W>s
-nnoremap <Space>w- <C-W>s
-nnoremap <Space>wv <C-W>v
-nnoremap <Space>w\| <C-W>v
+nnoremap <Leader>ww <C-W>w
+nnoremap <Leader>wd <C-W>c
+nnoremap <Leader>wj <C-W>j
+nnoremap <Leader>wk <C-W>k
+nnoremap <Leader>wh <C-W>h
+nnoremap <Leader>wl <C-W>l
+nnoremap <Leader>ws <C-W>s
+nnoremap <Leader>w- <C-W>s
+nnoremap <Leader>wv <C-W>v
+nnoremap <Leader>w\| <C-W>v
 
 " Tab operation
 nnoremap tn gt
@@ -70,17 +72,42 @@ nnoremap tp gT
 " built in search looks better
 nnoremap / :action Find<CR>
 " but preserve ideavim search
-nnoremap <Space>/ /
+nnoremap <Leader>/ /
 
-nnoremap <Space>gc :action GotoClass<CR>
-nnoremap <Space>ga :action GotoAction<CR>
+nnoremap <Leader>;; :action CommentByLineComment<CR>
 
-nnoremap <Space>fp :action ShowFilePath<CR>
+nnoremap <Leader>bb :action ToggleLineBreakpoint<CR>
+nnoremap <Leader>br :action ViewBreakpoints<CR>
 
-nnoremap <Space>pm :action ShowPopupMenu<CR>
+nnoremap <Leader>cv :action ChangeView<CR>
 
-nnoremap <Space>;; :action CommentByLineComment<CR>
+nnoremap <Leader>dc :action ChooseDebugConfiguration<CR>
 
-nnoremap <Space>se :action SearchEverywhere<CR>
+nnoremap <Leader>ga :action GotoAction<CR>
+nnoremap <Leader>gc :action GotoClass<CR>
+nnoremap <Leader>gd :action GotoDeclaration<CR>
+nnoremap <Leader>gi :action GotoImplementation<CR>
+nnoremap <Leader>gs :action GotoSuperMethod<CR>
+nnoremap <Leader>gt :action GotoTest<CR>
 
+nnoremap <Leader>fp :action ShowFilePath<CR>
+nnoremap <Leader>fu :action FindUsages<CR>
 
+nnoremap <Leader>ic :action InspectCode<CR>
+
+nnoremap <Leader>mv :action ActivateMavenProjectsToolWindow<CR>
+
+nnoremap <Leader>oi :action OptimizeImports<CR>
+
+nnoremap <Leader>pm :action ShowPopupMenu<CR>
+
+nnoremap <Leader>rc :action ChooseRunConfiguration<CR>
+nnoremap <Leader>re :action RenameElement<CR>
+nnoremap <Leader>rf :action RenameFile<CR>
+
+nnoremap <Leader>se :action SearchEverywhere<CR>
+nnoremap <Leader>su :action ShowUsages<CR>
+
+nnoremap <Leader>tc  :action CloseActiveTab<CR>
+nnoremap <Leader>tl Vy<CR>:action ActivateTerminalToolWindow<CR>
+vnoremap <Leader>tl y<CR>:action ActivateTerminalToolWindow<CR>
