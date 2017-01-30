@@ -7,3 +7,6 @@ if [ -f $(brew --prefix)/share/bash-completion/bash_completion ]; then
 fi
 
 export PATH=$HOME/anaconda3/bin:$PATH
+
+# Change the default CTRL_T to CTRL_F
+bindkey '^F' fzf-file-widget

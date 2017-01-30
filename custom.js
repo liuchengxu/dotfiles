@@ -1,4 +1,5 @@
 // Cusotomization for https://github.com/lambdalisue/jupyter-vim-binding
+// postioned at ~/.jupyter/custom/custom.js
 // Configure CodeMirror
 require([
     'nbextensions/vim_binding/vim_binding',   // depends your installation

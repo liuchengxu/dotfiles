@@ -19,6 +19,10 @@ function! Layers()
     Layer 'markdown'
     Layer 'graphviz'
 
+    Exclude 'plasticboy/vim-markdown'
+    " Exclude 'mzlogin/vim-markdown-toc'
+    " Exclude 'iamcco/markdown-preview.vim'
+
     " Layer 'lightline'
     " Layer 'airline'
     " Layer 'leader-guide'
@@ -43,7 +47,7 @@ function! UserInit()
     " Plug 'dracula/vim'
     " Plug 'terryma/vim-expand-region'
     " Plug 'junegunn/vader.vim'
-    " Plug 'morhetz/gruvbox'
+    Plug 'morhetz/gruvbox'
     " Plug 'junegunn/seoul256.vim'
     " Plug 'tomasr/molokai'
     " Plug 'justinmk/vim-sneak'
@@ -51,11 +55,14 @@ function! UserInit()
     " Plug 'tracyone/ctrlp-leader-guide'
     " Plug 'Yggdroot/hiPairs'
     " Plug 'lilydjwg/colorizer'
+    " Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
+    " Plug 'sickill/vim-monokai'
 
 endfunction
 
 function! UserConfig()
     autocmd FileType python nnoremap <LocalLeader>i :!isort %<CR><CR>
+    " colorscheme gruvbox
     " nnoremap <silent> <leader> :<c-u>LeaderGuide g:mapleader<CR>
     " vnoremap <silent> <leader> :<c-u>LeaderGuideVisual g:mapleader<CR>
     let g:pymode_python = 'python3'
