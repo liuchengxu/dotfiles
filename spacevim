@@ -19,7 +19,7 @@ function! Layers()
     Layer 'markdown'
     Layer 'graphviz'
 
-    Exclude 'plasticboy/vim-markdown'
+    " Exclude 'plasticboy/vim-markdown'
     " Exclude 'mzlogin/vim-markdown-toc'
     " Exclude 'iamcco/markdown-preview.vim'
 
@@ -62,6 +62,7 @@ endfunction
 
 function! UserConfig()
     autocmd FileType python nnoremap <LocalLeader>i :!isort %<CR><CR>
+    autocmd FileType python setlocal completeopt-=preview
     " colorscheme gruvbox
     " nnoremap <silent> <leader> :<c-u>LeaderGuide g:mapleader<CR>
     " vnoremap <silent> <leader> :<c-u>LeaderGuideVisual g:mapleader<CR>
