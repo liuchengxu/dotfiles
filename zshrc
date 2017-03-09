@@ -94,4 +94,7 @@ case "$TERM" in
         ;;
 esac
 
+# Change the default CTRL_T to CTRL_F
+bindkey '^F' fzf-file-widget
+
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh

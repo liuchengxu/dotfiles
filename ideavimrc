@@ -81,7 +81,7 @@ nnoremap <Leader>br :action ViewBreakpoints<CR>
 
 nnoremap <Leader>cv :action ChangeView<CR>
 
-nnoremap <Leader>dc :action ChooseDebugConfiguration<CR>
+nnoremap <Leader>cd :action ChooseDebugConfiguration<CR>
 
 nnoremap <Leader>ga :action GotoAction<CR>
 nnoremap <Leader>gc :action GotoClass<CR>

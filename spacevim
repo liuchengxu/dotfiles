@@ -5,16 +5,20 @@ function! Layers()
     Layer 'unite'
     Layer 'better-defaults'
 
-    Layer 'ycmd'
-    Layer 'syntax-checking'
-    " Layer 'auto-completion'
+    if g:spacevim_nvim
+        Layer 'auto-completion'
+    else
+        Layer 'ycmd'
+    endif
 
+    Layer 'syntax-checking'
     Layer 'emoji'
     Layer 'goyo'
 
     Layer 'html'
     Layer 'c-c++'
     Layer 'java'
+    Layer 'go'
     Layer 'python'
     Layer 'markdown'
     Layer 'graphviz'
@@ -25,11 +29,13 @@ function! Layers()
 
     " Layer 'lightline'
     " Layer 'airline'
+    " Layer 'go'
     " Layer 'leader-guide'
 
     Layer 'chinese'
 
     Layer 'git'
+    " Layer 'github'
 
     Layer 'text-align'
     Layer 'programming'
@@ -40,6 +46,8 @@ endfunction
 function! UserInit()
     " Plug 'mbbill/undotree',             { 'on': 'UndotreeToggle'   }
     " Plug 'hecal3/vim-leader-guide', { 'commit': 'bade1b9dfc5e56aaf322791fff11e350fd8681ae' }
+    Plug 'hecal3/vim-leader-guide'
+    Plug 'mhinz/vim-grepper'
     " Plug 'yuttie/comfortable-motion.vim'
     " Plug 'blueyed/vim-diminactive'
     " Plug 'colepeters/spacemacs-theme.vim'
@@ -47,7 +55,7 @@ function! UserInit()
     " Plug 'dracula/vim'
     " Plug 'terryma/vim-expand-region'
     " Plug 'junegunn/vader.vim'
-    Plug 'morhetz/gruvbox'
+    " Plug 'morhetz/gruvbox'
     " Plug 'junegunn/seoul256.vim'
     " Plug 'tomasr/molokai'
     " Plug 'justinmk/vim-sneak'
@@ -57,15 +65,31 @@ function! UserInit()
     " Plug 'lilydjwg/colorizer'
     " Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
     " Plug 'sickill/vim-monokai'
+    " Plug 'python-mode/python-mode'
+    Plug 'sunaku/vim-shortcut'
+    if g:spacevim_nvim
+        Plug 'davidhalter/jedi'
+        Plug 'zchee/deoplete-jedi', { 'for': 'python' }
+    endif
+    Plug 'tweekmonster/startuptime.vim'
+
+    " Plug 'roxma/nvim-completion-manager'
+    if !has('nvim')
+        Plug 'roxma/vim-hug-neovim-rpc'
+        inoremap <expr> <Tab> pumvisible() ? "\<C-n>" : "\<Tab>"
+        inoremap <expr> <S-Tab> pumvisible() ? "\<C-p>" : "\<S-Tab>"
+        inoremap <expr> <buffer> <CR> (pumvisible() ? "\<c-y>\<cr>" : "\<CR>")
+    endif
 
 endfunction
 
 function! UserConfig()
     autocmd FileType python nnoremap <LocalLeader>i :!isort %<CR><CR>
     autocmd FileType python setlocal completeopt-=preview
+    set pumheight=20
     " colorscheme gruvbox
-    " nnoremap <silent> <leader> :<c-u>LeaderGuide g:mapleader<CR>
-    " vnoremap <silent> <leader> :<c-u>LeaderGuideVisual g:mapleader<CR>
+    nnoremap <silent> <leader> :<c-u>LeaderGuide g:mapleader<CR>
+    vnoremap <silent> <leader> :<c-u>LeaderGuideVisual g:mapleader<CR>
     let g:pymode_python = 'python3'
 
     if $TERM_PROGRAM =~# 'iTerm'
@@ -76,15 +100,15 @@ function! UserConfig()
         let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
     endif
 
-    set noundofile
+    " set noundofile
     let g:airline_powerline_fonts=1
     " Define prefix dictionary
-    " let g:lmap =  {}
+    let g:lmap =  {}
 
-    " let g:lmap['a'] = { 'name' : '+align' }
-    " let g:lmap['b'] = { 'name' : '+buffer' }
-    " let g:lmap['c'] = { 'name' : '+comment' }
-    " let g:lmap['w'] = { 'name' : '+window' }
+    let g:lmap['a'] = { 'name' : '+align' }
+    let g:lmap['b'] = { 'name' : '+buffer' }
+    let g:lmap['c'] = { 'name' : '+comment' }
+    let g:lmap['w'] = { 'name' : '+window' }
     " let g:lmap.j = { 'name' : '+jump' }
     " Second level dictionaries:
     " let g:lmap.f = { 'name' : '+fold/files' }
@@ -132,12 +156,18 @@ function! UserConfig()
     " call leaderGuide#register_prefix_descriptions("<Space>", "g:lmap")
     " nnoremap <silent> <leader> :<c-u>LeaderGuide '<Space>'<CR>
     " vnoremap <silent> <leader> :<c-u>LeaderGuideVisual '<Space>'<CR>
-      let g:hiPairs_hl_matchPair = {
-              \                  'term'    : 'underline,bold',
-              \                  'cterm'   : 'underline,bold',
-              \                  'ctermfg' : 'green',
-              \                  'ctermbg' : 'NONE',
-              \                  'gui'     : 'underline,bold',
-              \                  'guifg'   : 'green',
-              \                  'guibg'   : 'NONE' }
+    hi Comment cterm=italic
+    if !exists(':Shortcut')
+        call plug#load('vim-shortcut')
+        Shortcut! <Leader>fs file save
+    endif
+
+    let g:ale_linters['markdown'] = []
+    let g:ale_linters['java'] = 'javac'
+    if g:spacevim_nvim
+        let g:python_host_skip_check=1
+        let g:python_host_prog = '/Users/xlc/anaconda3/bin/python'
+        let g:python3_host_skip_check=1
+        let g:python3_host_prog = '/Users/xlc/anaconda3/bin/python3'
+    endif
 endfunction
