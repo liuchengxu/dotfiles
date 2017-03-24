@@ -57,6 +57,7 @@ export PATH=$HOME/bin:/usr/local/bin:$PATH
 # export MANPATH="/usr/local/man:$MANPATH"
 
 alias gcc=/usr/local/opt/gcc/bin/gcc-6
+alias g++=g++-6
 source $ZSH/oh-my-zsh.sh
 
 # You may need to manually set your language environment
