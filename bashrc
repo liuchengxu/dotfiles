@@ -1,5 +1,8 @@
 export PLATFORM=$(uname -s)
 
+# Record the latest command and delete the previous duplicate entries.
+export HISTCONTROL=ignoreboth:erasedups
+
 # Aliases
 alias ..='cd ..'
 alias ...='cd ../..'
@@ -15,6 +18,7 @@ alias vi2='vi -O2 '
 alias hc="history -c"
 alias which='type -p'
 alias gs='git status'
+alias gd="git diff"
 
 # Colored ls
 if [ -x /usr/bin/dircolors ]; then
@@ -30,6 +34,10 @@ if [ "$PLATFORM" = Darwin ]; then
     # use these commands with their normal names, instead of the prefix 'g'
     PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
     MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
+    # For bash installed by brew
+    if [ -f $(brew --prefix)/share/bash-completion/bash_completion ]; then
+        . $(brew --prefix)/share/bash-completion/bash_completion
+    fi
 fi
 
 # Prompt
@@ -39,7 +47,7 @@ function nonzero_return() {
 }
 
 if [ "$PLATFORM" = Linux ]; then
-  PS1="\[\e[1;38m\]\u\[\e[1;34m\]@\[\e[1;31m\]\h\[\e[1;30m\]:"
+  PS1="\e[33m\]\$\[\e[1;38m\]\u\[\e[1;34m\]@\[\e[1;31m\]\h\[\e[1;30m\]:"
   PS1="$PS1\[\e[0;38m\]\w\[\e[1;35m\]> \[\e[0m\]"
 else
   ### git-prompt
@@ -53,9 +61,9 @@ fi
 
 export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 
-# Use anaconda3
-export PATH=~/anaconda3/bin:"$PATH"
-
 [ -f ~/.extra.bash ] && source ~/.extra.bash
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
+# Change the default CTRL_T to CTRL_F
+bindkey '^F' fzf-file-widget
