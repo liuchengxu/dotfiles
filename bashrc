@@ -47,8 +47,8 @@ function nonzero_return() {
 }
 
 if [ "$PLATFORM" = Linux ]; then
-  PS1="\[\e[1;38m\]\u\[\e[1;34m\]@\[\e[1;31m\]\h\[\e[1;30m\]:"
-  PS1="$PS1\[\e[0;38m\]\w\[\e[1;35m\]> \[\e[0m\]"
+  PS1="\[\e[1;35m\]\u\[\e[1;34m\]@\[\e[1;33m\]\h\[\e[1;32m\]:\[\e[0;36m\]\w \[\e[0m\][\t]\n"
+  PS1="$PS1\[\e[1;32m\]\$ \[\e[0m\]"
 else
   ## git-prompt
   __git_ps1() { :;}
