@@ -47,16 +47,16 @@ function nonzero_return() {
 }
 
 if [ "$PLATFORM" = Linux ]; then
-  PS1="\e[33m\]\$\[\e[1;38m\]\u\[\e[1;34m\]@\[\e[1;31m\]\h\[\e[1;30m\]:"
+  PS1="\[\e[1;38m\]\u\[\e[1;34m\]@\[\e[1;31m\]\h\[\e[1;30m\]:"
   PS1="$PS1\[\e[0;38m\]\w\[\e[1;35m\]> \[\e[0m\]"
 else
-  ### git-prompt
+  ## git-prompt
   __git_ps1() { :;}
   [ -e ~/.git-prompt.sh ] && source ~/.git-prompt.sh
   # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
   PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
-  PS1="\e[33m\]\$\[\e[34m\]\u\[\e[1;32m\]@\[\e[0;33m\]\h\[\e[35m\]:"
-  PS1="$PS1\[\e[m\]\w\[\e[1;31m\]> \[\e[0m\]"
+  PS1="\[\e[36m\]# \[\e[34m\]\u\[\e[1;32m\]@\[\e[0;33m\]\h \[\e[0m\]in \[\e[35m\]\w\n"
+  PS1="$PS1\[\e[1;31m\]\$ \[\e[0m\]"
 fi
 
 export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
@@ -66,4 +66,4 @@ export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
 # Change the default CTRL_T to CTRL_F
-bindkey '^F' fzf-file-widget
+bind -x '"\C-f": "fzf-file-widget"'
