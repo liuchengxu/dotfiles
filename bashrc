@@ -20,6 +20,8 @@ alias which='type -p'
 alias gs='git status'
 alias gd="git diff"
 
+alias tmux="tmux -2"
+
 # Colored ls
 if [ -x /usr/bin/dircolors ]; then
   eval "`dircolors -b`"
