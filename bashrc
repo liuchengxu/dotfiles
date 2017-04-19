@@ -64,6 +64,3 @@ export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 [ -f ~/.extra.bash ] && source ~/.extra.bash
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
-
-# Change the default CTRL_T to CTRL_F
-bind -x '"\C-f": "fzf-file-widget"'
