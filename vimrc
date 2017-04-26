@@ -155,6 +155,10 @@ endif
     let g:mapleader = "\<Space>"
     let g:maplocalleader = ','
 
+    " go to buffer
+    nnoremap <Leader>gb :ls<CR>:b<Space>
+    nnoremap <Leader>ft :Explore<CR>
+
     " Basic {
         " Quit normal mode
         nnoremap <Leader>q  :q<CR>
