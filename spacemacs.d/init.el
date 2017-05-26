@@ -290,8 +290,12 @@ layers configuration. You are free to put any user code."
   ;; j,k act like gj, gk
   (define-key evil-normal-state-map (kbd "j") 'evil-next-visual-line)
   (define-key evil-normal-state-map (kbd "k") 'evil-previous-visual-line)
-  ;; map ; to :
-  (define-key evil-normal-state-map (kbd ";") 'evil-ex)
+  (define-key evil-insert-state-map (kbd "\C-a") 'evil-first-non-blank)
+  (define-key evil-insert-state-map (kbd "\C-e") 'evil-end-of-line)
+
+  ;; map <return> to :
+  ;; http://ergoemacs.org/emacs/emacs_key_notation_return_vs_RET.html
+  (define-key evil-normal-state-map (kbd "<return>") 'evil-ex)
 
   ;; graphviz
   (org-babel-do-load-languages
