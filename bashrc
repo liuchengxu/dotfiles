@@ -39,6 +39,7 @@ alias ......='cd ../../../../..'
 alias cd.='cd ..'
 alias cd..='cd ..'
 
+alias l='ls -alF'
 alias la='ls -al'
 alias ll='ls -l'
 
@@ -91,7 +92,7 @@ if [ -e ~/.git-prompt.sh ]; then
 fi
 # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
-PS1="\[\e[36m\]# \[\e[34m\]\u\[\e[1;32m\]@\[\e[0;33m\]\h \[\e[0m\]in \[\e[35m\]\w \`nonzero_return\` \n"
+PS1="\[\e[36m\]# \[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h \[\e[0m\]in \[\e[35m\]\w \`nonzero_return\` \n"
 PS1="$PS1\[\e[1;31m\]\$ \[\e[0m\]"
 
 export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
