@@ -98,7 +98,7 @@ PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__g
 # PS1="\[\e[36m\]# \[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h \[\e[0m\]in \[\e[95m\]\w \`nonzero_return\` \n"
 # PS1="$PS1\[\e[1;31m\]\$ \[\e[0m\]"
 
-PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \e[1;93m\]>\e[1;92m\]>\e[1;96m\]> \[\e[0m\]"
+PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
 
 export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 
