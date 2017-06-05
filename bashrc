@@ -22,6 +22,8 @@ HISTCONTROL="erasedups:ignoreboth"
 # Don't record some commands
 export HISTIGNORE="&:[ ]*:exit:ls:bg:fg:history:clear"
 
+export PROMPT_DIRTRIM=2
+
 ### man bash
 export HISTCONTROL=ignoreboth:erasedups
 export HISTSIZE=
@@ -44,8 +46,9 @@ alias la='ls -al'
 alias ll='ls -l'
 
 ## Git
+alias gb='git branch'
+alias gd='git diff'
 alias gs='git status'
-alias gd="git diff"
 alias gpom="git push origin master"
 
 ## up: cd .. when you're too lazy to use the spacebar
@@ -92,8 +95,10 @@ if [ -e ~/.git-prompt.sh ]; then
 fi
 # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
-PS1="\[\e[36m\]# \[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h \[\e[0m\]in \[\e[35m\]\w \`nonzero_return\` \n"
-PS1="$PS1\[\e[1;31m\]\$ \[\e[0m\]"
+# PS1="\[\e[36m\]# \[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h \[\e[0m\]in \[\e[95m\]\w \`nonzero_return\` \n"
+# PS1="$PS1\[\e[1;31m\]\$ \[\e[0m\]"
+
+PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \e[1;93m\]>\e[1;92m\]>\e[1;96m\]> \[\e[0m\]"
 
 export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 
