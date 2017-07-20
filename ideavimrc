@@ -69,6 +69,10 @@ nnoremap <Leader>w\| <C-W>v
 nnoremap tn gt
 nnoremap tp gT
 
+" ==================================================
+" Show all the provided actions via `:actionlist`
+" ==================================================
+
 " built in search looks better
 nnoremap / :action Find<CR>
 " but preserve ideavim search
@@ -90,8 +94,10 @@ nnoremap <Leader>gi :action GotoImplementation<CR>
 nnoremap <Leader>gs :action GotoSuperMethod<CR>
 nnoremap <Leader>gt :action GotoTest<CR>
 
+nnoremap <Leader>ff :action GotoFile<CR>
 nnoremap <Leader>fp :action ShowFilePath<CR>
 nnoremap <Leader>fu :action FindUsages<CR>
+nnoremap <Leader>fs :action GotoSymbol<CR>
 
 nnoremap <Leader>ic :action InspectCode<CR>
 
