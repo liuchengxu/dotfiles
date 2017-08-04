@@ -44,5 +44,6 @@ create_symlinks() {
 }
 
 create_symlinks
+
 ret="$?"
 success 'Dotfiles have been configured!'

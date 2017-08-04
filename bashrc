@@ -1,4 +1,5 @@
-export PLATFORM=$(uname -s)
+export PLATFORM
+PLATFORM=$(uname -s)
 [ -f /etc/bashrc ] && . /etc/bashrc
 
 ### Append to the history file
@@ -65,7 +66,7 @@ alias tmux="tmux -2"
 
 ### Colored ls
 if [ -x /usr/bin/dircolors ]; then
-  eval "`dircolors -b`"
+    eval "$(dircolors -b)"
   alias ls='ls --color=auto'
   alias grep='grep --color=auto'
 elif [ "$PLATFORM" = Darwin ]; then
@@ -78,8 +79,8 @@ if [ "$PLATFORM" = Darwin ]; then
     PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
     MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
     # For bash installed by brew
-    if [ -f $(brew --prefix)/share/bash-completion/bash_completion ]; then
-        . $(brew --prefix)/share/bash-completion/bash_completion
+    if [ -f "$(brew --prefix)/share/bash-completion/bash_completion" ]; then
+        . "$(brew --prefix)/share/bash-completion/bash_completion"
     fi
 fi
 
@@ -90,8 +91,8 @@ function nonzero_return() {
 }
 ### git-prompt
 __git_ps1() { :;}
-if [ -e ~/.git-prompt.sh ]; then
-    source ~/.git-prompt.sh
+if [ -e "$HOME/.git-prompt.sh" ]; then
+    source "$HOME/.git-prompt.sh"
 fi
 # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
@@ -102,7 +103,8 @@ PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]>\[
 
 export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 
-[ -f ~/.extra.bash ] && source ~/.extra.bash
+EXTRA=$HOME/bashrc-extra
+[ -f "$EXTRA" ] && source "$EXTRA"
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
