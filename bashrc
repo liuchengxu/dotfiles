@@ -51,7 +51,7 @@ alias gb='git branch'
 alias gd='git diff'
 alias gs='git status'
 alias gpom="git push origin master"
-
+alias gitv='git log --color --graph --pretty=format:"%Cred%h%Creset -%C(green)%d%Creset %s %C(yellow)(%cr) %C(blue)<%an>%Creset" --abbrev-commit --'
 ## up: cd .. when you're too lazy to use the spacebar
 alias up="cd .."
 
@@ -102,6 +102,7 @@ PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__g
 PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
 
 export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
+export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
 
 EXTRA=$HOME/bashrc-extra
 [ -f "$EXTRA" ] && source "$EXTRA"
