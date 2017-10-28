@@ -41,7 +41,7 @@ alias ......='cd ../../../../..'
 
 alias cd.='cd ..'
 alias cd..='cd ..'
-
+alias p='pwd'
 alias l='ls -alF'
 alias la='ls -al'
 alias ll='ls -l'
@@ -49,6 +49,7 @@ alias ll='ls -l'
 ## Git
 alias gb='git branch'
 alias gd='git diff'
+alias gr='git remote'
 alias gs='git status'
 alias gpom="git push origin master"
 alias gitv='git log --color --graph --pretty=format:"%Cred%h%Creset -%C(green)%d%Creset %s %C(yellow)(%cr) %C(blue)<%an>%Creset" --abbrev-commit --'
@@ -96,13 +97,12 @@ if [ -e "$HOME/.git-prompt.sh" ]; then
 fi
 # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
-# PS1="\[\e[36m\]# \[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h \[\e[0m\]in \[\e[95m\]\w \`nonzero_return\` \n"
-# PS1="$PS1\[\e[1;31m\]\$ \[\e[0m\]"
 
-PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
+# PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
+PS1="\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
 
 export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
-export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
+# export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
 
 EXTRA=$HOME/bashrc-extra
 [ -f "$EXTRA" ] && source "$EXTRA"
