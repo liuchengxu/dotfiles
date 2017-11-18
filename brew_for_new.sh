@@ -74,18 +74,21 @@ brew install git
 brew install wget
 
 brew install ack
-brew install the_silver_searcher
 brew install ctags
 brew install ispell
-brew install shellcheck
 brew install flake8
+brew install cscope
+brew install ripgrep
+brew install shellcheck
+brew install the_silver_searcher
 
 brew install tree
-brew install pandoc
-brew install graphiviz
 brew install tmux
-brew install reattach-to-user-namespace
+brew install pandoc
+brew install neovim
+brew install graphiviz
 brew install mobile-shell
+brew install reattach-to-user-namespace
 
 # Remove outdated versions from the cellar.
 brew cleanup

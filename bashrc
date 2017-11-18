@@ -122,6 +122,10 @@ ftpane() {
   fi
 }
 
+keybindings() {
+  bind -p | grep -F "\C"
+}
+
 # export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 # export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
 export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
@@ -132,3 +136,6 @@ EXTRA=$HOME/bashrc-extra
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
 export FZF_COMPLETION_TRIGGER='/'
+
+bind -x '"\C-g": "fzf-file-widget"'
+bind '"\C-h": " \C-e\C-u`__fzf_cd__`\e\C-e\er\C-m"'
