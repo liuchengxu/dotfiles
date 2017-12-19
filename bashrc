@@ -67,7 +67,7 @@ alias tmux="tmux -2"
 
 ### Colored ls
 if [ -x /usr/bin/dircolors ]; then
-    eval "$(dircolors -b)"
+  eval "$(dircolors -b)"
   alias ls='ls --color=auto'
   alias grep='grep --color=auto'
 elif [ "$PLATFORM" = Darwin ]; then
@@ -99,7 +99,8 @@ fi
 PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 
 # PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
-PS1="\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
+# PS1="\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
+PS1="\[\e[95m\]\w \[\e[1;93m\]❯\[\e[1;92m\]❯\[\e[1;96m\]❯ \[\e[0m\]"
 
 # Tmux
 ## ftpane - switch pane (@george-b)
