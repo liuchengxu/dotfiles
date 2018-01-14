@@ -1,0 +1,28 @@
+.gdb_history
+
+# Vim
+*.swp
+Session.vim
+
+# ignore ctags file, but not 'tags' directory
+tags
+!tags/
+
+# OS-generated files
+.DS_Store
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+
+# Visual Studio
+bin
+obj
+*.suo
+*.csproj.user
+
+# Compiled
+*.class
+*.o
+*.pyc
+*.so

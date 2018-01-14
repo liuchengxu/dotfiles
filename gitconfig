@@ -1,3 +1,18 @@
 [user]
 	email = xuliuchengxlc@gmail.com
 	name = Liu-Cheng Xu
+[core]
+  excludesfile = ~/.gitexcludes
+[color "branch"]
+  current   = bold green
+  local     = yellow
+  remote    = magenta
+  upstream  = cyan
+[color "status"]
+  # staged changes
+  added     = bold green
+  updated   = green
+  # un-staged changes
+  changed   = yellow
+  untracked = blue
+  nobranch  = red

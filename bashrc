@@ -47,7 +47,9 @@ alias la='ls -al'
 alias ll='ls -l'
 
 ## Git
+alias ga='git add'
 alias gb='git branch'
+alias gc='git checkout'
 alias gd='git diff'
 alias gr='git remote'
 alias gs='git status'
@@ -102,9 +104,49 @@ PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__g
 # PS1="\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
 PS1="\[\e[95m\]\w \[\e[1;93m\]❯\[\e[1;92m\]❯\[\e[1;96m\]❯ \[\e[0m\]"
 
+keybindings() {
+  bind -p | grep -F "\C"
+}
+
+# export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
+# export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
+export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+
+EXTRA=$HOME/bashrc-extra
+[ -f "$EXTRA" ] && source "$EXTRA"
+
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
+export FZF_COMPLETION_TRIGGER='/'
+
+bind -x '"\C-g": "fzf-file-widget"'
+bind '"\C-h": " \C-e\C-u`__fzf_cd__`\e\C-e\er\C-m"'
+
+# Git
+## cshow - git commit browser (enter for show, ctrl-d for diff)
+cshow() {
+  local out shas sha q k
+  while out=$(
+      gitv "$@" |
+      fzf --ansi --multi --no-sort --reverse --query="$q" \
+          --print-query --expect=ctrl-d); do
+    q=$(head -1 <<< "$out")
+    k=$(head -2 <<< "$out" | tail -1)
+    shas=$(sed '1,2d;s/^[^a-z0-9]*//;/^$/d' <<< "$out" | awk '{print $1}')
+    [ -z "$shas" ] && continue
+    if [ "$k" = ctrl-d ]; then
+      git diff --color=always $shas | less -R
+    else
+      for sha in $shas; do
+        git show --color=always $sha | less -R
+      done
+    fi
+  done
+}
+
 # Tmux
-## ftpane - switch pane (@george-b)
-ftpane() {
+## tpane - switch pane (@george-b)
+tpane() {
   local panes current_window current_pane target target_window target_pane
   panes=$(tmux list-panes -s -F '#I:#P - #{pane_current_path} #{pane_current_command}')
   current_pane=$(tmux display-message -p '#I:#P')
@@ -123,20 +165,10 @@ ftpane() {
   fi
 }
 
-keybindings() {
-  bind -p | grep -F "\C"
+# Switch tmux-sessions
+tsession() {
+  local session
+  session=$(tmux list-sessions -F "#{session_name}" | \
+    fzf --height 40% --reverse --query="$1" --select-1 --exit-0) &&
+  tmux switch-client -t "$session"
 }
-
-# export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
-# export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
-export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
-
-EXTRA=$HOME/bashrc-extra
-[ -f "$EXTRA" ] && source "$EXTRA"
-
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
-
-export FZF_COMPLETION_TRIGGER='/'
-
-bind -x '"\C-g": "fzf-file-widget"'
-bind '"\C-h": " \C-e\C-u`__fzf_cd__`\e\C-e\er\C-m"'
