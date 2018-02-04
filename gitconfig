@@ -14,5 +14,10 @@
   updated   = green
   # un-staged changes
   changed   = yellow
-  untracked = blue
+  untracked = red
   nobranch  = red
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true

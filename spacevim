@@ -1,27 +1,171 @@
-function! Layers()
+" Let Vim and NeoVim shares the same plugin directory.
+" Comment it out if you don't like.
+let g:spacevim_plug_home = '~/.vim/plugged'
 
-    " Default layers, recommended!
-    Layer 'fzf'
-    Layer 'unite'
-    Layer 'better-defaults'
+" The default leader key is space key.
+" let g:spacevim_leader = "\<Space>"
 
-    Layer 'python'
-    Layer 'programming'
-    Layer 'syntax-checking'
+" The default local leader key is comma.
+" let g:spacevim_localleader = ','
 
-endfunction
+let g:spacevim_layers = [
+      \ 'fzf', 'unite', 'better-defaults',
+      \ 'syntax-checking',
+      \ 'lsp',
+      \ 'auto-completion',
+      \ 'better-motion', 'file-manager', 'programming', 'editing', 'text-align', 'formatting',
+      \ 'go', 'rust', 'graphviz', 'javascript', 'solidity', 'python', 'c-c++', 'markdown',
+      \ 'git', 'github', 'chinese', 'latex', 'which-key',
+      \ ]
 
-" You can put your extra plugins here.
+let s:lsp_enable = 0
+
+if s:lsp_enable
+  call add(g:spacevim_layers, 'lsp')
+  call filter(g:spacevim_layers, 'v:val !~ "auto-completion"')
+elseif g:spacevim_nvim
+  call add(g:spacevim_layers, 'auto-completion')
+  call filter(g:spacevim_layers, 'v:val !~ "lsp"')
+  call filter(g:spacevim_layers, 'v:val !~ "ycmd"')
+else
+  call add(g:spacevim_layers, 'ycmd')
+  call filter(g:spacevim_layers, 'v:val !~ "auto-completion"')
+  call filter(g:spacevim_layers, 'v:val !~ "lsp"')
+  nnoremap gd :YcmCompleter GoTo<CR>
+endif
+
+" Add your own plugins
 function! UserInit()
 
-    Plug 'morhetz/gruvbox'
-    Plug 'junegunn/seoul256.vim'
+  " Install personal plugins
+  " Plug 'sjl/gundo.vim'
+  Plug 'joshdick/onedark.vim'
+  Plug 'morhetz/gruvbox'
+  Plug 'ayu-theme/ayu-vim'
 
+  if g:spacevim_gui
+    let s:use_ncm = 0
+    Plug 'severin-lemaignan/vim-minimap'
+  endif
+
+  Plug 'skywind3000/quickmenu.vim'
+  Plug 'blueyed/vim-diminactive'
+  Plug 'neoclide/vim-easygit'
+  Plug 'MattesGroeger/vim-bookmarks'
+  Plug 'lambdalisue/gina.vim'
+  " Plug 'ervandew/supertab'
+  Plug 'wsdjeg/FlyGrep.vim'
 endfunction
 
+" Override the default settings as well as adding extras
 function! UserConfig()
+  let g:cm_matcher = {'module': 'cm_matchers.abbrev_matcher'}
 
-    autocmd FileType python setlocal completeopt-=preview
-    hi Comment cterm=italic
+  let g:anzu_enable_CursorMoved_AnzuUpdateSearchStatus=1
+  " If you have installed the powerline fonts and want to enable airline layer
+  let g:airline_powerline_fonts=1
+
+  " Use gui colors in terminal if available
+  if has('termguicolors') && $TERM_PROGRAM =~# 'iTerm'
+    set termguicolors
+    if g:spacevim_tmux
+      " If use vim inside tmux, see https://github.com/vim/vim/issues/993
+      " set Vim-specific sequences for RGB colors
+      let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+      let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+    endif
+    if has('nvim')
+      hi Comment gui=None
+    endif
+  endif
+
+  let g:tagbar_type_go = {
+        \ 'ctagstype' : 'go',
+        \ 'kinds'     : [
+        \ 'p:package',
+        \ 'i:imports',
+        \ 'c:constants',
+        \ 'v:variables',
+        \ 't:types',
+        \ 'n:interfaces',
+        \ 'w:fields',
+        \ 'e:embedded',
+        \ 'm:methods',
+        \ 'r:constructor',
+        \ 'f:functions'
+        \ ],
+        \ 'sro' : '.',
+        \ 'kind2scope' : {
+        \ 't' : 'ctype',
+        \ 'n' : 'ntype'
+        \ },
+        \ 'scope2kind' : {
+        \ 'ctype' : 't',
+        \ 'ntype' : 'n'
+        \ },
+        \ 'ctagsbin'  : '~/go/bin/gotags',
+        \ 'ctagsargs' : '-sort -silent'
+        \ }
+
+  nnoremap <F10> :call spacevim#util#SyntaxHiGroup()<CR>
+  set wrap undofile
+  set lazyredraw
+  set guifont=Source\ Code\ Pro\ Light:h13
+  if !has('nvim')
+    set antialias                                   " MacVim: smooth fonts
+  endif
+  command! Path :echo expand('%:p')
+  " set nocursorline
+  set synmaxcol=300
+
+  let g:ale_linters.go = ['golint']
+
+  nnoremap <Leader>mk :Marks<CR>
+  autocmd BufRead *bashrc* set ft=sh
+
+  command! -bang -nargs=* Rg
+        \ call fzf#vim#grep(
+    \   'rg --column --line-number --no-heading --color=always '.shellescape(<q-args>), 1,
+    \   <bang>0 ? fzf#vim#with_preview('up:60%')
+    \           : fzf#vim#with_preview('right:50%:hidden', '?'),
+    \   <bang>0
+    \ )
+  nnoremap <Leader>rg :Rg<CR>
+
+  command! -nargs=* Terminal :terminal ++close bash
+
+  command! Lcd lcd %:p:h
+
+  nnoremap <F8> :call spacevim#menu#init()<CR>
+
+" If buffer modified, update any 'Last modified: ' in the first 20 lines.
+" 'Last modified: ' can have up to 10 characters before (they are retained).
+" Restores cursor and window position using save_cursor variable.
+function! LastModified()
+  if &modified
+    let save_cursor = getpos(".")
+    let n = min([20, line("$")])
+    keepjumps exe '1,' . n . 's#^\(.\{,10}Last modified: \).*#\1' .
+          \ strftime('%d/%m/%y %H:%M:%S') . '#e'
+    call histdel('search', -1)
+    call setpos('.', save_cursor)
+  endif
+endfunction
+
+  autocmd BufWritePre exchanges.md call LastModified()
+  set list
+  set listchars=tab:│\ ,trail:•,extends:❯,precedes:❮
+  set listchars=tab:¦\ ,trail:•,extends:❯,precedes:❮
+  set fillchars+=vert:│
+  if has('conceal')
+    set conceallevel=1
+    set listchars+=conceal:Δ
+  endif
+
+nnoremap <LocalLeader>o :call spacevim#plug#fzf#Open()<CR>
+nnoremap <LocalLeader>v :call spacevim#plug#fzf#Open()<CR>
+nnoremap <LocalLeader>p :call spacevim#plug#fzf#Rtp()<CR>
+nnoremap <LocalLeader>fc :call spacevim#plug#fzf#FZFCmd()<CR>
+nnoremap <LocalLeader>ff :call spacevim#plug#fzf#Func()<CR>
 
 endfunction
