@@ -16,6 +16,7 @@ let g:spacevim_layers = [
       \ 'better-motion', 'file-manager', 'programming', 'editing', 'text-align', 'formatting',
       \ 'go', 'rust', 'graphviz', 'javascript', 'solidity', 'python', 'c-c++', 'markdown',
       \ 'git', 'github', 'chinese', 'latex', 'which-key',
+      \ 'airline'
       \ ]
 
 let s:lsp_enable = 0
@@ -43,18 +44,14 @@ function! UserInit()
   Plug 'morhetz/gruvbox'
   Plug 'ayu-theme/ayu-vim'
 
-  if g:spacevim_gui
-    let s:use_ncm = 0
-    Plug 'severin-lemaignan/vim-minimap'
-  endif
-
   Plug 'skywind3000/quickmenu.vim'
   Plug 'blueyed/vim-diminactive'
+  " Plug 'mhinz/vim-grepper'
   Plug 'neoclide/vim-easygit'
   Plug 'MattesGroeger/vim-bookmarks'
   Plug 'lambdalisue/gina.vim'
   " Plug 'ervandew/supertab'
-  Plug 'wsdjeg/FlyGrep.vim'
+  Plug 'junegunn/vader.vim'
 endfunction
 
 " Override the default settings as well as adding extras
@@ -157,10 +154,10 @@ endfunction
   set listchars=tab:│\ ,trail:•,extends:❯,precedes:❮
   set listchars=tab:¦\ ,trail:•,extends:❯,precedes:❮
   set fillchars+=vert:│
-  if has('conceal')
-    set conceallevel=1
-    set listchars+=conceal:Δ
-  endif
+  " if has('conceal')
+    " set conceallevel=1
+    " set listchars+=conceal:Δ
+  " endif
 
 nnoremap <LocalLeader>o :call spacevim#plug#fzf#Open()<CR>
 nnoremap <LocalLeader>v :call spacevim#plug#fzf#Open()<CR>
