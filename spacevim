@@ -1,3 +1,5 @@
+scriptencoding utf-8
+
 " Let Vim and NeoVim shares the same plugin directory.
 " Comment it out if you don't like.
 let g:spacevim_plug_home = '~/.vim/plugged'
@@ -11,29 +13,29 @@ let g:spacevim_plug_home = '~/.vim/plugged'
 let g:spacevim_layers = [
       \ 'fzf', 'unite', 'better-defaults',
       \ 'syntax-checking',
-      \ 'lsp',
       \ 'auto-completion',
       \ 'better-motion', 'file-manager', 'programming', 'editing', 'text-align', 'formatting',
       \ 'go', 'rust', 'graphviz', 'javascript', 'solidity', 'python', 'c-c++', 'markdown',
       \ 'git', 'github', 'chinese', 'latex', 'which-key',
-      \ 'airline'
+      \ 'auto-completion',
       \ ]
 
 let s:lsp_enable = 0
+let s:use_ncm = 1
 
-if s:lsp_enable
-  call add(g:spacevim_layers, 'lsp')
-  call filter(g:spacevim_layers, 'v:val !~ "auto-completion"')
-elseif g:spacevim_nvim
-  call add(g:spacevim_layers, 'auto-completion')
-  call filter(g:spacevim_layers, 'v:val !~ "lsp"')
-  call filter(g:spacevim_layers, 'v:val !~ "ycmd"')
-else
-  call add(g:spacevim_layers, 'ycmd')
-  call filter(g:spacevim_layers, 'v:val !~ "auto-completion"')
-  call filter(g:spacevim_layers, 'v:val !~ "lsp"')
-  nnoremap gd :YcmCompleter GoTo<CR>
-endif
+" if s:lsp_enable
+  " call add(g:spacevim_layers, 'lsp')
+  " call filter(g:spacevim_layers, 'v:val !~ "auto-completion"')
+" elseif g:spacevim_nvim
+  " call add(g:spacevim_layers, 'auto-completion')
+  " call filter(g:spacevim_layers, 'v:val !~ "lsp"')
+  " call filter(g:spacevim_layers, 'v:val !~ "ycmd"')
+" else
+  " call add(g:spacevim_layers, 'ycmd')
+  " call filter(g:spacevim_layers, 'v:val !~ "auto-completion"')
+  " call filter(g:spacevim_layers, 'v:val !~ "lsp"')
+  " nnoremap gd :YcmCompleter GoTo<CR>
+" endif
 
 " Add your own plugins
 function! UserInit()
@@ -47,11 +49,10 @@ function! UserInit()
   Plug 'skywind3000/quickmenu.vim'
   Plug 'blueyed/vim-diminactive'
   " Plug 'mhinz/vim-grepper'
-  Plug 'neoclide/vim-easygit'
   Plug 'MattesGroeger/vim-bookmarks'
   Plug 'lambdalisue/gina.vim'
-  " Plug 'ervandew/supertab'
   Plug 'junegunn/vader.vim'
+  Plug 'romainl/vim-qf'
 endfunction
 
 " Override the default settings as well as adding extras
@@ -72,37 +73,20 @@ function! UserConfig()
       let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
     endif
     if has('nvim')
-      hi Comment gui=None
+      hi Comment gui=None cterm=None
     endif
   endif
 
-  let g:tagbar_type_go = {
-        \ 'ctagstype' : 'go',
-        \ 'kinds'     : [
-        \ 'p:package',
-        \ 'i:imports',
-        \ 'c:constants',
-        \ 'v:variables',
-        \ 't:types',
-        \ 'n:interfaces',
-        \ 'w:fields',
-        \ 'e:embedded',
-        \ 'm:methods',
-        \ 'r:constructor',
-        \ 'f:functions'
-        \ ],
-        \ 'sro' : '.',
-        \ 'kind2scope' : {
-        \ 't' : 'ctype',
-        \ 'n' : 'ntype'
-        \ },
-        \ 'scope2kind' : {
-        \ 'ctype' : 't',
-        \ 'ntype' : 'n'
-        \ },
-        \ 'ctagsbin'  : '~/go/bin/gotags',
-        \ 'ctagsargs' : '-sort -silent'
-        \ }
+  " if $TERM_PROGRAM =~ 'Terminal'
+  if !g:spacevim_gui
+    hi Normal ctermbg=NONE guibg=NONE
+    hi LineNr ctermbg=NONE guibg=NONE
+    hi SignColumn guibg=NONE ctermbg=NONE
+  endif
+  " endif
+
+  let g:tagbar_type_go = g:spacevim#lang#go#tagbar_type
+  let g:tagbar_type_rust = g:spacevim#lang#rust#tagbar_type
 
   nnoremap <F10> :call spacevim#util#SyntaxHiGroup()<CR>
   set wrap undofile
@@ -159,10 +143,16 @@ endfunction
     " set listchars+=conceal:Δ
   " endif
 
-nnoremap <LocalLeader>o :call spacevim#plug#fzf#Open()<CR>
-nnoremap <LocalLeader>v :call spacevim#plug#fzf#Open()<CR>
-nnoremap <LocalLeader>p :call spacevim#plug#fzf#Rtp()<CR>
-nnoremap <LocalLeader>fc :call spacevim#plug#fzf#FZFCmd()<CR>
-nnoremap <LocalLeader>ff :call spacevim#plug#fzf#Func()<CR>
+  nnoremap <LocalLeader>o :call spacevim#plug#fzf#Open()<CR>
+  nnoremap <LocalLeader>v :call spacevim#plug#fzf#Open()<CR>
+  nnoremap <LocalLeader>p :call spacevim#plug#fzf#Rtp()<CR>
+  nnoremap <LocalLeader>fc :call spacevim#plug#fzf#FZFCmd()<CR>
+  nnoremap <LocalLeader>ff :call spacevim#plug#fzf#Func()<CR>
+
+  nnoremap <LocalLeader>sw :call spacevim#plug#fzf#SearchCword()<CR>
+  let g:ale_sign_error = "◉"
+  let g:ale_sign_warning = "◉"
+  highlight ALEErrorSign ctermfg=9 guifg=#C30500
+  highlight ALEWarningSign ctermfg=11 guifg=#ED6237
 
 endfunction
