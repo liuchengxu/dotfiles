@@ -100,9 +100,12 @@ fi
 # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 
-# PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
+if [ "$PLATFORM" = Darwin ]; then
+  PS1="\[\e[95m\]\w \[\e[1;93m\]❯\[\e[1;92m\]❯\[\e[1;96m\]❯ \[\e[0m\]"
+else
+  PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]❯\[\e[1;92m\]❯\[\e[1;96m\]❯ \[\e[0m\]"
 # PS1="\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
-PS1="\[\e[95m\]\w \[\e[1;93m\]❯\[\e[1;92m\]❯\[\e[1;96m\]❯ \[\e[0m\]"
+fi
 
 keybindings() {
   bind -p | grep -F "\C"
