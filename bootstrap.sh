@@ -19,7 +19,7 @@ error() {
     exit 1
 }
 
-dir=$HOME/dotfiles
+dir=$HOME/.dotfiles
 dotfiles='bashrc bash_profile zshrc ideavimrc spacemacs spacevim tmux.conf gitconfig gitexcludes ctags'
 
 lnif() {
