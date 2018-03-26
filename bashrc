@@ -67,15 +67,6 @@ alias restart="source ~/.bashrc"
 ### Tmux
 alias tmux="tmux -2"
 
-### Colored ls
-if [ -x /usr/bin/dircolors ]; then
-  eval "$(dircolors -b)"
-  alias ls='ls --color=auto'
-  alias grep='grep --color=auto'
-elif [ "$PLATFORM" = Darwin ]; then
-  alias ls='ls -G'
-fi
-
 if [ "$PLATFORM" = Darwin ]; then
     # For coreutils installed by brew
     # use these commands with their normal names, instead of the prefix 'g'
@@ -87,21 +78,36 @@ if [ "$PLATFORM" = Darwin ]; then
     fi
 fi
 
+exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+### Colored ls
+if exists "dircolors"; then
+  eval "$(dircolors -b)"
+  alias ls='ls --color=auto'
+  alias grep='grep --color=auto'
+elif [ "$PLATFORM" = Darwin ]; then
+  alias ls='ls -G'
+fi
+
 # Prompt
 function nonzero_return() {
 	RETVAL=$?
 	[ $RETVAL -ne 0 ] && echo "$RETVAL"
 }
+
 ### git-prompt
 __git_ps1() { :;}
 if [ -e "$HOME/.git-prompt.sh" ]; then
     source "$HOME/.git-prompt.sh"
 fi
+
 # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 
 if [ "$PLATFORM" = Darwin ]; then
-  PS1="\[\e[95m\]\w \[\e[1;93m\]❯\[\e[1;92m\]❯\[\e[1;96m\]❯ \[\e[0m\]"
+  PS1="\\[\\e[95m\\]\\w \\[\\e[1;93m\\]❯\\[\\e[1;92m\\]❯\\[\\e[1;96m\\]❯ \\[\\e[0m\\]"
 else
   PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]❯\[\e[1;92m\]❯\[\e[1;96m\]❯ \[\e[0m\]"
 # PS1="\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
@@ -111,9 +117,13 @@ keybindings() {
   bind -p | grep -F "\C"
 }
 
-# export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
-# export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
-export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+if exists "fd"; then
+  export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+elif exists "rg"; then
+  export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
+elif exists "ag"; then
+  export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
+fi
 
 EXTRA=$HOME/bashrc-extra
 [ -f "$EXTRA" ] && source "$EXTRA"
