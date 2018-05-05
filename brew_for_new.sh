@@ -92,3 +92,16 @@ brew install reattach-to-user-namespace
 
 # Remove outdated versions from the cellar.
 brew cleanup
+
+brew cask install alfred
+brew cask install eudic
+brew cask install java
+brew cask install iterm2
+brew cask install qq
+brew cask install shadowsocks-ng
+brew cask install neteasemusic
+brew cask install google-chrome
+brew cask install firefox
+
+brew cask cleaup
+

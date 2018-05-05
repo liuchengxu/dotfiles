@@ -99,6 +99,10 @@ function nonzero_return() {
 
 ### git-prompt
 __git_ps1() { :;}
+# git-prompt
+if [ ! -e ~/.git-prompt.sh ]; then
+  curl https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh -o ~/.git-prompt.sh
+fi
 if [ -e "$HOME/.git-prompt.sh" ]; then
     source "$HOME/.git-prompt.sh"
 fi
@@ -109,12 +113,17 @@ PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__g
 if [ "$PLATFORM" = Darwin ]; then
   PS1="\\[\\e[95m\\]\\w \\[\\e[1;93m\\]❯\\[\\e[1;92m\\]❯\\[\\e[1;96m\\]❯ \\[\\e[0m\\]"
 else
-  PS1="\[\e[94m\]\u\[\e[36m\]@\[\e[0;32m\]\h\[\e[0m\]:\[\e[95m\]\w \[\e[1;93m\]❯\[\e[1;92m\]❯\[\e[1;96m\]❯ \[\e[0m\]"
+  PS1="\\[\\e[94m\\]\\u\\[\\e[36m\\]@\\[\\e[0;32m\\]\\h\\[\\e[0m\\]:\\[\\e[95m\\]\\w \\[\\e[1;93m\\]❯\\[\\e[1;92m\\]❯\\[\\e[1;96m\\]❯ \\[\\e[0m\\]"
 # PS1="\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
 fi
 
 keybindings() {
-  bind -p | grep -F "\C"
+  bind -p | grep -F "\\C"
+}
+
+add_pwd() {
+  PATH=$(pwd):$PATH
+  export PATH
 }
 
 if exists "fd"; then
@@ -184,4 +193,9 @@ tsession() {
   session=$(tmux list-sessions -F "#{session_name}" | \
     fzf --height 40% --reverse --query="$1" --select-1 --exit-0) &&
   tmux switch-client -t "$session"
+}
+
+# Docker
+dip() {
+  docker inspect --format '{{ .NetworkSettings.IPAddress }}' "$1"
 }
