@@ -199,3 +199,33 @@ tsession() {
 dip() {
   docker inspect --format '{{ .NetworkSettings.IPAddress }}' "$1"
 }
+
+clone() {
+  local url=$1
+  git ls-remote "$url" >/dev/null 2>&1
+  if [ "$?" -ne 0 ]; then
+    echo "[ERROR] Unable to read from $1"
+    return
+  fi
+  if [[ $url =~ .git$ ]]; then
+    url="${url%.*}"
+  fi
+  if [[ $url =~ ^git@github.com ]]; then
+    repo="$(basename "$url")"
+    user="$(echo "${url#*:}" | cut -d'/' -f1)"
+  else
+    repo="$(basename "${url}")"
+    user="$(basename "${url%/${repo}}")"
+  fi
+  local target="$HOME/src/github.com/$user/$repo"
+  if [ -d "$target" ]; then
+    echo "[ERROR] $user/$repo already exists!"
+  else
+    git clone "$1" "$target" $2
+    if [ "$?" -ne 0 ]; then
+      echo "[ERROR] Unable to clone from $1"
+      return
+    fi
+  fi
+  cd "$target"
+}
