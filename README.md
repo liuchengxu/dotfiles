@@ -8,7 +8,7 @@ These are my very private configuration files, you are free to use at your own r
 
 ```bash
 $ git clone https://github.com/liuchengxu/dotfiles.git ~/.dotfiles
-$ bash ~/.dotfiles/bootstrap.sh
+$ bash ~/.dotfiles/bin/bootstrap
 ```
 
 ### Vim for server
