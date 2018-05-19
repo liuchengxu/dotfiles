@@ -1,3 +1,10 @@
+# If not running interactively, don't do anything
+# avoid bind: warning: line editing not enabled
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
 export PLATFORM
 PLATFORM=$(uname -s)
 [ -f /etc/bashrc ] && . /etc/bashrc
@@ -13,12 +20,11 @@ shopt -s checkwinsize
 
 ### Perform file completion in a case insensitive fashion
 bind "set completion-ignore-case on"
-
 ### Display matches for ambiguous patterns at first tab press
 bind "set show-all-if-ambiguous on"
 
-### Avoid duplicate entries
-HISTCONTROL="erasedups:ignoreboth"
+# Don't put duplicate lines in the history and do not add lines that start with a space
+export HISTCONTROL=erasedups:ignoredups:ignorespace
 
 # Don't record some commands
 export HISTIGNORE="&:[ ]*:exit:ls:bg:fg:history:clear"
@@ -26,7 +32,6 @@ export HISTIGNORE="&:[ ]*:exit:ls:bg:fg:history:clear"
 export PROMPT_DIRTRIM=2
 
 ### man bash
-export HISTCONTROL=ignoreboth:erasedups
 export HISTSIZE=
 export HISTFILESIZE=
 export HISTTIMEFORMAT="%Y/%m/%d %H:%M:%S:   "
@@ -67,20 +72,20 @@ alias restart="source ~/.bashrc"
 ### Tmux
 alias tmux="tmux -2"
 
-if [ "$PLATFORM" = Darwin ]; then
-    # For coreutils installed by brew
-    # use these commands with their normal names, instead of the prefix 'g'
-    PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
-    MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
-    # For bash installed by brew
-    if [ -f "$(brew --prefix)/share/bash-completion/bash_completion" ]; then
-        . "$(brew --prefix)/share/bash-completion/bash_completion"
-    fi
-fi
-
 exists() {
     command -v "$1" >/dev/null 2>&1
 }
+
+if [ "$PLATFORM" = Darwin ]; then
+  # For coreutils installed by brew
+  # use these commands with their normal names, instead of the prefix 'g'
+  PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+  MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
+  if exists brew; then
+    # For bash installed by brew
+    [ -f "$(brew --prefix)/share/bash-completion/bash_completion" ] && . "$(brew --prefix)/share/bash-completion/bash_completion"
+  fi
+fi
 
 ### Colored ls
 if exists "dircolors"; then
@@ -98,14 +103,12 @@ function nonzero_return() {
 }
 
 ### git-prompt
-__git_ps1() { :;}
+# __git_ps1() { :;}
 # git-prompt
 if [ ! -e ~/.git-prompt.sh ]; then
   curl https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh -o ~/.git-prompt.sh
 fi
-if [ -e "$HOME/.git-prompt.sh" ]; then
-    source "$HOME/.git-prompt.sh"
-fi
+source "$HOME/.git-prompt.sh"
 
 # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
@@ -141,7 +144,7 @@ EXTRA=$HOME/bashrc-extra
 
 export FZF_COMPLETION_TRIGGER='/'
 
-bind -x '"\C-g": "fzf-file-widget"'
+#bind -x '"\C-w": "fzf-file-widget"'
 bind '"\C-h": " \C-e\C-u`__fzf_cd__`\e\C-e\er\C-m"'
 
 # Git
@@ -195,11 +198,6 @@ tsession() {
   tmux switch-client -t "$session"
 }
 
-# Docker
-dip() {
-  docker inspect --format '{{ .NetworkSettings.IPAddress }}' "$1"
-}
-
 clone() {
   local url=$1
   git ls-remote "$url" >/dev/null 2>&1
@@ -228,4 +226,21 @@ clone() {
     fi
   fi
   cd "$target"
+}
+
+# Docker
+dip() {
+  if [ -z $1 ]; then
+    echo "Usage: $FUNCNAME container_name    -- Show container IP"
+  else
+    docker inspect --format '{{ .NetworkSettings.IPAddress }}' "$1"
+  fi
+}
+
+dbash() {
+  if [ -z $1 ]; then
+    echo "Usage: $FUNCNAME container_name    -- Execute interactive container"
+  else
+    docker exec -it $1 bash -c "stty cols $COLUMNS rows $LINES && bash"
+  fi
 }
