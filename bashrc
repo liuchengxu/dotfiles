@@ -103,8 +103,12 @@ function nonzero_return() {
 }
 
 ### git-prompt
-# __git_ps1() { :;}
-# git-prompt
+# To show */+/% may have an impact on the performance
+# Displays a * and + next to the branch name if there are unstaged (*) and staged (+) changes
+# export GIT_PS1_SHOWDIRTYSTATE=true
+# Displays a % if there are untracked files
+# export GIT_PS1_SHOWUNTRACKEDFILES=true
+
 if [ ! -e ~/.git-prompt.sh ]; then
   curl https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh -o ~/.git-prompt.sh
 fi
