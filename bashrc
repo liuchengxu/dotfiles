@@ -114,15 +114,36 @@ if [ ! -e ~/.git-prompt.sh ]; then
 fi
 source "$HOME/.git-prompt.sh"
 
+Black=$(tput setaf 0)
+Red=$(tput setaf 1)
+Green=$(tput setaf 2)
+Yellow=$(tput setaf 3)
+Blue=$(tput setaf 4)
+Magenta=$(tput setaf 5)
+Cyan=$(tput setaf 6)
+White=$(tput setaf 7)
+LBlack=$(tput setaf 8)
+LRed=$(tput setaf 9)
+LGreen=$(tput setaf 10)
+LYellow=$(tput setaf 11)
+LBlue=$(tput setaf 12)
+LMagenta=$(tput setaf 13)
+LCyan=$(tput setaf 14)
+LWhite=$(tput setaf 15)
+
+Bold=$(tput bold)
+Normal=$(tput sgr0)
+
 # PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
-PROMPT_COMMAND='history -a; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
+PROMPT_COMMAND='history -a; printf "\[$LBlack\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
 
 if [ "$PLATFORM" = Darwin ]; then
-  PS1="\\[\\e[95m\\]\\w \\[\\e[1;93m\\]❯\\[\\e[1;92m\\]❯\\[\\e[1;96m\\]❯ \\[\\e[0m\\]"
+  PS1=""
 else
-  PS1="\\[\\e[94m\\]\\u\\[\\e[36m\\]@\\[\\e[0;32m\\]\\h\\[\\e[0m\\]:\\[\\e[95m\\]\\w \\[\\e[1;93m\\]❯\\[\\e[1;92m\\]❯\\[\\e[1;96m\\]❯ \\[\\e[0m\\]"
-# PS1="\[\e[95m\]\w \[\e[1;93m\]>\[\e[1;92m\]>\[\e[1;96m\]> \[\e[0m\]"
+  PS1="\\[$LBlue\\]\\u\\[$Cyan\\]@\\[$Green\\]\\h\\[$Normal\\]:"
 fi
+
+PS1+="\\[$LMagenta\\]\\w \\[$LYellow$Bold\\]❯\\[$Green\\]❯\\[$LCyan\\]❯ \\[$Normal\\]"
 
 keybindings() {
   bind -p | grep -F "\\C"
@@ -141,18 +162,14 @@ elif exists "ag"; then
   export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 fi
 
-EXTRA=$HOME/bashrc-extra
-[ -f "$EXTRA" ] && source "$EXTRA"
-
+export FZF_COMPLETION_TRIGGER='/'
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
-export FZF_COMPLETION_TRIGGER='/'
-
-#bind -x '"\C-w": "fzf-file-widget"'
-bind '"\C-h": " \C-e\C-u`__fzf_cd__`\e\C-e\er\C-m"'
+[ -f "$HOME/bashrc-extra" ] && source "$HOME/bashrc-extra"
 
 # Git
 ## cshow - git commit browser (enter for show, ctrl-d for diff)
+## cshow --follow some_file: browser commits on some file
 cshow() {
   local out shas sha q k
   while out=$(
@@ -204,8 +221,7 @@ tsession() {
 
 clone() {
   local url=$1
-  git ls-remote "$url" >/dev/null 2>&1
-  if [ "$?" -ne 0 ]; then
+  if ! git ls-remote "$url" >/dev/null 2>&1; then
     echo "[ERROR] Unable to read from $1"
     return
   fi
@@ -223,28 +239,27 @@ clone() {
   if [ -d "$target" ]; then
     echo "[ERROR] $user/$repo already exists!"
   else
-    git clone "$1" "$target" $2
-    if [ "$?" -ne 0 ]; then
+    if ! git clone "$1" "$target" "$2"; then
       echo "[ERROR] Unable to clone from $1"
       return
     fi
   fi
-  cd "$target"
+  cd "$target" || return
 }
 
 # Docker
 dip() {
-  if [ -z $1 ]; then
-    echo "Usage: $FUNCNAME container_name    -- Show container IP"
+  if [ -z "$1" ]; then
+    echo "Usage: ${FUNCNAME[0]} container_name    -- Show container IP"
   else
     docker inspect --format '{{ .NetworkSettings.IPAddress }}' "$1"
   fi
 }
 
 dbash() {
-  if [ -z $1 ]; then
-    echo "Usage: $FUNCNAME container_name    -- Execute interactive container"
+  if [ -z "$1" ]; then
+    echo "Usage: ${FUNCNAME[0]} container_name    -- Execute interactive container"
   else
-    docker exec -it $1 bash -c "stty cols $COLUMNS rows $LINES && bash"
+    docker exec -it "$1" bash -c "stty cols $COLUMNS rows $LINES && bash"
   fi
 }
