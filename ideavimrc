@@ -16,6 +16,16 @@ nnoremap <Leader>sc :nohlsearch<CR>
 
 nnoremap <Leader>fs :w<CR>
 
+nnoremap <Leader>? :action GotoAction<CR>
+nnoremap gd :action GotoDeclaration<CR>
+nnoremap gi :action GotoImplementation<CR>
+
+" project search
+nnoremap <Leader>ps :action SearchEverywhere<CR>
+nnoremap <Leader>pf :action GotoFile<CR>
+
+nnoremap <Leader>fu :action FindUsages<CR>
+
 " Quit normal mode
 nnoremap <Leader>q  :q<CR>
 nnoremap <Leader>Q  :qa!<CR>
@@ -96,7 +106,6 @@ nnoremap <Leader>gs :action GotoSymbol<CR>
 nnoremap <Leader>gt :action GotoTest<CR>
 
 nnoremap <Leader>fp :action ShowFilePath<CR>
-nnoremap <Leader>fu :action FindUsages<CR>
 
 nnoremap <Leader>ic :action InspectCode<CR>
 
@@ -112,7 +121,7 @@ nnoremap <Leader>rf :action RenameFile<CR>
 
 nnoremap <Leader>se :action SearchEverywhere<CR>
 nnoremap <Leader>su :action ShowUsages<CR>
+nnoremap <Leader>tc :action CloseActiveTab<CR>
 
-nnoremap <Leader>tc  :action CloseActiveTab<CR>
 nnoremap <Leader>tl Vy<CR>:action ActivateTerminalToolWindow<CR>
 vnoremap <Leader>tl y<CR>:action ActivateTerminalToolWindow<CR>
