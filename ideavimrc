@@ -63,6 +63,9 @@ nnoremap U <C-r>
 " Yank to the end of line
 nnoremap Y y$
 
+" quit ==> close current window
+nnoremap <Leader>q <C-W>w
+
 " Window operation
 nnoremap <Leader>ww <C-W>w
 nnoremap <Leader>wd <C-W>c

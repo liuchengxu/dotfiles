@@ -32,9 +32,15 @@ export HISTIGNORE="&:[ ]*:exit:ls:bg:fg:history:clear"
 export PROMPT_DIRTRIM=2
 
 ### man bash
-export HISTSIZE=
-export HISTFILESIZE=
+export HISTSIZE=-1
+export HISTFILESIZE=-1
 export HISTTIMEFORMAT="%Y/%m/%d %H:%M:%S:   "
+
+# attempt to save all lines of a multiple-line command in the same history entry
+shopt -s cmdhist
+# save multi-line commands to the history with embedded newlines
+shopt -s lithist
+
 [ -z "$TMPDIR" ] && TMPDIR=/tmp
 
 # Aliases
@@ -57,7 +63,7 @@ alias gb='git branch'
 alias gc='git checkout'
 alias gd='git diff'
 alias gr='git remote'
-alias gs='git status'
+alias gst='git status'
 alias gpom="git push origin master"
 alias gitv='git log --color --graph --pretty=format:"%Cred%h%Creset -%C(green)%d%Creset %s %C(yellow)(%cr) %C(blue)<%an>%Creset" --abbrev-commit --'
 ## up: cd .. when you're too lazy to use the spacebar
@@ -262,4 +268,43 @@ dbash() {
   else
     docker exec -it "$1" bash -c "stty cols $COLUMNS rows $LINES && bash"
   fi
+}
+
+extract() {
+    if [ -f $1 ] ; then
+        case $1 in
+        *.tar.bz2)   tar -xvjf  $1    ;;
+        *.tar.gz)    tar -xvzf  $1    ;;
+        *.tar.xz)    tar -xvJf  $1    ;;
+        *.bz2)       bunzip2    $1    ;;
+        *.rar)       rar x      $1    ;;
+        *.gz)        gunzip     $1    ;;
+        *.tar)       tar -xvf   $1    ;;
+        *.tbz2)      tar -xvjf  $1    ;;
+        *.tgz)       tar -xvzf  $1    ;;
+        *.zip)       unzip      $1    ;;
+        *.Z)         uncompress $1    ;;
+        *.7z)        7z x       $1    ;;
+        *)           echo "don't know how to extract '$1'..." ;;
+        esac
+    else
+        echo "'$1' is not a valid file!"
+    fi
+}
+
+compress() {
+    if [ -n "$1" ] ; then
+        FILE=$1
+        case $FILE in
+        *.tar) shift && tar -cf $FILE $* ;;
+        *.tar.bz2) shift && tar -cjf $FILE $* ;;
+        *.tar.xz) shift && tar -cJf $FILE $* ;;
+        *.tar.gz) shift && tar -czf $FILE $* ;;
+        *.tgz) shift && tar -czf $FILE $* ;;
+        *.zip) shift && zip $FILE $* ;;
+        *.rar) shift && rar $FILE $* ;;
+        esac
+    else
+        echo "usage: q-compress <foo.tar.gz> ./foo ./bar"
+    fi
 }
