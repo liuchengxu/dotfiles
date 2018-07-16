@@ -3,6 +3,8 @@
 	name = Liu-Cheng Xu
 [core]
   excludesfile = ~/.gitexcludes
+  # I have no idea why the python3 feature is broken when committing with vim
+  editor       = nvim
 [color "branch"]
   current   = bold green
   local     = yellow
