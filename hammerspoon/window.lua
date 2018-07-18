@@ -30,7 +30,7 @@ hotkey.bind(hyper, 'Down', grid.pushWindowDown)
 
 -- Hyper / to show window hints
 hotkey.bind(hyper, '/', function()
-    jints.windowHints()
+    hints.windowHints()
 end)
 
 switcher = window.switcher.new(

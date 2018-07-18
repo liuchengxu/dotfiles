@@ -70,38 +70,49 @@ if ! fgrep -q '/usr/local/bin/bash' /etc/shells; then
     chsh -s /usr/local/bin/bash;
 fi;
 
-brew install git
-brew install wget
-
 brew install ack
-brew install ctags
-brew install ispell
-brew install flake8
 brew install cscope
+brew install ctags
+brew install fd
+brew install fish
+brew install flake8
+brew install git
+brew install go
+brew install graphiviz
+brew install ispell
+brew install htop
+brew install jq
+brew install llvm
+brew install macvim
+brew install mobile-shell
+brew install neovim
+brew install pandoc
 brew install ripgrep
 brew install shellcheck
 brew install the_silver_searcher
-
-brew install tree
 brew install tmux
-brew install pandoc
-brew install neovim
-brew install graphiviz
-brew install mobile-shell
-brew install reattach-to-user-namespace
+brew install tree
+brew install vim --HEAD --with-override-system-vi --with-lua --with-luajit
+brew install wget
+
+# https://github.com/ChrisJohnsen/tmux-MacOSX-pasteboard/issues/66
+# reattach-to-user-namespace is not needed since tmux 2.6
 
 # Remove outdated versions from the cellar.
 brew cleanup
 
 brew cask install alfred
+brew cask install docker
 brew cask install eudic
-brew cask install java
-brew cask install iterm2
-brew cask install qq
-brew cask install shadowsocks-ng
-brew cask install neteasemusic
-brew cask install google-chrome
 brew cask install firefox
+brew cask install google-chrome
+brew cask install hammerspoon
+brew cask install haskell-platform
+brew cask install iterm2
+brew cask install java
+brew cask install neteasemusic
+brew cask install qq
+brew cask install shadowsocksx-ng
+brew cask install sogouinput
 
 brew cask cleaup
-
