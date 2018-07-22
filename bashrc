@@ -160,6 +160,8 @@ add_pwd() {
   export PATH
 }
 
+export GOPATH=$HOME
+
 if exists "fd"; then
   export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 elif exists "rg"; then

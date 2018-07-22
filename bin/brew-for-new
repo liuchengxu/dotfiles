@@ -70,13 +70,14 @@ if ! fgrep -q '/usr/local/bin/bash' /etc/shells; then
     chsh -s /usr/local/bin/bash;
 fi;
 
+# brew install git
+
 brew install ack
 brew install cscope
 brew install ctags
 brew install fd
 brew install fish
 brew install flake8
-brew install git
 brew install go
 brew install graphiviz
 brew install ispell
@@ -92,7 +93,7 @@ brew install shellcheck
 brew install the_silver_searcher
 brew install tmux
 brew install tree
-brew install vim --HEAD --with-override-system-vi --with-lua --with-luajit
+brew install vim --HEAD --with-override-system-vi --with-lua
 brew install wget
 
 # https://github.com/ChrisJohnsen/tmux-MacOSX-pasteboard/issues/66
@@ -113,6 +114,8 @@ brew cask install java
 brew cask install neteasemusic
 brew cask install qq
 brew cask install shadowsocksx-ng
-brew cask install sogouinput
+brew cask install sogouinput # open /usr/local/...
+brew cask install telegram
+brew cask install wechat
 
 brew cask cleaup

@@ -41,6 +41,8 @@ create_symlinks() {
             ln -s "$dir/$file" "$HOME/.$file"
         fi
     done
+    mkdir -p ~/.config/kitty
+    lnif "$dir/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 }
 
 create_symlinks

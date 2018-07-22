@@ -6,6 +6,8 @@ require "launch"
 require "window"
 require "input_method"
 
+hs.loadSpoon('SpeedMenu')
+
 -- reload
 hs.hotkey.bind(hyper, 'r', function()
     hs.reload()

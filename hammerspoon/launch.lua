@@ -7,6 +7,7 @@ local key2app = {
     d = 'EuDic',
     e = 'Emacs',
     f = 'Firefox',
+    g = 'Telegram',
     i = 'iTerm',
     m = 'MacDown',
     p = 'Preview',
