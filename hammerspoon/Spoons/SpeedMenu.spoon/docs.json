@@ -16,63 +16,63 @@
 
     ],
     "desc" : "Menubar netspeed meter",
-    "type" : "Module",
     "Deprecated" : [
 
     ],
+    "type" : "Module",
     "Constructor" : [
 
     ],
-    "doc" : "Menubar netspeed meter\n\nbased on official Hammerspoon\/Spoons\/SpeedMenu.spoon\n\nDownload: [https:\/\/github.com\/Hammerspoon\/Spoons\/raw\/master\/Spoons\/SpeedMenu.spoon.zip](https:\/\/github.com\/Hammerspoon\/Spoons\/raw\/master\/Spoons\/SpeedMenu.spoon.zip)",
-    "Method" : [
-      {
-        "desc" : "Redetect the active interface, darkmode …And redraw everything.",
-        "stripped_doc" : [
-          "Redetect the active interface, darkmode …And redraw everything."
-        ],
-        "def" : "SpeedMenu:rescan()",
-        "doc" : "Redetect the active interface, darkmode …And redraw everything.",
-        "notes" : [
+    "doc" : "Menubar netspeed meter\n\nBased on official Hammerspoon\/Spoons\/SpeedMenu.spoon\n\nDownload: [https:\/\/github.com\/Hammerspoon\/Spoons\/raw\/master\/Spoons\/SpeedMenu.spoon.zip](https:\/\/github.com\/Hammerspoon\/Spoons\/raw\/master\/Spoons\/SpeedMenu.spoon.zip)",
+    "Field" : [
 
-        ],
-        "signature" : "SpeedMenu:rescan()",
-        "type" : "Method",
-        "returns" : [
-
-        ],
-        "name" : "rescan",
-        "parameters" : [
-
-        ]
-      }
     ],
     "Command" : [
 
     ],
-    "items" : [
+    "Method" : [
       {
+        "doc" : "Redetect the active interface, darkmode …And redraw everything.",
         "desc" : "Redetect the active interface, darkmode …And redraw everything.",
+        "parameters" : [
+
+        ],
         "stripped_doc" : [
           "Redetect the active interface, darkmode …And redraw everything."
         ],
-        "def" : "SpeedMenu:rescan()",
-        "doc" : "Redetect the active interface, darkmode …And redraw everything.",
         "notes" : [
 
         ],
-        "signature" : "SpeedMenu:rescan()",
+        "signature" : "SpeedMenu:reload()",
         "type" : "Method",
         "returns" : [
 
         ],
-        "name" : "rescan",
-        "parameters" : [
-
-        ]
+        "name" : "reload",
+        "def" : "SpeedMenu:reload()"
       }
     ],
-    "Field" : [
+    "items" : [
+      {
+        "doc" : "Redetect the active interface, darkmode …And redraw everything.",
+        "desc" : "Redetect the active interface, darkmode …And redraw everything.",
+        "parameters" : [
 
+        ],
+        "stripped_doc" : [
+          "Redetect the active interface, darkmode …And redraw everything."
+        ],
+        "notes" : [
+
+        ],
+        "signature" : "SpeedMenu:reload()",
+        "type" : "Method",
+        "returns" : [
+
+        ],
+        "name" : "reload",
+        "def" : "SpeedMenu:reload()"
+      }
     ],
     "name" : "SpeedMenu"
   }
