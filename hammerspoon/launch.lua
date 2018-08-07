@@ -11,6 +11,7 @@ local key2app = {
     i = 'iTerm',
     m = 'MacDown',
     p = 'Preview',
+    s = 'NeteaseMusic',
     t = 'Terminal',
     v = 'MacVim',
     w = 'WeChat',

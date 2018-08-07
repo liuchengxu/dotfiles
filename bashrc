@@ -62,6 +62,7 @@ alias ga='git add'
 alias gb='git branch'
 alias gc='git checkout'
 alias gd='git diff'
+alias gdc='git diff --cached'
 alias gr='git remote'
 alias gst='git status'
 alias gpom="git push origin master"
@@ -79,13 +80,20 @@ alias restart="source ~/.bashrc"
 alias tmux="tmux -2"
 
 exists() {
-    command -v "$1" >/dev/null 2>&1
+  command -v "$1" >/dev/null 2>&1
+}
+
+add_to_path() {
+  local p=$1
+  if [[ ! "$PATH" == *"$p"* ]]; then
+    export PATH="$p:$PATH"
+  fi
 }
 
 if [ "$PLATFORM" = Darwin ]; then
   # For coreutils installed by brew
   # use these commands with their normal names, instead of the prefix 'g'
-  PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+  add_to_path "/usr/local/opt/coreutils/libexec/gnubin"
   MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
   if exists brew; then
     # For bash installed by brew
@@ -160,8 +168,6 @@ add_pwd() {
   export PATH
 }
 
-export GOPATH=$HOME
-
 if exists "fd"; then
   export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 elif exists "rg"; then
@@ -171,8 +177,13 @@ elif exists "ag"; then
 fi
 
 export FZF_COMPLETION_TRIGGER='/'
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
+export GOPATH=$HOME
+
+add_to_path "$HOME/.cargo/bin"
+add_to_path "$GOPATH/bin"
+
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash
 [ -f "$HOME/bashrc-extra" ] && source "$HOME/bashrc-extra"
 
 # Git

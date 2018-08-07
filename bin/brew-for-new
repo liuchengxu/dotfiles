@@ -118,4 +118,7 @@ brew cask install sogouinput # open /usr/local/...
 brew cask install telegram
 brew cask install wechat
 
+brew cask install font-fira-code
+brew cask install font-iosevka
+
 brew cask cleaup
