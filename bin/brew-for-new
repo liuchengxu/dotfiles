@@ -116,8 +116,11 @@ brew cask install qq
 brew cask install shadowsocksx-ng
 brew cask install sogouinput # open /usr/local/...
 brew cask install telegram
+brew cask install visual-studio-code
 brew cask install wechat
 
+brew tap homebrew/cask-fonts
+brew cask install font-fantasque-sans-mono
 brew cask install font-fira-code
 brew cask install font-iosevka
 

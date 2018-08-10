@@ -1,158 +1,124 @@
-scriptencoding utf-8
-
 " Let Vim and NeoVim shares the same plugin directory.
-" Comment it out if you don't like.
+" Comment it out if you don't like
 let g:spacevim_plug_home = '~/.vim/plugged'
 
 " The default leader key is space key.
-" let g:spacevim_leader = "\<Space>"
+" Uncomment the line below and modify "<\Space>" if you prefer another
+" let g:spacevim_leader = "<\Space>"
 
 " The default local leader key is comma.
+" Uncomment the line below and modify ',' if you prefer another
 " let g:spacevim_localleader = ','
 
+" Enable the existing layers in space-vim
 let g:spacevim_layers = [
       \ 'fzf', 'unite', 'better-defaults',
       \ 'syntax-checking',
-      \ 'auto-completion',
       \ 'better-motion', 'file-manager', 'programming', 'editing', 'text-align', 'formatting',
       \ 'go', 'rust', 'graphviz', 'javascript', 'solidity', 'python', 'c-c++', 'markdown',
-      \ 'git', 'github', 'chinese', 'latex', 'which-key',
-      \ 'auto-completion',
+      \ 'git', 'github', 'chinese', 'latex', 'which-key', 'lsp',
       \ ]
 
-let s:lsp_enable = 0
-let s:use_ncm = 1
+" call remove(g:spacevim_layers, index(g:spacevim_layers, 'syntax-checking'))
 
-" if s:lsp_enable
-  " call add(g:spacevim_layers, 'lsp')
-  " call filter(g:spacevim_layers, 'v:val !~ "auto-completion"')
-" elseif g:spacevim_nvim
-  " call add(g:spacevim_layers, 'auto-completion')
-  " call filter(g:spacevim_layers, 'v:val !~ "lsp"')
-  " call filter(g:spacevim_layers, 'v:val !~ "ycmd"')
-" else
-  " call add(g:spacevim_layers, 'ycmd')
-  " call filter(g:spacevim_layers, 'v:val !~ "auto-completion"')
-  " call filter(g:spacevim_layers, 'v:val !~ "lsp"')
-  " nnoremap gd :YcmCompleter GoTo<CR>
-" endif
+let g:spacevim_use_ncm2 = 1 | Layer 'auto-completion'
+Layer 'code-snippets'
+" Layer 'ycmd'
 
-" Add your own plugins
+" Manage your own plugins, refer to vim-plug's instruction for more detials.
 function! UserInit()
 
-  " Install personal plugins
-  " Plug 'sjl/gundo.vim'
-  Plug 'joshdick/onedark.vim'
-  Plug 'morhetz/gruvbox'
-  Plug 'ayu-theme/ayu-vim'
+  " Add plugin via Plug command.
+  Plug 'junegunn/seoul256.vim'
+  Plug 'lifepillar/vim-gruvbox8'
 
-  Plug 'skywind3000/quickmenu.vim'
-  Plug 'blueyed/vim-diminactive'
-  " Plug 'mhinz/vim-grepper'
-  Plug 'MattesGroeger/vim-bookmarks'
-  Plug 'lambdalisue/gina.vim'
-  Plug 'junegunn/vader.vim'
-  Plug 'romainl/vim-qf'
 endfunction
 
 " Override the default settings as well as adding extras
 function! UserConfig()
-  let g:cm_matcher = {'module': 'cm_matchers.abbrev_matcher'}
-
-  let g:anzu_enable_CursorMoved_AnzuUpdateSearchStatus=1
   " If you have installed the powerline fonts and want to enable airline layer
   let g:airline_powerline_fonts=1
 
   " Use gui colors in terminal if available
-  if has('termguicolors') && $TERM_PROGRAM =~# 'iTerm'
-    set termguicolors
-    if g:spacevim_tmux
-      " If use vim inside tmux, see https://github.com/vim/vim/issues/993
-      " set Vim-specific sequences for RGB colors
-      let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
-      let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+  function! s:enable_termgui()
+    if has('termguicolors')
+      set termguicolors
+      if g:spacevim.tmux && !g:spacevim.nvim
+        " If use vim inside tmux, see https://github.com/vim/vim/issues/993
+        " set Vim-specific sequences for RGB colors
+        let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+        let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+      endif
     endif
-    if has('nvim')
-      hi Comment gui=None cterm=None
-    endif
+  endfunction
+
+  if g:spacevim.nvim
+    hi Comment gui=NONE
+  endif
+  hi LineNr ctermbg=NONE guibg=NONE
+  hi SpecialComment ctermfg=244 guifg=#768294
+
+  " If your terminal(-emulator) supports true colors, uncomment the line below
+  if $TERM_PROGRAM !~? 'Apple_Terminal'
+    call s:enable_termgui()
   endif
 
-  " if $TERM_PROGRAM =~ 'Terminal'
-  if !g:spacevim_gui
-    hi Normal ctermbg=NONE guibg=NONE
-    hi LineNr ctermbg=NONE guibg=NONE
-    hi SignColumn guibg=NONE ctermbg=NONE
-  endif
-  " endif
+  let g:python3_host_prg = '/usr/local/bin/python3'
 
-  let g:tagbar_type_go = g:spacevim#lang#go#tagbar_type
-  let g:tagbar_type_rust = g:spacevim#lang#rust#tagbar_type
+  set list listchars=tab:¦\ ,trail:•,extends:❯,precedes:❮
+  set wrap
 
-  nnoremap <F10> :call spacevim#util#SyntaxHiGroup()<CR>
-  set wrap undofile
-  set lazyredraw
-  set guifont=Source\ Code\ Pro\ Light:h13
-  if !has('nvim')
-    set antialias                                   " MacVim: smooth fonts
-  endif
-  command! Path :echo expand('%:p')
-  " set nocursorline
-  set synmaxcol=300
-
-  let g:ale_linters.go = ['golint']
-
-  nnoremap <Leader>mk :Marks<CR>
-  autocmd BufRead *bashrc* set ft=sh
-
-  command! -bang -nargs=* Rg
-        \ call fzf#vim#grep(
-    \   'rg --column --line-number --no-heading --color=always '.shellescape(<q-args>), 1,
-    \   <bang>0 ? fzf#vim#with_preview('up:60%')
-    \           : fzf#vim#with_preview('right:50%:hidden', '?'),
-    \   <bang>0
-    \ )
-  nnoremap <Leader>rg :Rg<CR>
-
-  command! -nargs=* Terminal :terminal ++close bash
-
-  command! Lcd lcd %:p:h
-
-  nnoremap <F8> :call spacevim#menu#init()<CR>
-
-" If buffer modified, update any 'Last modified: ' in the first 20 lines.
-" 'Last modified: ' can have up to 10 characters before (they are retained).
-" Restores cursor and window position using save_cursor variable.
-function! LastModified()
-  if &modified
-    let save_cursor = getpos(".")
-    let n = min([20, line("$")])
-    keepjumps exe '1,' . n . 's#^\(.\{,10}Last modified: \).*#\1' .
-          \ strftime('%d/%m/%y %H:%M:%S') . '#e'
-    call histdel('search', -1)
-    call setpos('.', save_cursor)
-  endif
-endfunction
-
-  autocmd BufWritePre exchanges.md call LastModified()
-  set list
-  set listchars=tab:│\ ,trail:•,extends:❯,precedes:❮
-  set listchars=tab:¦\ ,trail:•,extends:❯,precedes:❮
-  set fillchars+=vert:│
-  " if has('conceal')
-    " set conceallevel=1
-    " set listchars+=conceal:Δ
-  " endif
-
-  nnoremap <LocalLeader>o :call spacevim#plug#fzf#Open()<CR>
   nnoremap <LocalLeader>v :call spacevim#plug#fzf#Open()<CR>
   nnoremap <LocalLeader>p :call spacevim#plug#fzf#Rtp()<CR>
   nnoremap <LocalLeader>fc :call spacevim#plug#fzf#FZFCmd()<CR>
   nnoremap <LocalLeader>ff :call spacevim#plug#fzf#Func()<CR>
 
-  nnoremap <LocalLeader>sw :call spacevim#plug#fzf#SearchCword()<CR>
   let g:ale_sign_error = "◉"
   let g:ale_sign_warning = "◉"
   highlight ALEErrorSign ctermfg=9 guifg=#C30500
   highlight ALEWarningSign ctermfg=11 guifg=#ED6237
 
+  let g:eleline_slim = 1
+
+  let g:ncm2#complete_length = [[1,2],[7,1]]
+
+  let g:rust_recommended_style = 0
+
+  nnoremap <silent> <C-G> :call spacevim#vim#file#CtrlG()<CR>
+  inoremap <C-C> <ESC>
+
+  let g:LanguageClient_selectionUI = 'fzf'
+
+  color gruvbox8
+  if g:colors_name ==? 'gruvbox8'
+    hi! link SpecialComment Comment
+    hi Function ctermfg=203 ctermbg=NONE guifg=#fb4934 guibg=NONE guisp=NONE cterm=NONE,bold gui=NONE,bold
+    hi Keyword ctermfg=142 ctermbg=NONE guifg=#b8bb26 guibg=NONE guisp=NONE cterm=NONE gui=NONE
+    hi CurrentWordTwins cterm=reverse ctermfg=109 ctermbg=235 gui=reverse guifg=#83a598 guibg=#282828
+  endif
+endfunction
+
+function! Test()
+  let old_line = line('.')
+  let old_col = col('.')
+  let cword = expand('<cword>')
+  let str = repeat('-', len(cword)+2)
+  call cursor(old_line-1, old_col)
+  " if the column number of previous line less than current line, col('.') is the col('$') of previous line
+  if col('.') < old_col
+    exe "normal a".repeat(' ', old_col-col('.'))
+  endif
+  call cursor(old_line-1, old_col)
+  exe "normal i+".str."+"
+  call cursor(old_line, old_col)
+  exe "normal i| "
+  call cursor(old_line+1, old_col)
+  if col('.') < old_col
+    exe "normal a".repeat(' ', old_col-col('.'))
+  endif
+  call cursor(old_line+1, old_col)
+  exe "normal i+".str."+"
+  call cursor(old_line, old_col+1)
+  exe "normal ea |"
+  call cursor(old_line, old_col+1)
 endfunction
