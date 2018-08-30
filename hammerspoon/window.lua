@@ -50,6 +50,30 @@ switcher = window.switcher.new(
 hotkey.bind("alt", "tab", function() switcher:next() end)
 hotkey.bind("alt-shift", "tab", function() switcher:previous() end)
 
+hotkey.bind(hyperShift, 'm', function() window.focusedWindow():maximize() end)
+
+local function isInScreen(screen, win)
+  return win:screen() == screen
+end
+
+-- Move cursor to next monitor and focus on it
+hotkey.bind(hyperShift, 'n', function()
+    local screen = hs.mouse.getCurrentScreen()
+    local nextScreen = screen:next()
+    local rect = nextScreen:fullFrame()
+    local center = hs.geometry.rectMidPoint(rect)
+
+    hs.mouse.setAbsolutePosition(center)
+
+    local windows = hs.fnutils.filter(
+        hs.window.orderedWindows(),
+        hs.fnutils.partial(isInScreen, nextScreen))
+
+    local windowToFocus = #windows > 0 and windows[1] or hs.window.desktop()
+    windowToFocus:focus()
+
+end)
+
 window.animationDuration = 0
 
 -- hotkey.bind(hyper, 'h', function()
@@ -59,6 +83,19 @@ window.animationDuration = 0
 -- hotkey.bind(hyper, 'l', function()
     -- window.focusedWindow():moveToUnit(layout.right50)
 -- end)
+
+function hs.window.maximize(win)
+  local f = win:frame()
+  local screen = win:screen()
+  local max = screen:frame()
+
+  f.x = max.x
+  f.y = max.y
+  f.w = max.w
+  f.h = max.h
+  win:setFrame(f)
+end
+
 
 -- +-----------------+
 -- |        |        |

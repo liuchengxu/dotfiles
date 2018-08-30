@@ -66,6 +66,7 @@ alias gdc='git diff --cached'
 alias gr='git remote'
 alias gst='git status'
 alias gpom="git push origin master"
+alias push="git push origin master"
 alias gitv='git log --color --graph --pretty=format:"%Cred%h%Creset -%C(green)%d%Creset %s %C(yellow)(%cr) %C(blue)<%an>%Creset" --abbrev-commit --'
 ## up: cd .. when you're too lazy to use the spacebar
 alias up="cd .."
@@ -182,6 +183,9 @@ export GOPATH=$HOME
 
 add_to_path "$HOME/.cargo/bin"
 add_to_path "$GOPATH/bin"
+add_to_path "$HOME/.local/bin" # hie
+
+export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 [ -f "$HOME/bashrc-extra" ] && source "$HOME/bashrc-extra"
@@ -318,6 +322,6 @@ compress() {
         *.rar) shift && rar $FILE $* ;;
         esac
     else
-        echo "usage: q-compress <foo.tar.gz> ./foo ./bar"
+        echo "usage: compress <foo.tar.gz> ./foo ./bar"
     fi
 }
