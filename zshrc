@@ -7,6 +7,7 @@ export ZSH=$HOME/.oh-my-zsh
 # Optionally, if you set this to "random", it'll load a random theme each
 # time that oh-my-zsh is loaded.
 ZSH_THEME="ys"
+ZSH_THEME="refined"
 
 # Uncomment the following line to use case-sensitive completion.
 # CASE_SENSITIVE="true"
@@ -57,8 +58,6 @@ plugins=(git z vi-mode osx colored-man-pages)
 export PATH=$HOME/bin:/usr/local/bin:$PATH
 # export MANPATH="/usr/local/man:$MANPATH"
 
-alias gcc=/usr/local/opt/gcc/bin/gcc-6
-alias g++=g++-6
 source $ZSH/oh-my-zsh.sh
 
 # You may need to manually set your language environment
@@ -85,8 +84,24 @@ source $ZSH/oh-my-zsh.sh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-export PATH="/usr/local/sbin:$PATH"
-export PATH="$HOME/anaconda3/bin:$PATH"
+
+alias restart="source $HOME/.zshrc"
+
+add_to_path() {
+  local p=$1
+  if [[ ! "$PATH" == *"$p"* ]]; then
+    export PATH="$p:$PATH"
+  fi
+}
+
+add_to_path "/usr/local/sbin"
+add_to_path "$HOME/.cargo/bin"
+add_to_path "$GOPATH/bin"
+add_to_path "$HOME/.local/bin" # hie
+add_to_path "/Library/TeX/texbin"
+add_to_path "$HOME/anaconda3/bin"
+add_to_path "$HOME/.npm-packages/bin"
+
 case "$TERM" in
     xterm)
         export TERM=xterm-256color
@@ -104,3 +119,6 @@ export FZF_COMPLETION_TRIGGER='/'
 
 # Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
 export PATH="$PATH:$HOME/.rvm/bin"
+
+# added by travis gem
+[ -f /Users/xlc/.travis/travis.sh ] && source /Users/xlc/.travis/travis.sh

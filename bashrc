@@ -77,6 +77,10 @@ alias space="df -h"
 ## restart: a quick refresh for your shell instance.
 alias restart="source ~/.bashrc"
 
+## util
+alias lip="ipconfig getifaddr en0"
+alias www='python3 -m SimpleHTTPServer 8000'
+
 ### Tmux
 alias tmux="tmux -2"
 
@@ -116,6 +120,8 @@ function nonzero_return() {
 	RETVAL=$?
 	[ $RETVAL -ne 0 ] && echo "$RETVAL"
 }
+
+[ -f /usr/local/etc/profile.d/autojump.sh ] && . /usr/local/etc/profile.d/autojump.sh
 
 ### git-prompt
 # To show */+/% may have an impact on the performance
@@ -177,13 +183,16 @@ elif exists "ag"; then
   export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 fi
 
-export FZF_COMPLETION_TRIGGER='/'
+export FZF_COMPLETION_TRIGGER='..'
 
 export GOPATH=$HOME
 
 add_to_path "$HOME/.cargo/bin"
 add_to_path "$GOPATH/bin"
 add_to_path "$HOME/.local/bin" # hie
+add_to_path "/Library/TeX/texbin"
+
+add_to_path "$HOME/.npm-packages/bin"
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
 
@@ -325,3 +334,6 @@ compress() {
         echo "usage: compress <foo.tar.gz> ./foo ./bar"
     fi
 }
+
+# added by travis gem
+[ -f /Users/xlc/.travis/travis.sh ] && source /Users/xlc/.travis/travis.sh
