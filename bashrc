@@ -80,6 +80,7 @@ alias restart="source ~/.bashrc"
 ## util
 alias lip="ipconfig getifaddr en0"
 alias www='python3 -m SimpleHTTPServer 8000'
+alias n="nvim"
 
 ### Tmux
 alias tmux="tmux -2"
@@ -104,6 +105,11 @@ if [ "$PLATFORM" = Darwin ]; then
     # For bash installed by brew
     [ -f "$(brew --prefix)/share/bash-completion/bash_completion" ] && . "$(brew --prefix)/share/bash-completion/bash_completion"
   fi
+
+  alias cat="bat"
+  alias ping="prettyping --nolegend"
+  alias du="ncdu --color dark -rr -x --exclude .git --exclude node_modules"
+  alias h="tldr"
 fi
 
 ### Colored ls

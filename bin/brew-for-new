@@ -73,11 +73,13 @@ fi;
 # brew install git
 
 brew install ack
+brew install bat
 brew install cscope
 brew install ctags
 brew install fd
 brew install fish
 brew install flake8
+brew install fzy
 brew install go
 brew install graphiviz
 brew install ispell
@@ -87,10 +89,13 @@ brew install llvm
 brew install macvim
 brew install mobile-shell
 brew install neovim
+brew install ncdu
 brew install pandoc
+brew install prettyping
 brew install ripgrep
 brew install shellcheck
 brew install the_silver_searcher
+brew install tldr
 brew install tmux
 brew install tree
 brew install vim --HEAD --with-override-system-vi --with-lua
