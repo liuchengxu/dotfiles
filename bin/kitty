@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+
+import runpy
+
+runpy.run_path(
+    '/Users/xlc/src/github.com/kovidgoyal/kitty', run_name='__main__')
