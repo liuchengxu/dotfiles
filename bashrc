@@ -141,6 +141,11 @@ if [ ! -e ~/.git-prompt.sh ]; then
 fi
 source "$HOME/.git-prompt.sh"
 
+if [ ! -e ~/.z.sh ]; then
+  curl https://raw.githubusercontent.com/rupa/z/master/z.sh -o ~/.z.sh
+fi
+source "$HOME/.z.sh"
+
 Black=$(tput setaf 0)
 Red=$(tput setaf 1)
 Green=$(tput setaf 2)
@@ -181,6 +186,10 @@ add_pwd() {
   export PATH
 }
 
+# https://github.com/wernight/powerline-web-fonts/issues/8
+export LANG=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
 if exists "fd"; then
   export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 elif exists "rg"; then
@@ -192,13 +201,12 @@ fi
 export FZF_COMPLETION_TRIGGER='..'
 
 export GOPATH=$HOME
+add_to_path "$GOPATH/bin"
 
 add_to_path "$HOME/.cargo/bin"
-add_to_path "$GOPATH/bin"
 add_to_path "$HOME/.local/bin" # hie
-add_to_path "/Library/TeX/texbin"
-
 add_to_path "$HOME/.npm-packages/bin"
+add_to_path "/Library/TeX/texbin"
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
 
@@ -343,3 +351,7 @@ compress() {
 
 # added by travis gem
 [ -f /Users/xlc/.travis/travis.sh ] && source /Users/xlc/.travis/travis.sh
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion

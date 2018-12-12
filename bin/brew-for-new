@@ -107,26 +107,26 @@ brew install wget
 # Remove outdated versions from the cellar.
 brew cleanup
 
-brew cask install alfred
-brew cask install docker
-brew cask install eudic
-brew cask install firefox
-brew cask install google-chrome
-brew cask install hammerspoon
-brew cask install haskell-platform
-brew cask install iterm2
-brew cask install java
-brew cask install neteasemusic
-brew cask install qq
-brew cask install shadowsocksx-ng
-brew cask install sogouinput # open /usr/local/...
-brew cask install telegram
-brew cask install visual-studio-code
-brew cask install wechat
-
 brew tap homebrew/cask-fonts
 brew cask install font-fantasque-sans-mono
 brew cask install font-fira-code
 brew cask install font-iosevka
+
+brew cask install shadowsocksx-ng
+brew cask install alfred
+brew cask install eudic
+brew cask install firefox
+brew cask install google-chrome
+brew cask install hammerspoon
+brew cask install iterm2
+brew cask install neteasemusic
+brew cask install qq
+brew cask install visual-studio-code
+brew cask install wechat
+brew cask install telegram
+brew cask install sogouinput # open /usr/local/...
+brew cask install java
+brew cask install haskell-platform
+brew cask install docker
 
 brew cask cleaup

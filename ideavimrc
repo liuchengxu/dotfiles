@@ -24,6 +24,7 @@ nnoremap gi :action GotoImplementation<CR>
 nnoremap <Leader>ps :action SearchEverywhere<CR>
 nnoremap <Leader>pf :action GotoFile<CR>
 
+nnoremap fu :action FindUsages<CR>
 nnoremap <Leader>fu :action FindUsages<CR>
 
 " Quit normal mode
@@ -99,6 +100,13 @@ nnoremap <Leader>br :action ViewBreakpoints<CR>
 nnoremap <Leader>cv :action ChangeView<CR>
 
 nnoremap <Leader>cd :action ChooseDebugConfiguration<CR>
+
+nnoremap ga :action GotoAction<CR>
+nnoremap gc :action GotoClass<CR>
+nnoremap gd :action GotoDeclaration<CR>
+nnoremap gf :action GotoFile<CR>
+nnoremap gi :action GotoImplementation<CR>
+nnoremap gs :action GotoSymbol<CR>
 
 nnoremap <Leader>ga :action GotoAction<CR>
 nnoremap <Leader>gc :action GotoClass<CR>
