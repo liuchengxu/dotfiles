@@ -33,7 +33,7 @@ hotkey.bind(hyper, '/', function()
     hints.windowHints()
 end)
 
-switcher = window.switcher.new(
+local switcher = window.switcher.new(
    window.filter.new()
       :setAppFilter('Emacs', {allowRoles = '*', allowTitles = 1}), -- make emacs window show in switcher list
    {

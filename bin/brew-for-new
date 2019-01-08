@@ -7,18 +7,18 @@ msg() {
 
 success() {
     if [ "$ret" -eq '0' ]; then
-        msg "\33[32m[✔]\33[0m ${1}${2}"
+        msg "\\33[32m[✔]\\33[0m ${1}${2}"
     fi
 }
 
 error() {
-    msg "\33[31m[✘]\33[0m ${1}${2}"
+    msg "\\33[31m[✘]\\33[0m ${1}${2}"
     exit 1
 }
 
 program_exists() {
     local ret='0'
-    command -v $1 >/dev/null 2>&1 || { local ret='1'; }
+    command -v "$1" >/dev/null 2>&1 || { local ret='1'; }
 
     # fail on non-zero return value
     if [ "$ret" -ne 0 ]; then
@@ -29,10 +29,8 @@ program_exists() {
 }
 
 program_must_exist() {
-    program_exists $1
-
     # throw error on non-zero return value
-    if [ "$?" -ne 0 ]; then
+    if program_exists "$1"; then
         error "You must have '$1' installed to continue."
     fi
 }
@@ -65,7 +63,7 @@ brew tap homebrew/versions
 brew install bash-completion2
 
 # Switch to using brew-installed bash as default shell
-if ! fgrep -q '/usr/local/bin/bash' /etc/shells; then
+if ! grep -F -q '/usr/local/bin/bash' /etc/shells; then
     echo '/usr/local/bin/bash' | sudo tee -a /etc/shells;
     chsh -s /usr/local/bin/bash;
 fi;
@@ -88,7 +86,7 @@ brew install jq
 brew install llvm
 brew install macvim
 brew install mobile-shell
-brew install neovim
+brew install neovim --HEAD
 brew install ncdu
 brew install pandoc
 brew install prettyping

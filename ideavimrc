@@ -6,7 +6,7 @@ set ignorecase
 set smartcase
 set showmode
 set number
-set relativenumber
+" set relativenumber
 set scrolloff=3
 set history=100000
 set clipboard=unnamed

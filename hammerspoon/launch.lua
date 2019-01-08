@@ -2,6 +2,9 @@ local hotkey = require 'hs.hotkey'
 local window = require 'hs.window'
 local application = require 'hs.application'
 
+-- https://emacs-china.org/t/topic/3688/5
+-- https://github.com/manateelazycat/hammerspoon-config/blob/master/init.lua
+
 local key2app = {
     c = 'Google Chrome',
     d = 'EuDic',
@@ -14,7 +17,7 @@ local key2app = {
     s = 'NeteaseMusic',
     t = 'Terminal',
     v = 'MacVim',
-    w = 'WeChat',
+    w = '/Applications/WeChat.app',
 }
 
 -- Toggle an application between being the frontmost app, and being hidden
@@ -22,16 +25,16 @@ local function toggle_application(_app)
     -- finds a running application
     local app = application.find(_app)
 
+    -- if app is not running, launch it
     if not app then
-        -- if app is not running, launch it
         application.launchOrFocus(_app)
         return
     end
 
-    -- application running, toggle hide/unhide
+    -- if app is running, toggle hide/unhide
     local mainwin = app:mainWindow()
     if mainwin then
-        if true == app:isFrontmost() then
+        if app:isFrontmost() then
             mainwin:application():hide()
         else
             mainwin:application():activate(true)
@@ -43,8 +46,6 @@ local function toggle_application(_app)
         if true == app:hide() then
             -- focus app
             application.launchOrFocus(_app)
-        else
-            -- nothing to do
         end
     end
 end

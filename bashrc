@@ -66,7 +66,6 @@ alias gdc='git diff --cached'
 alias gr='git remote'
 alias gst='git status'
 alias gpom="git push origin master"
-alias push="git push origin master"
 alias gitv='git log --color --graph --pretty=format:"%Cred%h%Creset -%C(green)%d%Creset %s %C(yellow)(%cr) %C(blue)<%an>%Creset" --abbrev-commit --'
 ## up: cd .. when you're too lazy to use the spacebar
 alias up="cd .."
@@ -186,6 +185,7 @@ add_pwd() {
   export PATH
 }
 
+export EDITOR=vim
 # https://github.com/wernight/powerline-web-fonts/issues/8
 export LANG=en_US.UTF-8
 export LC_CTYPE=en_US.UTF-8
@@ -209,6 +209,7 @@ add_to_path "$HOME/.npm-packages/bin"
 add_to_path "/Library/TeX/texbin"
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
+alias cargoexpand="cargo rustc -- -Z unstable-options --pretty=expanded"
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 [ -f "$HOME/bashrc-extra" ] && source "$HOME/bashrc-extra"
@@ -227,13 +228,27 @@ cshow() {
     shas=$(sed '1,2d;s/^[^a-z0-9]*//;/^$/d' <<< "$out" | awk '{print $1}')
     [ -z "$shas" ] && continue
     if [ "$k" = ctrl-d ]; then
-      git diff --color=always $shas | less -R
+      git diff --color=always "$shas" | less -R
     else
       for sha in $shas; do
-        git show --color=always $sha | less -R
+        git show --color=always "$sha" | less -R
       done
     fi
   done
+}
+
+push() {
+  local remote branch
+  remote=$(git remote)
+  branch=$(git rev-parse --abbrev-ref HEAD)
+  git push $remote $branch
+}
+
+pull() {
+  local remote branch
+  remote=$(git remote)
+  branch=$(git rev-parse --abbrev-ref HEAD)
+  git pull $remote $branch
 }
 
 # Tmux
