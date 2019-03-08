@@ -56,6 +56,8 @@ alias p='pwd'
 alias l='ls -alF'
 alias la='ls -al'
 alias ll='ls -l'
+alias viml='vim -c "set bg=light"'
+alias nviml='nvim -c "set bg=light"'
 
 ## Git
 alias ga='git add'
@@ -210,6 +212,7 @@ add_to_path "/Library/TeX/texbin"
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
 alias cargoexpand="cargo rustc -- -Z unstable-options --pretty=expanded"
+alias cb="cargo build"
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 [ -f "$HOME/bashrc-extra" ] && source "$HOME/bashrc-extra"
@@ -370,3 +373,32 @@ compress() {
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# fco - checkout git branch/tag
+fco() {
+  local tags branches target
+  if [ -n "$1" ] ; then
+    git remote update origin --prune >/dev/null
+  fi
+  tags=$(git tag | awk '{print "\x1b[31;1mtag\x1b[m\t" $1}') || return
+  branches=$(
+    git branch --all | grep -v HEAD             |
+    sed "s/.* //"    | sed "s#remotes/[^/]*/##" |
+    sort -u          | awk '{print "\x1b[34;1mbranch\x1b[m\t" $1}') || return
+  target=$(
+    (echo "$tags"; echo "$branches") |
+    fzf --height=40% --no-hscroll --ansi -d "\t" -n 2) || return
+  git checkout $(echo "$target" | awk '{print $2}')
+}
+
+# fbr - checkout git branch (including remote branches)
+fbr() {
+  local branches branch
+  branches=$(git branch --all | grep -v HEAD) &&
+  branch=$(echo "$branches" | fzf --height=40% -d $(( 2 + $(wc -l <<< "$branches") )) +m) &&
+  git checkout $(echo "$branch" | sed "s/.* //" | sed "s#remotes/[^/]*/##")
+}
+
+fcof() {
+  git checkout -- $(git ls-files --modified | fzf --height=40% -m) >/dev/null
+}

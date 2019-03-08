@@ -126,5 +126,6 @@ brew cask install sogouinput # open /usr/local/...
 brew cask install java
 brew cask install haskell-platform
 brew cask install docker
+brew cask install kap
 
 brew cask cleaup

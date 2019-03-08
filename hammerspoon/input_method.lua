@@ -1,20 +1,20 @@
 -- https://emacs-china.org/t/topic/6348
 -- Smart input method switcher
 local function Chinese()
-  hs.keycodes.currentSourceID("com.sogou.inputmethod.sogou.pinyin")
+    hs.keycodes.currentSourceID("com.sogou.inputmethod.sogou.pinyin")
 end
 
 local function English()
-  hs.keycodes.currentSourceID("com.apple.keylayout.ABC")
+    hs.keycodes.currentSourceID("com.apple.keylayout.ABC")
 end
 
 local function set_app_input_method(app_name, set_input_method_function, event)
-  event = event or hs.window.filter.windowFocused
+    event = event or hs.window.filter.windowFocused
 
-  hs.window.filter.new(app_name)
+    hs.window.filter.new(app_name)
     :subscribe(event, function()
-                 set_input_method_function()
-              end)
+        set_input_method_function()
+    end)
 end
 
 set_app_input_method('Hammerspoon', English, hs.window.filter.windowCreated)
@@ -34,7 +34,7 @@ set_app_input_method('Telegram', Chinese)
 
 hs.hotkey.bind(hyper, ".", function()
     hs.alert.show(
-        "App path:      "..hs.window.focusedWindow():application():path().."\n"..
-        "App name:      "..hs.window.focusedWindow():application():name().."\n"..
-        "IM source ID:  "..hs.keycodes.currentSourceID())
+    "App path:      "..hs.window.focusedWindow():application():path().."\n"..
+    "App name:      "..hs.window.focusedWindow():application():name().."\n"..
+    "IM source ID:  "..hs.keycodes.currentSourceID())
 end)
