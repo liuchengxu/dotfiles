@@ -402,3 +402,7 @@ fbr() {
 fcof() {
   git checkout -- $(git ls-files --modified | fzf --height=40% -m) >/dev/null
 }
+
+nop() {
+  http_proxy= https_proxy= "$@"
+}

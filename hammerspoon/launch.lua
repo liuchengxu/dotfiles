@@ -6,7 +6,7 @@ local application = require 'hs.application'
 -- https://github.com/manateelazycat/hammerspoon-config/blob/master/init.lua
 
 local key2app = {
-    c = 'Google Chrome',
+    c = '/Applications/Google Chrome.app',
     d = 'EuDic',
     e = 'Emacs',
     f = 'Firefox',
