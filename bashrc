@@ -167,8 +167,11 @@ LWhite=$(tput setaf 15)
 Bold=$(tput bold)
 Normal=$(tput sgr0)
 
-# PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
-PROMPT_COMMAND='history -a; printf "\[$LBlack\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
+if [ "$PLATFORM" = Darwin ]; then
+  PROMPT_COMMAND='history -a; printf "\[$LBlack\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
+else
+  PROMPT_COMMAND='history -a; history -c; history -r; printf "\[\e[38;5;59m\]%$(($COLUMNS - 4))s\r" "$(__git_ps1) ($(date +%m/%d\ %H:%M:%S))"'
+fi
 
 if [ "$PLATFORM" = Darwin ]; then
   PS1=""
@@ -406,3 +409,5 @@ fcof() {
 nop() {
   http_proxy= https_proxy= "$@"
 }
+
+alias gnvim="VIMRUNTIME=/usr/share/vim/vim80 GNVIM_RUNTIME_PATH=./runtime /home/xlc/src/github.com/vhakulinen/gnvim/target/release/gnvim --nvim=/home/xlc/src/github.com/neovim/neovim/build/bin/nvim"
