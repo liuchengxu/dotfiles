@@ -128,8 +128,6 @@ function nonzero_return() {
 	[ $RETVAL -ne 0 ] && echo "$RETVAL"
 }
 
-[ -f /usr/local/etc/profile.d/autojump.sh ] && . /usr/local/etc/profile.d/autojump.sh
-
 ### git-prompt
 # To show */+/% may have an impact on the performance
 # Displays a * and + next to the branch name if there are unstaged (*) and staged (+) changes
@@ -142,10 +140,15 @@ if [ ! -e ~/.git-prompt.sh ]; then
 fi
 source "$HOME/.git-prompt.sh"
 
-if [ ! -e ~/.z.sh ]; then
-  curl https://raw.githubusercontent.com/rupa/z/master/z.sh -o ~/.z.sh
+# if [ ! -e ~/.z.sh ]; then
+  # curl https://raw.githubusercontent.com/rupa/z/master/z.sh -o ~/.z.sh
+# fi
+# source "$HOME/.z.sh"
+
+if [ ! -e ~/.z.lua ]; then
+  curl https://raw.githubusercontent.com/skywind3000/z.lua/master/z.lua -o ~/.z.lua
 fi
-source "$HOME/.z.sh"
+eval "$(lua $HOME/.z.lua  --init bash)" 
 
 Black=$(tput setaf 0)
 Red=$(tput setaf 1)
