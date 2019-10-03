@@ -82,6 +82,7 @@ alias restart="source ~/.bashrc"
 alias lip="ipconfig getifaddr en0"
 alias www='python3 -m SimpleHTTPServer 8000'
 alias n="nvim"
+alias grepi='grep -i'
 
 ### Tmux
 alias tmux="tmux -2"
@@ -219,9 +220,14 @@ add_to_path "/Library/TeX/texbin"
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
 alias cargoexpand="cargo rustc -- -Z unstable-options --pretty=expanded"
 alias cb="cargo build"
+alias cbr="cargo build --release"
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 [ -f "$HOME/bashrc-extra" ] && source "$HOME/bashrc-extra"
+
+cargotest() {
+  cargo test $1 -- --nocapture --test-threads=1
+}
 
 # Git
 ## cshow - git commit browser (enter for show, ctrl-d for diff)
