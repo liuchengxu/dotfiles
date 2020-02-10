@@ -1,316 +1,82 @@
-" Layers {{
-" Let Vim and NeoVim shares the same plugin directory.
-" Comment it out if you don't like
+" Comment the following line if you don't want Vim and NeoVim to share the
+" same plugin download directory.
 let g:spacevim_plug_home = '~/.vim/plugged'
 
-" The default leader key is space key.
-" Uncomment the line below and modify "<\Space>" if you prefer another
+" Uncomment the following line to override the leader key. The default value is space key "<\Space>".
 " let g:spacevim_leader = "<\Space>"
 
-" The default local leader key is comma.
-" Uncomment the line below and modify ',' if you prefer another
+" Uncomment the following line to override the local leader key. The default value is comma ','.
 " let g:spacevim_localleader = ','
 
-" Enable the existing layers in space-vim
+" Enable the existing layers in space-vim.
+" Refer to https://github.com/liuchengxu/space-vim/blob/master/layers/LAYERS.md for all available layers.
 let g:spacevim_layers = [
       \ 'fzf', 'better-defaults', 'which-key',
-      \ 'better-motion', 'file-manager', 'programming', 'editing', 'text-align', 'formatting',
-      \ 'go', 'rust', 'graphviz', 'javascript', 'solidity', 'python', 'c-c++',
-      \ 'git', 'github', 'chinese', 'latex', 'goyo'
       \ ]
 
-" call remove(g:spacevim_layers, index(g:spacevim_layers, 'syntax-checking'))
+let g:spacevim_layers = ['programming', 'fzf', 'better-defaults', 'which-key', 'better-motion', 'editing', 'text-align', 'formatting',
+      \ 'go', 'rust', 'python', 'c-c++', 'latex', 'goyo', 'graphviz', 'git', 'github', 'chinese', 'javascript', 'file-manager'
+      \ ]
 
-let g:spacevim_lsp_prefer_coc = 1
-let g:spacevim_enable_coc_completion = 0
-Layer 'syntax-checking'
-" Layer 'ctrlp'
+let g:coc_force_debug = 1
+let g:spacevim_disable_nerdtree_arrow_icons = 0
 
-" let g:spacevim_use_ncm2 = 1 | Layer 'auto-completion' | Layer 'syntax-checking'
-Layer 'lsp'
-" Layer 'ycmd'
-Layer 'code-snippets'
-Layer 'markdown', { 'exclude': 'dominikduda/vim_current_word' }
-" Layer 'airline'
-" }}
+" Uncomment the following line if your terminal(-emulator) supports true colors.
+if $TERM_PROGRAM !~? 'Apple_Terminal'
+  let g:spacevim_enable_true_color = 1
+endif
 
-" Init {{
-" Manage your own plugins, refer to vim-plug's instruction for more detials.
-function! UserInit()
+let g:space_vim_plugin_hi_groups = 1
 
-  " Add plugin via Plug command.
-  Plug 'junegunn/seoul256.vim'
-  Plug 'lifepillar/vim-gruvbox8'
+let g:spacevim_lsp_engine = 'coc'
 
-  Plug 'lifepillar/vim-colortemplate'
-  " Plug 'junegunn/limelight.vim'
-  " Plug 'junegunn/vim-peekaboo'
+" Layer 'lsp'
 
-  " Plug 'mpevnev/guten-tag'
+set timeoutlen=500
 
-  Plug 'mattn/vim-fz'
-  Plug 'cloudhead/neovim-fuzzy'
+" Uncomment the following if you have some nerd font installed.
+" let g:spacevim_nerd_fonts = 1
 
-  Plug 'tpope/vim-commentary'
-
-  " Plug 'justinmk/vim-dirvish'
-  " Plug 'junegunn/vim-slash'
-
-  Plug 'cormacrelf/vim-colors-github'
-  Plug 'Shougo/denite.nvim'
-
-endfunction
-" }}
-
-function! ToCamelCase(s)
-    let subbed = substitute(a:s, "\\(\\L\\+\\)", " \\L\\1", "g")
-    let sp = split(subbed, "[ _-]\\+")
-    let tail = join(sp, " ")
-
-    return substitute(tail, " \\(\\a\\)", "\\u\\1", "g")
-endfunction
-
-" Override the default settings as well as adding extras
-function! UserConfig()
-" autocmd User ALELintPost call s:ale()
-hi CocHighlightText ctermfg=235 guifg=#282828 ctermbg=109 guibg=#83a598
-hi link CocHighlightRead CocHighlightText
-hi link CocHighlightWrite CocHighlightText
-" hi CocHighlightText ctermbg=237 guibg=#14323e
-" hi CocHighlightText cterm=bold ctermfg=239 ctermbg=109 gui=bold guifg=#504945 guibg=#83a598 
-
-function! s:ale() abort
-  autocmd CursorMoved * call spacevim#plug#ale#EchoVirtualText()
-endfunction
-
-let g:Lf_ShortcutB = '<Leader>bt'
-let g:Lf_ShortcutF = '<Leader>ff'
-
-" if has('timers') && !has('nvim')
-  noremap <expr> <plug>(slash-after) slash#blink(2, 50)
+" If you want to have more control over the layer, try using Layer command.
+" if g:spacevim.gui
+"   Layer 'airline'
 " endif
 
-nnoremap <leader>fm :echom "fm"<CR>
-
-set norelativenumber
-let g:vim_better_default_persistent_undo = 1
-" set nonumber
-
-let g:fz_command = 'rg --files . | fzy'
-let g:fz_command = 'sk --ansi -i -c ''rg --color=always --line-number "{}"'''
-let g:fz_command_files = ''
-let g:fz_command_options_action = ''
-
-nnoremap ： :
-
 if g:spacevim.nvim
-  " autocmd TermOpen * setlocal nonumber norelativenumber | startinsert
-  " autocmd TermClose * exe expand('<abuf>').'bd!'
-
-  " command! Terminal split term://bash
+  let g:spacevim_lsp_engine = 'coc'
+  " let g:spacevim_use_ncm2 = 1 | Layer 'auto-completion' | Layer 'syntax-checking'
+  " let g:spacevim_enable_coc_completion = 0
+else
+  let g:spacevim_use_ncm2 = 1 | Layer 'auto-completion' | Layer 'syntax-checking'
 endif
 
-  " let g:LanguageClient_serverCommands.rust = []
-  " If you have installed the powerline fonts and want to enable airline layer
-  let g:airline_powerline_fonts=1
+" Manage your own plugins.
+" Refer to https://github.com/junegunn/vim-plug for more detials.
+function! UserInit()
 
-  " Use gui colors in terminal if available
-  function! s:enable_termgui()
-    if has('termguicolors')
-      set termguicolors
-      if g:spacevim.tmux && !g:spacevim.nvim
-        " If use vim inside tmux, see https://github.com/vim/vim/issues/993
-        " set Vim-specific sequences for RGB colors
-        let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
-        let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
-      endif
-    endif
-  endfunction
+  " Add your own plugin via Plug command.
+  Plug 'junegunn/seoul256.vim'
 
-  " If your terminal(-emulator) supports true colors, uncomment the line below
-  if $TERM_PROGRAM !~? 'Apple_Terminal'
-    call s:enable_termgui()
+  if $TERM =~ 'xterm-kitty' || $TERM_PROGRAM == 'iTerm.app'
+    Plug 'ryanoasis/vim-devicons'
   endif
 
-  let g:python3_host_prg = '/usr/local/bin/python3'
+  Plug 'lifepillar/vim-colortemplate'
+  Plug 'neoclide/coc.nvim'
 
-  set list listchars=tab:¦\ ,trail:•,extends:❯,precedes:❮
-  set wrap
-
-  let g:ale_sign_error = "◉"
-  let g:ale_sign_warning = "◉"
-  highlight ALEErrorSign ctermfg=9 guifg=#C30500
-  highlight ALEWarningSign ctermfg=11 guifg=#ED6237
-
-  let g:eleline_slim = 1
-
-  let g:ncm2#complete_length = [[1,3],[7,2]]
-
-  let g:rust_recommended_style = 0
-
-  nnoremap <silent> <C-G> :call spacevim#vim#file#CtrlG()<CR>
-  inoremap <C-C> <ESC>
-
-  let g:LanguageClient_selectionUI = 'fzf'
-
-  " color gruvbox8
-  if g:colors_name ==? 'gruvbox8'
-    hi! link SpecialComment Comment
-    hi Function ctermfg=203 ctermbg=NONE guifg=#fb4934 guibg=NONE guisp=NONE cterm=NONE,bold gui=NONE,bold
-    hi Keyword ctermfg=142 ctermbg=NONE guifg=#b8bb26 guibg=NONE guisp=NONE cterm=NONE gui=NONE
-  endif
-  " hi CurrentWord cterm=reverse ctermfg=214 ctermbg=235 gui=reverse guifg=#fabd2f guibg=#282828
-  " hi CurrentWordTwins cterm=reverse ctermfg=109 ctermbg=235 gui=reverse guifg=#83a598 guibg=#282828
-  " hi CurrentWord guibg=#293239
-  " hi CurrentWordTwins guibg=#293235
-  " hi CurrentWord guibg=#293235
-  " hi CurrentWord guibg=#32322c
-
-  if g:spacevim.nvim
-    hi Comment gui=NONE cterm=NONE
-    autocmd ColorScheme * hi Comment gui=NONE cterm=NONE
-  endif
-  if 1
-    hi LineNr ctermbg=NONE guibg=NONE
-    hi SpecialComment ctermfg=244 guifg=#768294
-  endif
-  if 0
-    hi DiffAdd        ctermbg=85 guibg=#e6ffed
-    hi DiffChange ctermbg=230 guibg=#fffbdd
-    hi DiffDelete ctermfg=250 ctermbg=167 guifg=#babbbc guibg=#ffeef0
-    hi DiffText  ctermbg=222 guibg=#f2e496
-    hi diffAdded      ctermfg=29 ctermbg=85 guifg=#22863a guibg=#e6ffed
-    hi diffFile ctermfg=235 ctermbg=255 guifg=#24292e guibg=#f6f8fa
-    hi diffIndexLine  ctermfg=17 ctermbg=255 guifg=#032f62 guibg=#f6f8fa
-    hi diffLine ctermfg=243 ctermbg=153 guifg=#6a737d guibg=#f1f8ff
-    hi diffNewFile    ctermfg=235 ctermbg=255 guifg=#24292e guibg=#f6f8fa
-    hi diffRemoved    ctermfg=167 ctermbg=167 guifg=#d73a49 guibg=#ffeef0
-    hi diffSubname    ctermfg=17 ctermbg=153 guifg=#032f62 guibg=#f1f8ff
-  endif
-
-  if $TERM == 'xterm-kitty'
-    hi Comment cterm=italic
-  endif
-
-  if has('python3')
-    python3 1
-  endif
-  let g:space_vim_filetype_hi_groups = 1
-  let g:space_vim_plugin_hi_groups = 1
-  " color space_vim_theme
-  cnoreabbrev ag Ag
-
-  command! -nargs=+ Run call spacevim#vim#term#Run(<f-args>)
-  command! -nargs=+ -range Respace call s:respace(<f-args>)
-
-  set timeoutlen=500
-
-  " unlet g:fzf_colors
-
-  " set guifont=Fira\ Code:h12
-  " let &guifont = 'Fira Code:h12'
-  let &guifont = 'Iosevka-Slab:h16'
-  " let &guifont = 'Fantasque Sans Mono:h16'
-
-  command! Font set guifont=*
-
-if has_key(g:plugs, 'LanguageClient-neovim')
-  let g:LanguageClient_serverCommands.lua = ['lua-lsp']
-
-  let g:LanguageClient_serverCommands.typescript = ['typescript-language-server', '--stdio']
-  let g:LanguageClient_serverCommands['typescript.jsx'] = ['typescript-language-server', '--stdio']
-endif
-
-let s:black_list = ['nerdtree', 'tagbar']
-
-highlight WhichKeyDesc ctermfg=68 guifg=#5f87d7
-
-" disable EX-mode
-nnoremap  Q <Nop>
-nnoremap gQ <Nop>
-
-nnoremap <silent> ] :<c-u>WhichKey ']'<CR>
-nnoremap <silent> [ :<c-u>WhichKey '['<CR>
-
-nmap <silent> ]k <Plug>(ale_previous_wrap)
-nmap <silent> ]j <Plug>(ale_next_wrap)
-
-" CTRL-A is Select all
-" This works better than the default Windows script.
-noremap <C-A> ggVG
-inoremap <C-A> <Esc>ggvG
-vnoremap <C-A> <Esc>ggVG
-let g:ale_virtualtext_cursor = 1
-let g:ale_virtualtext_prefix = "💡 "
-" let g:maplocalleader = 'g'
-" nnoremap <silent> <localleader> :WhichKey 'g'<CR>
-
+  Plug '~/.vim/plugged/vista.vim'
 endfunction
 
-function! s:respace(...) abort
-  let before = a:1
-  let after = a:2
-  execute 'setlocal' 'tabstop='.before 'softtabstop='.before 'noexpandtab'
-  retab!
-  execute 'setlocal' 'tabstop='.after 'softtabstop='.after 'expandtab'
-  retab
+" Override the default settings from space-vim as well as adding extras
+function! UserConfig()
+
+  " Override the default settings.
+  " Uncomment the following line to disable relative number.
+  " set norelativenumber
+
+  " Adding extras.
+  " Uncomment the following line If you have installed the powerline fonts.
+  " It is good for airline layer.
+  " let g:airline_powerline_fonts = 1
+
 endfunction
-
-function! Test()
-  let old_line = line('.')
-  let old_col = col('.')
-  let cword = expand('<cword>')
-  let str = repeat('-', len(cword)+2)
-  call cursor(old_line-1, old_col)
-  " if the column number of previous line less than current line, col('.') is the col('$') of previous line
-  if col('.') < old_col
-    exe "normal a".repeat(' ', old_col-col('.'))
-  endif
-  call cursor(old_line-1, old_col)
-  exe "normal i+".str."+"
-  call cursor(old_line, old_col)
-  exe "normal i| "
-  call cursor(old_line+1, old_col)
-  if col('.') < old_col
-    exe "normal a".repeat(' ', old_col-col('.'))
-  endif
-  call cursor(old_line+1, old_col)
-  exe "normal i+".str."+"
-  call cursor(old_line, old_col+1)
-  exe "normal ea |"
-  call cursor(old_line, old_col+1)
-endfunction
-
-" Automatic Hover
-function! DoNothingHandler(output)
-endfunction
-
-function! IsDifferentHoverLineFromLast()
-  if !exists('b:last_hover_line')
-    return 1
-  endif
-
-  return b:last_hover_line !=# line('.') || b:last_hover_col !=# col('.')
-endfunction
-
-function! GetHoverInfo()
-  " Only call hover if the cursor position changed.
-  "
-  " This is needed to prevent infinite loops, because hover info is displayed
-  " in a popup window via nvim_buf_set_lines() which puts the cursor into the
-  " popup window and back, which in turn calls CursorMoved again.
-  if mode() == 'n' && IsDifferentHoverLineFromLast()
-    let b:last_hover_line = line('.')
-    let b:last_hover_col = col('.')
-
-    call LanguageClient_textDocument_hover({'handle': v:true}, 'DoNothingHandler')
-    call LanguageClient_clearDocumentHighlight()
-    call LanguageClient_textDocument_documentHighlight({'handle': v:true}, 'DoNothingHandler')
-  endif
-endfunction
-
-" augroup LanguageClient_config
-  " autocmd!
-  " autocmd CursorMoved * call GetHoverInfo()
-  " autocmd CursorMovedI * call LanguageClient_clearDocumentHighlight()
-" augroup end

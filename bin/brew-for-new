@@ -73,6 +73,7 @@ fi;
 brew install ack
 brew install bat
 brew install cscope
+brew tap universal-ctags/universal-ctags
 brew install --with-jansson universal-ctags/universal-ctags/universal-ctags --HEAD
 brew install fd
 brew install fish
@@ -109,6 +110,8 @@ brew tap homebrew/cask-fonts
 brew cask install font-fantasque-sans-mono
 brew cask install font-fira-code
 brew cask install font-iosevka
+brew cask install font-firacode-nerd-font
+brew cask install font-iosevka-nerd-font
 
 brew cask install shadowsocksx-ng
 brew cask install alfred
@@ -126,5 +129,6 @@ brew cask install sogouinput # open /usr/local/...
 brew cask install java
 brew cask install haskell-platform
 brew cask install docker
+brew cask install thunder
 brew cask install kap
 brew cask cleaup

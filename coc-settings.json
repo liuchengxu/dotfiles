@@ -1,0 +1,124 @@
+{
+   "rust-client.disableRustup": true,
+   "rust-client.channel": "nightly",
+   "rust-client.rlsPath": "rls",
+   "rust-analyzer.lruCapacity": 100,
+   "rust-analyzer.featureFlags": {
+       "lsp.diagnostics": false
+   },
+   "rust-analyzer.enableCargoWatchOnStartup": false,
+   "explorer.icon.enableNerdfont": true,
+        "explorer.keyMappings": {
+        "k": "nodePrev",
+        "j": "nodeNext",
+
+        "*": "toggleSelection",
+        "<tab>": "actionMenu",
+
+        "h": "collapse",
+        "l": "expand",
+        "J": ["toggleSelection", "normal:j"],
+        "K": ["toggleSelection", "normal:k"],
+        "gl": "expandRecursive",
+        "gh": "collapseRecursive",
+        "o": "expandOrCollapse",
+        "<cr>": "open",
+        "e": "open",
+        "E": "openInVsplit",
+        "t": "openInTab",
+        "<bs>": "gotoParent",
+
+        "y": "copyFilepath",
+        "Y": "copyFilename",
+        "c": "copyFile",
+        "x": "cutFile",
+        "p": "pasteFile",
+        "d": "delete",
+        "D": "deleteForever",
+
+        "a": "addFile",
+        "A": "addDirectory",
+        "r": "rename",
+
+        ".": "toggleHidden",
+        "R": "refresh",
+
+        "?": "help",
+        "q": "quit",
+        "X": "systemExecute",
+        "gd": "listDrive",
+
+        "f": "search",
+        "F": "searchRecursive",
+
+        "gf": "gotoSource:file",
+        "gb": "gotoSource:buffer",
+
+        "[[": "sourcePrev",
+        "]]": "sourceNext",
+
+        "[d": "diagnosticPrev",
+        "]d": "diagnosticNext",
+
+        "[c": "gitPrev",
+        "]c": "gitNext",
+        "<<": "gitStage",
+        ">>": "gitUnstage"
+    },
+   "diagnostic.enable": false,
+   "diagnostic.displayByAle": true,
+   "suggest.minTriggerInputLength": 2,
+   "languageserver":{
+      "lua":{
+         "command":"lua-lsp",
+         "filetypes":["lua"]
+      },
+      "ccls":{
+         "command":"ccls",
+         "filetypes":["c", "cpp", "objc", "objcpp" ],
+         "rootPatterns":[ ".ccls", "compile_commands.json", ".vim/", ".git/", ".hg/" ],
+         "initializationOptions":{
+            "cacheDirectory":"/tmp/ccls"
+         }
+      },
+      "bash":{
+         "command":"bash-language-server",
+         "args":["start"],
+         "filetypes":["sh"],
+         "ignoredRootPaths":["~"]
+      }
+   },
+  "suggest.completionItemKindLabels": {
+    "function": "\uf794 ",
+    "method": "\uf6a6 ",
+    "variable": "\uf71b ",
+    "constant": "\uf8ff ",
+    "struct": "\ufb44 ",
+    "class": "\uf0e8 ",
+    "interface": "\ufa52 ",
+    "text": "\ue612 ",
+    "enum": "\uf435 ",
+    "enumMember": "\uf02b ",
+    "module": "\uf668 ",
+    "color": "\ue22b ",
+    "property": "\ufab6 ",
+    "field": "\uf93d ",
+    "unit": "\uf475 ",
+    "file": "\uf471 ",
+    "value": "\uf8a3 ",
+    "event": "\ufacd ",
+    "folder": "\uf115 ",
+    "keyword": "\uf893 ",
+    "snippet": "\uf64d ",
+    "operator": "\uf915 ",
+    "reference": "\uf87a ",
+    "typeParameter": "\uf278 ",
+    "default": "\uf29c"
+  },
+  "list.insertMappings": {
+      "<C-c>": "do:exit"
+  },
+  "list.normalMappings": {
+      "<C-c>": "do:exit"
+  }
+}
