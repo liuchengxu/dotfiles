@@ -2,7 +2,7 @@
 	email = xuliuchengxlc@gmail.com
 	name = Liu-Cheng Xu
 [core]
-  excludesfile = ~/.gitexcludes
+	excludesfile = /Users/xuliucheng/.gitexcludes
   # I have no idea why the python3 feature is broken when committing with vim
   editor       = nvim
 [color "branch"]
@@ -23,3 +23,11 @@
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
+[difftool "sourcetree"]
+	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
+	path = 
+[mergetool "sourcetree"]
+	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+	trustExitCode = true
+[commit]
+	template = /Users/xuliucheng/.stCommitMsg

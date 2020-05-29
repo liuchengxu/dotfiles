@@ -53,14 +53,15 @@ alias ......='cd ../../../../..'
 alias cd.='cd ..'
 alias cd..='cd ..'
 alias p='pwd'
-alias l='ls -alF'
-alias la='ls -al'
-alias ll='ls -l'
+alias l='ls -alFG'
+alias la='ls -al --color=auto'
+alias ll='ls -l --color=auto'
 alias viml='vim -c "set bg=light"'
 alias nviml='nvim -c "set bg=light"'
 
 ## Git
 alias ga='git add'
+alias gau='git add -u'
 alias gb='git branch'
 alias gc='git checkout'
 alias gd='git diff'
@@ -115,12 +116,16 @@ if [ "$PLATFORM" = Darwin ]; then
 fi
 
 ### Colored ls
-if exists "dircolors"; then
+if exists 'exa'; then
+  alias ls='exa'
+elif [ "$TERM" = xterm-kitty ]; then
+  alias ls='ls -G'
+elif [ "$PLATFORM" = Darwin ]; then
+  alias ls='ls --color=auto'
+elif exists "dircolors"; then
   eval "$(dircolors -b)"
   alias ls='ls --color=auto'
   alias grep='grep --color=auto'
-elif [ "$PLATFORM" = Darwin ]; then
-  alias ls='ls -G'
 fi
 
 # Prompt
@@ -145,11 +150,6 @@ source "$HOME/.git-prompt.sh"
   # curl https://raw.githubusercontent.com/rupa/z/master/z.sh -o ~/.z.sh
 # fi
 # source "$HOME/.z.sh"
-
-if [ ! -e ~/.z.lua ]; then
-  curl https://raw.githubusercontent.com/skywind3000/z.lua/master/z.lua -o ~/.z.lua
-fi
-eval "$(lua $HOME/.z.lua  --init bash)" 
 
 Black=$(tput setaf 0)
 Red=$(tput setaf 1)
@@ -208,6 +208,7 @@ elif exists "ag"; then
 fi
 
 export FZF_COMPLETION_TRIGGER='..'
+export FZF_DEFAULT_OPTS='--layout=reverse'
 
 export GOPATH=$HOME
 add_to_path "$GOPATH/bin"
@@ -254,14 +255,15 @@ cshow() {
 
 push() {
   local remote branch
-  remote=$(git remote)
+  # normally origin is the last one of remotes
+  remote=$(git remote | tail -n1)
   branch=$(git rev-parse --abbrev-ref HEAD)
   git push $remote $branch
 }
 
 pull() {
   local remote branch
-  remote=$(git remote)
+  remote=$(git remote | tail -n1)
   branch=$(git rev-parse --abbrev-ref HEAD)
   git pull $remote $branch
 }
@@ -419,4 +421,11 @@ nop() {
   http_proxy= https_proxy= "$@"
 }
 
-alias gnvim="VIMRUNTIME=/usr/share/vim/vim80 GNVIM_RUNTIME_PATH=./runtime /home/xlc/src/github.com/vhakulinen/gnvim/target/release/gnvim --nvim=/home/xlc/src/github.com/neovim/neovim/build/bin/nvim"
+export XDG_CONFIG_HOME="$HOME/.config"
+
+# For brew info llvm
+export PATH="/usr/local/opt/llvm/bin:$PATH"
+export LDFLAGS="-L/usr/local/opt/llvm/lib"
+export CPPFLAGS="-I/usr/local/opt/llvm/include"
+
+export PATH="$HOME/src/github.com/MaskRay/ccls/Release:$PATH"

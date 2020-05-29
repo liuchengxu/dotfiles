@@ -1,12 +1,12 @@
 {
-   "rust-client.disableRustup": true,
-   "rust-client.channel": "nightly",
-   "rust-client.rlsPath": "rls",
    "rust-analyzer.lruCapacity": 100,
    "rust-analyzer.featureFlags": {
        "lsp.diagnostics": false
    },
-   "rust-analyzer.enableCargoWatchOnStartup": false,
+   "rust-analyzer.serverPath": "/Users/xuliucheng/.cargo/bin/rust-analyzer",
+   "codeLens.enable": true,
+   "explorer.file.showHiddenFiles": true,
+   "explorer.previewAction.onHover": false,
    "explorer.icon.enableNerdfont": true,
         "explorer.keyMappings": {
         "k": "nodePrev",
@@ -21,7 +21,7 @@
         "K": ["toggleSelection", "normal:k"],
         "gl": "expandRecursive",
         "gh": "collapseRecursive",
-        "o": "expandOrCollapse",
+        "o": ["expanded?", "collapse", "expand"],
         "<cr>": "open",
         "e": "open",
         "E": "openInVsplit",
@@ -79,7 +79,10 @@
          "rootPatterns":[ ".ccls", "compile_commands.json", ".vim/", ".git/", ".hg/" ],
          "initializationOptions":{
             "cacheDirectory":"/tmp/ccls"
-         }
+         },
+         "client": {
+            "snippetSupport": true
+        }
       },
       "bash":{
          "command":"bash-language-server",

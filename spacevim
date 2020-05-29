@@ -1,25 +1,30 @@
-" Comment the following line if you don't want Vim and NeoVim to share the
-" same plugin download directory.
 let g:spacevim_plug_home = '~/.vim/plugged'
 
-" Uncomment the following line to override the leader key. The default value is space key "<\Space>".
-" let g:spacevim_leader = "<\Space>"
-
-" Uncomment the following line to override the local leader key. The default value is comma ','.
-" let g:spacevim_localleader = ','
-
-" Enable the existing layers in space-vim.
-" Refer to https://github.com/liuchengxu/space-vim/blob/master/layers/LAYERS.md for all available layers.
-let g:spacevim_layers = [
-      \ 'fzf', 'better-defaults', 'which-key',
-      \ ]
-
 let g:spacevim_layers = ['programming', 'fzf', 'better-defaults', 'which-key', 'better-motion', 'editing', 'text-align', 'formatting',
-      \ 'go', 'rust', 'python', 'c-c++', 'latex', 'goyo', 'graphviz', 'git', 'github', 'chinese', 'javascript', 'file-manager'
+      \ 'rust', 'python', 'c-c++', 'latex', 'goyo', 'graphviz', 'git', 'github', 'chinese', 'javascript','lsp'
       \ ]
 
+Layer 'file-manager'
+Layer 'markdown'
+
+Layer 'syntax-checking'
+let g:spacevim_excluded = ['dominikduda/vim_current_word', 'kshenoy/vim-signature', 'python-mode/python-mode']
+
+Layer 'file-manager'
+" let g:coc_global_extensions = ['coc-rust-analyzer', 'coc-explorer']
 let g:coc_force_debug = 1
-let g:spacevim_disable_nerdtree_arrow_icons = 0
+
+let g:spacevim_nerd_fonts = 1
+let g:airline_powerline_fonts = 1
+let g:spacevim_lsp_engine = 'coc'
+let g:spacevim_enable_clap =  1
+let g:spacevim_enable_true_color = 1
+let g:spacevim_disable_nerdtree_arrow_icons = 1
+
+let clap_search_box_border_style = 'nil'
+let g:clap_disable_bottom_top = 1
+
+let g:which_key_floating_relative_win = 1
 
 " Uncomment the following line if your terminal(-emulator) supports true colors.
 if $TERM_PROGRAM !~? 'Apple_Terminal'
@@ -28,55 +33,172 @@ endif
 
 let g:space_vim_plugin_hi_groups = 1
 
+let g:vista_echo_cursor_strategy = 'floating_win'
+
+tnoremap <Esc> <C-\><C-n>
+
 let g:spacevim_lsp_engine = 'coc'
+" let g:spacevim_use_ncm2 = 1 | Layer 'auto-completion' | Layer 'syntax-checking'
+" let g:spacevim_enable_coc_completion = 0
 
-" Layer 'lsp'
+let g:clap_provider_yanks_history = '~/.clap_yanks.history'
 
-set timeoutlen=500
-
-" Uncomment the following if you have some nerd font installed.
-" let g:spacevim_nerd_fonts = 1
-
-" If you want to have more control over the layer, try using Layer command.
-" if g:spacevim.gui
-"   Layer 'airline'
-" endif
-
-if g:spacevim.nvim
-  let g:spacevim_lsp_engine = 'coc'
-  " let g:spacevim_use_ncm2 = 1 | Layer 'auto-completion' | Layer 'syntax-checking'
-  " let g:spacevim_enable_coc_completion = 0
-else
-  let g:spacevim_use_ncm2 = 1 | Layer 'auto-completion' | Layer 'syntax-checking'
-endif
-
-" Manage your own plugins.
-" Refer to https://github.com/junegunn/vim-plug for more detials.
 function! UserInit()
-
-  " Add your own plugin via Plug command.
   Plug 'junegunn/seoul256.vim'
+  Plug 'junegunn/fzf.vim'
+  Plug '~/.fzf'
+  Plug 'vn-ki/coc-clap'
+  Plug 'chuling/vim-equinusocio-material'
 
-  if $TERM =~ 'xterm-kitty' || $TERM_PROGRAM == 'iTerm.app'
-    Plug 'ryanoasis/vim-devicons'
-  endif
-
-  Plug 'lifepillar/vim-colortemplate'
-  Plug 'neoclide/coc.nvim'
-
-  Plug '~/.vim/plugged/vista.vim'
+  Plug '~/.vim/plugged/vim-deco'
+  Plug 'arzg/vim-colors-xcode'
+  Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app & yarn install' }
 endfunction
+
+" let g:clap_enable_icon = 0
+let g:clap_theme = 'material_design_dark'
 
 " Override the default settings from space-vim as well as adding extras
 function! UserConfig()
+  let g:fzf_layout = { 'window': {'width': 0.8, 'height': 0.6 } }
 
-  " Override the default settings.
-  " Uncomment the following line to disable relative number.
-  " set norelativenumber
+  set norelativenumber
+  set timeoutlen=500
+  set wrap
+  set list listchars=tab:¦\ ,trail:•,extends:❯,precedes:❮
 
-  " Adding extras.
-  " Uncomment the following line If you have installed the powerline fonts.
-  " It is good for airline layer.
-  " let g:airline_powerline_fonts = 1
+  let &guifont = 'FiraCode Nerd Font:h16'
+  " let &guifont = 'Iosevka-Slab:h16'
+  " let &guifont = 'Fantasque Sans Mono:h16'
+
+  if g:spacevim.nvim
+    " Reset wildmode for wildoptions=pum as changing it somehow invalids
+    " cmdline pum.
+    set wildmode&
+  endif
+  " let g:clap_layout = {'width': '80%', 'height': '33%', 'row': '33%', 'col': '10%'}
+  let g:eleline_slim = 1
+
+  nnoremap <C-f> :Clap files<CR>
+  nnoremap <C-p> :Clap grep<CR>
+  nnoremap <Leader>pw :Clap grep ++query=<cword><CR>
+
+  let g:ale_sign_error = "◉"
+  let g:ale_sign_warning = "◉"
+  let g:ale_virtualtext_cursor = 1
+  let g:ale_virtualtext_prefix = "💡 "
+  highlight ALEErrorSign ctermfg=9 guifg=#C30500
+  highlight ALEWarningSign ctermfg=11 guifg=#ED6237
+
+  hi link CocHighlightText Pmemu
+
+  function! FinderReveal() abort
+    if empty(expand('%:p'))
+      CocCommand explorer --toggle --width=25
+    else
+      execute 'CocCommand explorer --toggle --width=25 --reveal='.expand('%:p')
+    endif
+    call timer_start(200, { -> execute('normal! zz') })
+  endfunction
+
+  command! ExplorerFind call FinderReveal()
+
+  nnoremap <C-A> ggVG
+
+  nnoremap <silent> gd :Deco definition<CR>
+  nnoremap <silent> gi :Deco implementation<CR>
+  nnoremap <silent> gr :Deco references<CR>
+  nnoremap <silent> K  :Deco hover<CR>
+
+  function! GotoFile() abort
+    let git_dir = system('git rev-parse --git-dir')
+    if v:shell_error
+      Clap files
+    else
+      Clap git_files
+    endif
+  endfunction
+
+  nnoremap <silent> gf :call GotoFile()<CR>
+
+  nnoremap <silent> <Leader>ft :CocCommand explorer --toggle --width=25<CR>
+  nnoremap <silent> <Leader>fd :call FinderReveal()<CR>
+
+  command! ProfileStart call spacevim#util#ProfileStart()
+  command! ProfileStop call spacevim#util#ProfileStop()
+
+  function! MarkQfEntry() abort
+    cfirst
+    normal! m1
+    let idx = 2
+    let qf_len = len(getqflist())
+    while idx <= qf_len
+      if idx < qf_len
+        cnext
+      endif
+      execute 'normal! m'.idx
+      let idx += 1
+    endwhile
+    cfirst
+    echom "All quickfix entries have been number marked"
+  endfunction
+
+  command! MarkQfEntry call MarkQfEntry()
+
+  augroup X
+    autocmd!
+
+    autocmd FileType coc-explorer setlocal cursorline
+
+    autocmd CursorHold * silent call CocActionAsync('highlight')
+
+    autocmd VimEnter * call timer_start(100, { -> vista#RunForNearestMethodOrFunction()})
+  augroup END
+
+  vnoremap <C-P> :Clap grep ++query=@visual<CR>
+endfunction
+
+function! CommitReference() abort
+  " Assuming pwd is the git dir
+  " let file = filter(split(execute('file'), "\n"), '!empty(v:val)')[0]
+
+  let fname = bufname('')
+
+  let abs_path = expand('%:p')
+  let root_dir = clap#path#find_project_root(bufnr(''))
+
+  " Not a git repo
+  if empty(root_dir)
+    return
+  endif
+
+  if abs_path =~ '^'.root_dir
+    " /autoload/clap/rooter.vim
+    let relative_path = abs_path[strlen(root_dir):]
+  else
+    echoerr 'abs_path:'.abs_path.', root_dir:'.root_dir.' mismatches.'
+    return
+  endif
+
+  " https://github.com/liuchengxu/vim-clap/blob/d8ff7dc8b41e3be15810718163202df0c1122405/crates/fuzzy_filter/src/lib.rs#L59
+  let output = systemlist('git remote -v')
+  let origin = filter(output, 'v:val =~ "^origin"')
+  if empty(origin)
+    echoerr 'On origin remote info'
+    return
+  endif
+
+  " https://github.com/liuchengxu/vim-clap
+  let remote_url = split(origin[0])[1]
+
+  let rev = systemlist('git rev-parse HEAD')[0]
+
+  let commit_url = printf('%s/blob/%s%s#L%d', remote_url, rev, relative_path, line('.'))
+
+  let @+ = commit_url
+
+  echom commit_url.' copied to your clipboard'
 
 endfunction
+
+command! CommitRef call CommitReference()

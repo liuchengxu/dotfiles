@@ -16,6 +16,8 @@ nnoremap <Leader>sc :nohlsearch<CR>
 
 nnoremap <Leader>fs :w<CR>
 
+nnoremap <C-C> <Esc>
+
 nnoremap <Leader>? :action GotoAction<CR>
 nnoremap gd :action GotoDeclaration<CR>
 nnoremap gi :action GotoImplementation<CR>

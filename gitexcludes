@@ -16,7 +16,7 @@ Thumbs.db
 Desktop.ini
 
 # Visual Studio
-bin
+# bin
 obj
 *.suo
 *.csproj.user
