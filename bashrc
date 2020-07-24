@@ -202,7 +202,7 @@ export LC_CTYPE=en_US.UTF-8
 if exists "fd"; then
   export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 elif exists "rg"; then
-  export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
+  export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules,target}/*" 2> /dev/null'
 elif exists "ag"; then
   export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 fi
@@ -405,6 +405,15 @@ fco() {
   git checkout $(echo "$target" | awk '{print $2}')
 }
 
+# fcs - get git commit sha
+# example usage: git rebase -i `fcs`
+fcs() {
+  local commits commit
+  commits=$(git log --color=always --pretty=oneline --abbrev-commit --reverse) &&
+  commit=$(echo "$commits" | fzf --tac +s +m -e --ansi --reverse) &&
+  echo -n $(echo "$commit" | sed "s/ .*//")
+}
+
 # fbr - checkout git branch (including remote branches)
 fbr() {
   local branches branch
@@ -428,4 +437,8 @@ export PATH="/usr/local/opt/llvm/bin:$PATH"
 export LDFLAGS="-L/usr/local/opt/llvm/lib"
 export CPPFLAGS="-I/usr/local/opt/llvm/include"
 
-export PATH="$HOME/src/github.com/MaskRay/ccls/Release:$PATH"
+subsh() {
+  ("$@")
+}
+
+export RUST_BACKTRACE=1

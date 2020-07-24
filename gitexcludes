@@ -16,6 +16,8 @@ Thumbs.db
 Desktop.ini
 
 # Visual Studio
+
+# Do not ignore bin, lots of Rust project use this.
 # bin
 obj
 *.suo
