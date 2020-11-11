@@ -8,7 +8,7 @@
    "explorer.file.showHiddenFiles": true,
    "explorer.previewAction.onHover": false,
    "explorer.icon.enableNerdfont": true,
-        "explorer.keyMappings": {
+        "explorer.keyMappings.global": {
         "k": "nodePrev",
         "j": "nodeNext",
 

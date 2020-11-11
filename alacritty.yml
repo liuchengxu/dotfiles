@@ -72,7 +72,8 @@ font:
 
     # family: Noto Sans Mono Light
     # family: FuraCode Nerd Font
-    family: FuraCode Nerd Font
+    # family: FuraCode Nerd Font
+    family: FiraCode Nerd Font
     # family: FantasqueSansMono Nerd Font Mono
     # family: Anonymice Nerd Font
     # family: Iosevka Nerd Font
@@ -230,7 +231,7 @@ colors:
 #   - Linear
 #
 # Specifying a `duration` of `0` will disable the visual bell.
-visual_bell:
+bell:
   animation: EaseOutExpo
   duration: 0
 
