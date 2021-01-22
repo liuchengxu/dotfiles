@@ -207,6 +207,13 @@ elif exists "ag"; then
   export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 fi
 
+if exists 'zoxide'; then
+  eval "$(zoxide init bash)"
+elif exists 'cargo'; then
+  cargo install zoxide
+  eval "$(zoxide init bash)"
+fi
+
 export FZF_COMPLETION_TRIGGER='..'
 export FZF_DEFAULT_OPTS='--layout=reverse'
 
@@ -441,4 +448,12 @@ subsh() {
   ("$@")
 }
 
+listdir() {
+  # List the files and directories by size.
+  du -sh * | sort -rh
+}
+
 export RUST_BACKTRACE=1
+
+export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm

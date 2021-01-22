@@ -4,7 +4,17 @@
        "lsp.diagnostics": false
    },
    "rust-analyzer.serverPath": "/Users/xuliucheng/.cargo/bin/rust-analyzer",
+   "git.addGBlameToBufferVar": true,
+   "git.addGBlameToVirtualText": true,
+   "git.addedSign.hlGroup": "GitGutterAdd",
+   "git.changedSign.hlGroup": "GitGutterChange",
+   "git.removedSign.hlGroup": "GitGutterDelete",
+   "git.topRemovedSign.hlGroup": "GitGutterDelete",
+   "git.changeRemovedSign.hlGroup": "GitGutterChangeDelete",
+   "coc.preferences.formatOnSaveFiletypes": ["css", "markdown", "javascript", "typescript"],
+   "rust-analyzer.inlayHints.chainingHints": false,
    "codeLens.enable": true,
+   "explorer.width": 25,
    "explorer.file.showHiddenFiles": true,
    "explorer.previewAction.onHover": false,
    "explorer.icon.enableNerdfont": true,
@@ -83,6 +93,12 @@
          "client": {
             "snippetSupport": true
         }
+      },
+    "golang": {
+        "command": "gopls",
+        "rootPatterns": ["go.mod"],
+        "disableWorkspaceFolders": true,
+        "filetypes": ["go"]
       },
       "bash":{
          "command":"bash-language-server",

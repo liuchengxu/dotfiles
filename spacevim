@@ -1,66 +1,51 @@
 let g:spacevim_plug_home = '~/.vim/plugged'
 
-let g:spacevim_layers = ['programming', 'fzf', 'better-defaults', 'which-key', 'better-motion', 'editing', 'text-align', 'formatting',
-      \ 'rust', 'python', 'c-c++', 'latex', 'goyo', 'graphviz', 'git', 'github', 'chinese', 'javascript','lsp'
+" Disable rust layer as the features of it are mostly unused and
+" somehow always run rustfmt on save regardless the option.
+" \ 'rust',
+let g:spacevim_layers = [
+      \ 'programming', 'fzf', 'better-defaults', 'which-key', 'better-motion', 'editing', 'text-align', 'formatting',
+      \ 'python', 'c-c++', 'latex', 'goyo', 'graphviz', 'git', 'github', 'chinese', 'javascript','lsp'
       \ ]
 
 Layer 'file-manager'
 Layer 'markdown'
-
 Layer 'syntax-checking'
+Layer 'file-manager'
+
 let g:spacevim_excluded = ['dominikduda/vim_current_word', 'kshenoy/vim-signature', 'python-mode/python-mode']
 
-Layer 'file-manager'
-" let g:coc_global_extensions = ['coc-rust-analyzer', 'coc-explorer']
-let g:coc_force_debug = 1
-
-let g:spacevim_nerd_fonts = 1
 let g:airline_powerline_fonts = 1
+let g:spacevim_nerd_fonts = 1
 let g:spacevim_lsp_engine = 'coc'
 let g:spacevim_enable_clap =  1
 let g:spacevim_enable_true_color = 1
 let g:spacevim_disable_nerdtree_arrow_icons = 1
-
-let clap_search_box_border_style = 'nil'
-let g:clap_disable_bottom_top = 1
-
-let g:which_key_floating_relative_win = 1
+let g:space_vim_plugin_hi_groups = 1
 
 " Uncomment the following line if your terminal(-emulator) supports true colors.
 if $TERM_PROGRAM !~? 'Apple_Terminal'
   let g:spacevim_enable_true_color = 1
 endif
 
-let g:space_vim_plugin_hi_groups = 1
-
-let g:vista_echo_cursor_strategy = 'floating_win'
-
-tnoremap <Esc> <C-\><C-n>
-
-let g:spacevim_lsp_engine = 'coc'
-" let g:spacevim_use_ncm2 = 1 | Layer 'auto-completion' | Layer 'syntax-checking'
-" let g:spacevim_enable_coc_completion = 0
-
-let g:clap_provider_yanks_history = '~/.clap_yanks.history'
-
 function! UserInit()
   Plug 'junegunn/seoul256.vim'
+  Plug 'chuling/vim-equinusocio-material'
+  Plug 'arzg/vim-colors-xcode'
+
   Plug 'junegunn/fzf.vim'
   Plug '~/.fzf'
-  Plug 'vn-ki/coc-clap'
-  Plug 'chuling/vim-equinusocio-material'
 
-  Plug '~/.vim/plugged/vim-deco'
-  Plug 'arzg/vim-colors-xcode'
   Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app & yarn install' }
 endfunction
 
-" let g:clap_enable_icon = 0
-let g:clap_theme = 'material_design_dark'
-
 " Override the default settings from space-vim as well as adding extras
 function! UserConfig()
-  let g:fzf_layout = { 'window': {'width': 0.8, 'height': 0.6 } }
+  if g:spacevim.nvim
+    " Reset wildmode for wildoptions=pum as changing it somehow invalids
+    " cmdline pum.
+    set wildmode&
+  endif
 
   set norelativenumber
   set timeoutlen=500
@@ -71,25 +56,51 @@ function! UserConfig()
   " let &guifont = 'Iosevka-Slab:h16'
   " let &guifont = 'Fantasque Sans Mono:h16'
 
-  if g:spacevim.nvim
-    " Reset wildmode for wildoptions=pum as changing it somehow invalids
-    " cmdline pum.
-    set wildmode&
-  endif
-  " let g:clap_layout = {'width': '80%', 'height': '33%', 'row': '33%', 'col': '10%'}
+  let g:fzf_layout = { 'window': {'width': 0.8, 'height': 0.6 } }
+
   let g:eleline_slim = 1
+  let g:vista_echo_cursor_strategy = 'floating_win'
+  let g:which_key_floating_relative_win = 1
 
-  nnoremap <C-f> :Clap files<CR>
-  nnoremap <C-p> :Clap grep<CR>
-  nnoremap <Leader>pw :Clap grep ++query=<cword><CR>
+  let g:clap_theme = 'material_design_dark'
+  let g:clap_layout = { 'relative': 'editor' }
+  let g:clap_provider_yanks_history = '~/.clap_yanks.history'
+  let clap_search_box_border_style = 'nil'
+  let g:clap_disable_bottom_top = 1
 
+  function! GotoFile() abort
+    let git_dir = system('git rev-parse --git-dir')
+    if v:shell_error
+      Clap files
+    else
+      Clap git_files
+    endif
+  endfunction
+
+  tnoremap <Esc> <C-\><C-n>
+  vnoremap <C-P> :Clap grep ++query=@visual<CR>
+
+  nnoremap <C-A> ggVG
+
+  nnoremap <C-G>       :call spacevim#vim#file#CtrlG()<CR>
+  nnoremap <C-f>       :Clap files<CR>
+  nnoremap <C-p>       :Clap grep<CR>
+  nnoremap <Leader>pw  :Clap dumb_jump ++query=<cword><CR>
+  nnoremap <silent> gf :call GotoFile()<CR>
+
+  let g:ale_linters = {'rust': ['cargo', 'analyzer']}
+  let g:ale_echo_cursor = 0
   let g:ale_sign_error = "◉"
   let g:ale_sign_warning = "◉"
   let g:ale_virtualtext_cursor = 1
   let g:ale_virtualtext_prefix = "💡 "
+  let g:ale_hover_cursor = 0
+
   highlight ALEErrorSign ctermfg=9 guifg=#C30500
   highlight ALEWarningSign ctermfg=11 guifg=#ED6237
 
+  let g:coc_force_debug = 1
+  " let g:coc_global_extensions = ['coc-rust-analyzer', 'coc-explorer']
   hi link CocHighlightText Pmemu
 
   function! FinderReveal() abort
@@ -103,23 +114,10 @@ function! UserConfig()
 
   command! ExplorerFind call FinderReveal()
 
-  nnoremap <C-A> ggVG
-
-  nnoremap <silent> gd :Deco definition<CR>
-  nnoremap <silent> gi :Deco implementation<CR>
-  nnoremap <silent> gr :Deco references<CR>
-  nnoremap <silent> K  :Deco hover<CR>
-
-  function! GotoFile() abort
-    let git_dir = system('git rev-parse --git-dir')
-    if v:shell_error
-      Clap files
-    else
-      Clap git_files
-    endif
-  endfunction
-
-  nnoremap <silent> gf :call GotoFile()<CR>
+  nmap <silent> gd <Plug>(coc-definition)
+  nmap <silent> gy <Plug>(coc-type-definition)
+  nmap <silent> gi <Plug>(coc-implementation)
+  nmap <silent> gr <Plug>(coc-references)
 
   nnoremap <silent> <Leader>ft :CocCommand explorer --toggle --width=25<CR>
   nnoremap <silent> <Leader>fd :call FinderReveal()<CR>
@@ -145,60 +143,34 @@ function! UserConfig()
 
   command! MarkQfEntry call MarkQfEntry()
 
+  command! CommitRef call spacevim#github#CommitRef()
+
   augroup X
     autocmd!
 
     autocmd FileType coc-explorer setlocal cursorline
+    autocmd FileType qf nnoremap <buffer> <silent> j :<c-u>call spacevim#util#CycleQuickfix('cnext', 'cfirst')<CR>
+    autocmd FileType qf nnoremap <buffer> <silent> k :<c-u>call spacevim#util#CycleQuickfix('cprev', 'clast')<CR>
+    autocmd FileType startify normal! j
 
-    autocmd CursorHold * silent call CocActionAsync('highlight')
+    if exists('*CocActionAsync')
+      autocmd CursorHold * silent call CocActionAsync('highlight')
+    endif
 
     autocmd VimEnter * call timer_start(100, { -> vista#RunForNearestMethodOrFunction()})
+
+    autocmd BufEnter *spacevim setlocal ft=vim
+    autocmd BufEnter bashrc-extra setlocal ft=sh
+
+    autocmd BufWritePre *.rs call TryRustfmt()
   augroup END
 
-  vnoremap <C-P> :Clap grep ++query=@visual<CR>
 endfunction
 
-function! CommitReference() abort
-  " Assuming pwd is the git dir
-  " let file = filter(split(execute('file'), "\n"), '!empty(v:val)')[0]
-
-  let fname = bufname('')
-
-  let abs_path = expand('%:p')
-  let root_dir = clap#path#find_project_root(bufnr(''))
-
-  " Not a git repo
-  if empty(root_dir)
-    return
-  endif
-
-  if abs_path =~ '^'.root_dir
-    " /autoload/clap/rooter.vim
-    let relative_path = abs_path[strlen(root_dir):]
+function! TryRustfmt() abort
+  if exists('b:git_dir') && b:git_dir =~? 'substrate'
+    " Do not run rustfmt when in substrate.
   else
-    echoerr 'abs_path:'.abs_path.', root_dir:'.root_dir.' mismatches.'
-    return
+    call spacevim#lang#util#Format()
   endif
-
-  " https://github.com/liuchengxu/vim-clap/blob/d8ff7dc8b41e3be15810718163202df0c1122405/crates/fuzzy_filter/src/lib.rs#L59
-  let output = systemlist('git remote -v')
-  let origin = filter(output, 'v:val =~ "^origin"')
-  if empty(origin)
-    echoerr 'On origin remote info'
-    return
-  endif
-
-  " https://github.com/liuchengxu/vim-clap
-  let remote_url = split(origin[0])[1]
-
-  let rev = systemlist('git rev-parse HEAD')[0]
-
-  let commit_url = printf('%s/blob/%s%s#L%d', remote_url, rev, relative_path, line('.'))
-
-  let @+ = commit_url
-
-  echom commit_url.' copied to your clipboard'
-
 endfunction
-
-command! CommitRef call CommitReference()
