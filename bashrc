@@ -207,6 +207,13 @@ elif exists "ag"; then
   export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 fi
 
+if exists 'zoxide'; then
+  eval "$(zoxide init bash)"
+elif exists 'cargo'; then
+  cargo install zoxide
+  eval "$(zoxide init bash)"
+fi
+
 export FZF_COMPLETION_TRIGGER='..'
 export FZF_DEFAULT_OPTS='--layout=reverse'
 
