@@ -448,4 +448,12 @@ subsh() {
   ("$@")
 }
 
+ssh() {
+  if [ "$TERM" = xterm-kitty ]; then
+    kitty +kitten ssh "$@"
+  else
+    ssh "$@"
+  fi
+}
+
 export RUST_BACKTRACE=1
