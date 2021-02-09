@@ -1,7 +1,11 @@
 let g:spacevim_plug_home = '~/.vim/plugged'
 
-let g:spacevim_layers = ['programming', 'fzf', 'better-defaults', 'which-key', 'better-motion', 'editing', 'text-align', 'formatting',
-      \ 'rust', 'python', 'c-c++', 'latex', 'goyo', 'graphviz', 'git', 'github', 'chinese', 'javascript','lsp'
+" Disable rust layer as the features of it are mostly unused and
+" somehow always run rustfmt on save regardless the option.
+" \ 'rust',
+let g:spacevim_layers = [
+      \ 'programming', 'fzf', 'better-defaults', 'which-key', 'better-motion', 'editing', 'text-align', 'formatting',
+      \ 'python', 'c-c++', 'latex', 'goyo', 'graphviz', 'git', 'github', 'chinese', 'javascript','lsp'
       \ ]
 
 Layer 'file-manager'
@@ -150,55 +154,24 @@ function! UserConfig()
 
     autocmd FileType coc-explorer setlocal cursorline
 
-    autocmd CursorHold * silent call CocActionAsync('highlight')
+    if exists('*CocActionAsync')
+      autocmd CursorHold * silent call CocActionAsync('highlight')
+    endif
 
     autocmd VimEnter * call timer_start(100, { -> vista#RunForNearestMethodOrFunction()})
+
+    autocmd BufWritePre *.rs call TryRustfmt()
   augroup END
 
   vnoremap <C-P> :Clap grep ++query=@visual<CR>
 endfunction
 
-function! CommitReference() abort
-  " Assuming pwd is the git dir
-  " let file = filter(split(execute('file'), "\n"), '!empty(v:val)')[0]
-
-  let fname = bufname('')
-
-  let abs_path = expand('%:p')
-  let root_dir = clap#path#find_project_root(bufnr(''))
-
-  " Not a git repo
-  if empty(root_dir)
-    return
-  endif
-
-  if abs_path =~ '^'.root_dir
-    " /autoload/clap/rooter.vim
-    let relative_path = abs_path[strlen(root_dir):]
+function! TryRustfmt() abort
+  if exists('b:git_dir') && b:git_dir =~? 'substrate'
+    " Do not run rustfmt when in substrate.
   else
-    echoerr 'abs_path:'.abs_path.', root_dir:'.root_dir.' mismatches.'
-    return
+    call spacevim#lang#util#Format()
   endif
-
-  " https://github.com/liuchengxu/vim-clap/blob/d8ff7dc8b41e3be15810718163202df0c1122405/crates/fuzzy_filter/src/lib.rs#L59
-  let output = systemlist('git remote -v')
-  let origin = filter(output, 'v:val =~ "^origin"')
-  if empty(origin)
-    echoerr 'On origin remote info'
-    return
-  endif
-
-  " https://github.com/liuchengxu/vim-clap
-  let remote_url = split(origin[0])[1]
-
-  let rev = systemlist('git rev-parse HEAD')[0]
-
-  let commit_url = printf('%s/blob/%s%s#L%d', remote_url, rev, relative_path, line('.'))
-
-  let @+ = commit_url
-
-  echom commit_url.' copied to your clipboard'
-
 endfunction
 
-command! CommitRef call CommitReference()
+command! CommitRef call spacevim#util#GitHubCommitRef()
