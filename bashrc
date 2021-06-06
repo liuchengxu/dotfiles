@@ -448,12 +448,12 @@ subsh() {
   ("$@")
 }
 
-ssh() {
-  if [ "$TERM" = xterm-kitty ]; then
-    kitty +kitten ssh "$@"
-  else
-    ssh "$@"
-  fi
+listdir() {
+  # List the files and directories by size.
+  du -sh * | sort -rh
 }
 
 export RUST_BACKTRACE=1
+
+export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
