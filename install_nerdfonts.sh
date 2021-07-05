@@ -31,6 +31,9 @@ install_font() {
 
 # install_font FiraCode
 # install_font Iosevka
+# install_font FantasqueSansMono
+# install_font Lekton
+install_font Inconsolata
 # install_font VictorMono
 # install_font InconsolataGo
-install_font Monofur
+# install_font Monofur

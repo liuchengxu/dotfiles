@@ -3,7 +3,10 @@
    "rust-analyzer.featureFlags": {
        "lsp.diagnostics": false
    },
-   "rust-analyzer.serverPath": "/Users/xuliucheng/.cargo/bin/rust-analyzer",
+   "rust-analyzer.serverPath": "/home/xlc/.cargo/bin/rust-analyzer",
+   "rust-analyzer.inlayHints.enable": false,
+   "rust-analyzer.inlayHints.typeHints": false,
+   "rust-analyzer.inlayHints.chainingHints": false,
    "git.addGBlameToBufferVar": true,
    "git.addGBlameToVirtualText": true,
    "git.addedSign.hlGroup": "GitGutterAdd",
