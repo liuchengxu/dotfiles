@@ -11,6 +11,8 @@ let g:spacevim_layers = [
 Layer 'file-manager'
 Layer 'markdown'
 Layer 'syntax-checking'
+
+let g:coc_global_extensions = ['coc-rust-analyzer', 'coc-explorer']
 Layer 'file-manager'
 
 let g:spacevim_excluded = ['dominikduda/vim_current_word', 'kshenoy/vim-signature', 'python-mode/python-mode']
@@ -65,7 +67,7 @@ function! UserConfig()
   let g:clap_theme = 'material_design_dark'
   let g:clap_layout = { 'relative': 'editor' }
   let g:clap_provider_yanks_history = '~/.clap_yanks.history'
-  let clap_search_box_border_style = 'nil'
+  let g:clap_search_box_border_style = 'nil'
   let g:clap_disable_bottom_top = 1
 
   function! GotoFile() abort
@@ -99,28 +101,14 @@ function! UserConfig()
   highlight ALEErrorSign ctermfg=9 guifg=#C30500
   highlight ALEWarningSign ctermfg=11 guifg=#ED6237
 
+  let g:coc_node_path = '/usr/bin/node'
   let g:coc_force_debug = 1
-  " let g:coc_global_extensions = ['coc-rust-analyzer', 'coc-explorer']
   hi link CocHighlightText Pmemu
-
-  function! FinderReveal() abort
-    if empty(expand('%:p'))
-      CocCommand explorer --toggle --width=25
-    else
-      execute 'CocCommand explorer --toggle --width=25 --reveal='.expand('%:p')
-    endif
-    call timer_start(200, { -> execute('normal! zz') })
-  endfunction
-
-  command! ExplorerFind call FinderReveal()
 
   nmap <silent> gd <Plug>(coc-definition)
   nmap <silent> gy <Plug>(coc-type-definition)
   nmap <silent> gi <Plug>(coc-implementation)
   nmap <silent> gr <Plug>(coc-references)
-
-  nnoremap <silent> <Leader>ft :CocCommand explorer --toggle --width=25<CR>
-  nnoremap <silent> <Leader>fd :call FinderReveal()<CR>
 
   command! ProfileStart call spacevim#util#ProfileStart()
   command! ProfileStop call spacevim#util#ProfileStop()
@@ -164,6 +152,7 @@ function! UserConfig()
 
     autocmd BufWritePre *.rs call TryRustfmt()
   augroup END
+
 endfunction
 
 function! TryRustfmt() abort
