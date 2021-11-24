@@ -92,7 +92,7 @@ function hs.window.maximize(win)
     f.y = max.y
     f.w = max.w
     f.h = max.h
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 
@@ -111,7 +111,7 @@ function hs.window.left(win)
     f.y = max.y
     f.w = max.w / 2
     f.h = max.h
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 -- +-----------------+
@@ -128,7 +128,7 @@ function hs.window.right(win)
     f.y = max.y
     f.w = max.w / 2
     f.h = max.h
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 -- +-----------------+
@@ -145,7 +145,7 @@ function hs.window.up(win)
     f.w = max.w
     f.y = max.y
     f.h = max.h / 2
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 -- +-----------------+
@@ -162,7 +162,7 @@ function hs.window.down(win)
     f.w = max.w
     f.y = max.y + (max.h / 2)
     f.h = max.h / 2
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 -- +-----------------+
@@ -179,7 +179,7 @@ function hs.window.upLeft(win)
     f.y = 0
     f.w = max.w/2
     f.h = max.h/2
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 -- +-----------------+
@@ -196,7 +196,7 @@ function hs.window.downLeft(win)
     f.y = max.h/2
     f.w = max.w/2
     f.h = max.h/2
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 -- +-----------------+
@@ -214,7 +214,7 @@ function hs.window.downRight(win)
     f.w = max.w/2
     f.h = max.h/2
 
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 -- +-----------------+
@@ -231,7 +231,7 @@ function hs.window.upRight(win)
     f.y = 0
     f.w = max.w/2
     f.h = max.h/2
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 -- +--------------+
@@ -248,32 +248,32 @@ function hs.window.centerWithFullHeight(win)
     f.w = max.w * 3/5
     f.y = max.y
     f.h = max.h
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 function hs.window.moveLeft(win)
     local f = win:frame()
 
     f.x = f.x-80
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 function hs.window.moveRight(win)
     local f = win:frame()
 
     f.x = f.x+80
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 function hs.window.moveUp(win)
     local f = win:frame()
 
     f.y = f.y-60
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 function hs.window.moveDown(win)
     local f = win:frame()
 
     f.y = f.y+60
-    win:setFrame(f)
+    win:setFrameCorrectness(f)
 end
 
 function hs.window.nextScreen(win)
@@ -302,13 +302,13 @@ function winIncrease()
     local max = screen:frame()
     local inscW =120
     if (max.w-curFrame.w)==0 then
-        win:setFrame(max)
+        win:setFrameCorrectness(max)
         return
     end
     local inscH =inscW*(max.h-curFrame.h)/(max.w-curFrame.w)
 
     if max.w-curFrame.h<inscW and max.h-curFrame.h<inscW then
-        win.setFrame(max)
+        win.setFrameCorrectness(max)
     else
         curFrame.w=curFrame.w +inscW
         local a = (curFrame.x-max.x) -- 左边空白的宽度
@@ -341,7 +341,7 @@ function winIncrease()
         else
             -- a*(inscH-m)=b*m -->a*inscH-a*m=b*m
             if b+a==0 then
-                win:setFrame(max)
+                win:setFrameCorrectness(max)
                 return
             end
             local m =inscH*a/(b+a)                         -- 左边应变化的尺寸
@@ -351,7 +351,7 @@ function winIncrease()
             end
         end
 
-        win:setFrame(curFrame)
+        win:setFrameCorrectness(curFrame)
     end
 end
 
@@ -379,5 +379,5 @@ local function winReduce()
     -- hs.alert.show(tostring((max.h-curFrame.h)))
     curFrame.h =curFrame.h-inscH
     curFrame.y =curFrame.y+inscH/2
-    win:setFrame(curFrame)
+    win:setFrameCorrectness(curFrame)
 end

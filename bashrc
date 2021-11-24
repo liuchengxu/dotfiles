@@ -100,19 +100,10 @@ add_to_path() {
 }
 
 if [ "$PLATFORM" = Darwin ]; then
-  # For coreutils installed by brew
-  # use these commands with their normal names, instead of the prefix 'g'
-  add_to_path "/usr/local/opt/coreutils/libexec/gnubin"
-  MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
   if exists brew; then
     # For bash installed by brew
     [ -f "$(brew --prefix)/share/bash-completion/bash_completion" ] && . "$(brew --prefix)/share/bash-completion/bash_completion"
   fi
-
-  alias cat="bat"
-  alias ping="prettyping --nolegend"
-  alias du="ncdu --color dark -rr -x --exclude .git --exclude node_modules"
-  alias h="tldr"
 fi
 
 ### Colored ls
@@ -226,7 +217,6 @@ add_to_path "$HOME/.npm-packages/bin"
 add_to_path "/Library/TeX/texbin"
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
-alias cargoexpand="cargo rustc -- -Z unstable-options --pretty=expanded"
 alias cb="cargo build"
 alias cbr="cargo build --release"
 
@@ -272,7 +262,7 @@ pull() {
   local remote branch
   remote=$(git remote | tail -n1)
   branch=$(git rev-parse --abbrev-ref HEAD)
-  git pull $remote $branch
+  git pull $remote $branch --ff
 }
 
 # Tmux
@@ -440,9 +430,9 @@ nop() {
 export XDG_CONFIG_HOME="$HOME/.config"
 
 # For brew info llvm
-export PATH="/usr/local/opt/llvm/bin:$PATH"
-export LDFLAGS="-L/usr/local/opt/llvm/lib"
-export CPPFLAGS="-I/usr/local/opt/llvm/include"
+# export PATH="/usr/local/opt/llvm/bin:$PATH"
+# export LDFLAGS="-L/usr/local/opt/llvm/lib"
+# export CPPFLAGS="-I/usr/local/opt/llvm/include"
 
 subsh() {
   ("$@")
@@ -457,3 +447,8 @@ export RUST_BACKTRACE=1
 
 export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+
+
+# BEGIN_KITTY_SHELL_INTEGRATION
+if test -e "$HOME/src/github.com/kovidgoyal/kitty/shell-integration/kitty.bash"; then source "$HOME/src/github.com/kovidgoyal/kitty/shell-integration/kitty.bash"; fi
+# END_KITTY_SHELL_INTEGRATION

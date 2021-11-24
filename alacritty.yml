@@ -13,6 +13,12 @@ env:
   TERM: xterm-256color
 
 window:
+  # Background opacity
+  #
+  # Window opacity as a floating point number from `0.0` to `1.0`.
+  # The value `0.0` is completely transparent and `1.0` is opaque.
+  opacity: 1.0
+
   # Window dimensions (changes require restart)
   #
   # Specified in number of columns/lines, not pixels.
@@ -76,9 +82,9 @@ font:
     # family: FiraCode Nerd Font
     # family: CascadiaCode Nerd Font
     # family: FantasqueSansMono Nerd Font Mono
-    # family: VictorMono Nerd Font
+    family: VictorMono Nerd Font
     # family: Anonymice Nerd Font
-    family: Iosevka Nerd Font
+    # family: Iosevka Nerd Font
     # family: SauceCodePro Nerd Font
     # The `style` can be specified to pick a specific face.
     # style: Light
@@ -236,12 +242,6 @@ colors:
 bell:
   animation: EaseOutExpo
   duration: 0
-
-# Background opacity
-#
-# Window opacity as a floating point number from `0.0` to `1.0`.
-# The value `0.0` is completely transparent and `1.0` is opaque.
-background_opacity: 1.0
 
 # Mouse bindings
 #
