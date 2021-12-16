@@ -5,15 +5,112 @@ local hotkey = require 'hs.hotkey'
 local window = require 'hs.window'
 local layout = require 'hs.layout'
 
+-- +-----------------+
+-- |        |        |
+-- |  HERE  |        |
+-- |        |        |
+-- +-----------------+
+local function moveFocusedLeft()
+    local win = hs.window.focusedWindow()
+
+    local f = win:frame()
+    local screen = win:screen()
+    local max = screen:frame()
+
+    f.x = max.x
+    f.y = max.y
+    f.w = max.w / 2
+    f.h = max.h
+    win:setFrame(f)
+end
+
+-- +-----------------+
+-- |                 |
+-- +-----------------+
+-- |      HERE       |
+-- +-----------------+
+local function moveFocusedDown()
+    local win = hs.window.focusedWindow()
+
+    local f = win:frame()
+    local screen = win:screen()
+    local max = screen:frame()
+
+    f.x = max.x
+    f.w = max.w
+    f.y = max.y + (max.h / 2)
+    f.h = max.h / 2
+    win:setFrame(f)
+end
+
+-- +-----------------+
+-- |      HERE       |
+-- +-----------------+
+-- |                 |
+-- +-----------------+
+local function moveFocusedUp()
+    local win = hs.window.focusedWindow()
+
+    local f = win:frame()
+    local screen = win:screen()
+    local max = screen:frame()
+
+    f.x = max.x
+    f.w = max.w
+    f.y = max.y
+    f.h = max.h / 2
+    win:setFrame(f)
+end
+
+-- +-----------------+
+-- |        |        |
+-- |        |  HERE  |
+-- |        |        |
+-- +-----------------+
+local function moveFocusedRight()
+    local win = hs.window.focusedWindow()
+
+    local f = win:frame()
+    local screen = win:screen()
+    local max = screen:frame()
+
+    f.x = max.x + (max.w / 2)
+    f.y = max.y
+    f.w = max.w / 2
+    f.h = max.h
+    win:setFrame(f)
+end
+
+-- +--------------+
+-- |  |        |  |
+-- |  |  HERE  |  |
+-- |  |        |  |
+-- +---------------+
+function moveFocusedCenterWithFullHeight()
+    local win = hs.window.focusedWindow()
+
+    local f = win:frame()
+    local screen = win:screen()
+    local max = screen:fullFrame()
+
+    -- set offset to 2 to fit with TG on the left.
+    f.x = max.w * 1/5 - 2
+    f.w = max.w * 3/5
+    f.y = max.y
+    f.h = max.h
+    win:setFrame(f)
+end
+
 -- h ==> move to left half of the screen
 -- l ==> move to right half of the screen
 -- j ==> move to down half of the screen
 -- k ==> move to up half of the screen
 local key2action = {
-    h = function() window.focusedWindow():left() end,
-    j = function() window.focusedWindow():down() end,
-    k = function() window.focusedWindow():up() end,
-    l = function() window.focusedWindow():right() end,
+    h = function() moveFocusedLeft() end,
+    j = function() moveFocusedDown() end,
+    k = function() moveFocusedUp() end,
+    l = function() moveFocusedRight() end,
+    m = function() moveFocusedCenterWithFullHeight() end,
     n = function() window.focusedWindow():nextScreen() end,
 }
 
@@ -49,6 +146,7 @@ window.filter.new():setAppFilter('Emacs', {allowRoles = '*', allowTitles = 1}), 
 hotkey.bind("alt", "tab", function() switcher:next() end)
 hotkey.bind("alt-shift", "tab", function() switcher:previous() end)
 
+-- Ctrl-Cmd-Shift + m => maximize the window
 hotkey.bind(hyperShift, 'm', function() window.focusedWindow():maximize() end)
 
 local function isInScreen(screen, win)
@@ -92,78 +190,9 @@ function hs.window.maximize(win)
     f.y = max.y
     f.w = max.w
     f.h = max.h
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 
-
--- +-----------------+
--- |        |        |
--- |  HERE  |        |
--- |        |        |
--- +-----------------+
--- Usage: hs.window.focusedWindow():left()
-function hs.window.left(win)
-    local f = win:frame()
-    local screen = win:screen()
-    local max = screen:frame()
-
-    f.x = max.x
-    f.y = max.y
-    f.w = max.w / 2
-    f.h = max.h
-    win:setFrameCorrectness(f)
-end
-
--- +-----------------+
--- |        |        |
--- |        |  HERE  |
--- |        |        |
--- +-----------------+
-function hs.window.right(win)
-    local f = win:frame()
-    local screen = win:screen()
-    local max = screen:frame()
-
-    f.x = max.x + (max.w / 2)
-    f.y = max.y
-    f.w = max.w / 2
-    f.h = max.h
-    win:setFrameCorrectness(f)
-end
-
--- +-----------------+
--- |      HERE       |
--- +-----------------+
--- |                 |
--- +-----------------+
-function hs.window.up(win)
-    local f = win:frame()
-    local screen = win:screen()
-    local max = screen:frame()
-
-    f.x = max.x
-    f.w = max.w
-    f.y = max.y
-    f.h = max.h / 2
-    win:setFrameCorrectness(f)
-end
-
--- +-----------------+
--- |                 |
--- +-----------------+
--- |      HERE       |
--- +-----------------+
-function hs.window.down(win)
-    local f = win:frame()
-    local screen = win:screen()
-    local max = screen:frame()
-
-    f.x = max.x
-    f.w = max.w
-    f.y = max.y + (max.h / 2)
-    f.h = max.h / 2
-    win:setFrameCorrectness(f)
-end
 
 -- +-----------------+
 -- |  HERE  |        |
@@ -179,7 +208,7 @@ function hs.window.upLeft(win)
     f.y = 0
     f.w = max.w/2
     f.h = max.h/2
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 
 -- +-----------------+
@@ -196,7 +225,7 @@ function hs.window.downLeft(win)
     f.y = max.h/2
     f.w = max.w/2
     f.h = max.h/2
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 
 -- +-----------------+
@@ -214,7 +243,7 @@ function hs.window.downRight(win)
     f.w = max.w/2
     f.h = max.h/2
 
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 
 -- +-----------------+
@@ -231,49 +260,32 @@ function hs.window.upRight(win)
     f.y = 0
     f.w = max.w/2
     f.h = max.h/2
-    win:setFrameCorrectness(f)
-end
-
--- +--------------+
--- |  |        |  |
--- |  |  HERE  |  |
--- |  |        |  |
--- +---------------+
-function hs.window.centerWithFullHeight(win)
-    local f = win:frame()
-    local screen = win:screen()
-    local max = screen:fullFrame()
-
-    f.x = max.w * 1/5
-    f.w = max.w * 3/5
-    f.y = max.y
-    f.h = max.h
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 
 function hs.window.moveLeft(win)
     local f = win:frame()
 
     f.x = f.x-80
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 function hs.window.moveRight(win)
     local f = win:frame()
 
     f.x = f.x+80
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 function hs.window.moveUp(win)
     local f = win:frame()
 
     f.y = f.y-60
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 function hs.window.moveDown(win)
     local f = win:frame()
 
     f.y = f.y+60
-    win:setFrameCorrectness(f)
+    win:setFrame(f)
 end
 
 function hs.window.nextScreen(win)
@@ -302,13 +314,13 @@ function winIncrease()
     local max = screen:frame()
     local inscW =120
     if (max.w-curFrame.w)==0 then
-        win:setFrameCorrectness(max)
+        win:setFrame(max)
         return
     end
     local inscH =inscW*(max.h-curFrame.h)/(max.w-curFrame.w)
 
     if max.w-curFrame.h<inscW and max.h-curFrame.h<inscW then
-        win.setFrameCorrectness(max)
+        win.setFrame(max)
     else
         curFrame.w=curFrame.w +inscW
         local a = (curFrame.x-max.x) -- 左边空白的宽度
@@ -341,7 +353,7 @@ function winIncrease()
         else
             -- a*(inscH-m)=b*m -->a*inscH-a*m=b*m
             if b+a==0 then
-                win:setFrameCorrectness(max)
+                win:setFrame(max)
                 return
             end
             local m =inscH*a/(b+a)                         -- 左边应变化的尺寸
@@ -351,7 +363,7 @@ function winIncrease()
             end
         end
 
-        win:setFrameCorrectness(curFrame)
+        win:setFrame(curFrame)
     end
 end
 
@@ -379,5 +391,5 @@ local function winReduce()
     -- hs.alert.show(tostring((max.h-curFrame.h)))
     curFrame.h =curFrame.h-inscH
     curFrame.y =curFrame.y+inscH/2
-    win:setFrameCorrectness(curFrame)
+    win:setFrame(curFrame)
 end
