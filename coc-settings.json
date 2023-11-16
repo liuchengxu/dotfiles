@@ -3,10 +3,15 @@
    "rust-analyzer.featureFlags": {
        "lsp.diagnostics": false
    },
-   "rust-analyzer.serverPath": "/home/xlc/.cargo/bin/rust-analyzer",
+   "rust-analyzer.serverPath": "/home/xlc/Data1/github.com/ra-multiplex/target/release/ra-multiplex",
+   "rust-analyzer.checkOnSave": false,
    "rust-analyzer.inlayHints.enable": false,
-   "rust-analyzer.inlayHints.typeHints": false,
    "rust-analyzer.inlayHints.chainingHints": false,
+   "rust-analyzer.inlayHints.parameterHints.enable": false,
+   "rust-analyzer.inlayHints.typeHints.enable": false,
+   "rust-analyzer.cargo.loadOutDirsFromCheck": true,
+   "rust-analyzer.procMacro.enable": true,
+   "rust-analyzer.lens.enable": false,
    "git.addGBlameToBufferVar": true,
    "git.addGBlameToVirtualText": true,
    "git.addedSign.hlGroup": "GitGutterAdd",
@@ -17,6 +22,7 @@
    "coc.preferences.formatOnSaveFiletypes": ["css", "markdown", "javascript", "typescript"],
    "rust-analyzer.inlayHints.chainingHints": false,
    "codeLens.enable": true,
+   "explorer.file.child.labelingTemplate": "[fullpath][link][git][size][timeAccessed][timeModified][timeCreated][readonly][modified]",
    "explorer.width": 25,
    "explorer.file.showHiddenFiles": true,
    "explorer.previewAction.onHover": false,
@@ -82,33 +88,11 @@
    "diagnostic.displayByAle": true,
    "suggest.minTriggerInputLength": 2,
    "languageserver":{
-      "lua":{
-         "command":"lua-lsp",
-         "filetypes":["lua"]
-      },
-      "ccls":{
-         "command":"ccls",
-         "filetypes":["c", "cpp", "objc", "objcpp" ],
-         "rootPatterns":[ ".ccls", "compile_commands.json", ".vim/", ".git/", ".hg/" ],
-         "initializationOptions":{
-            "cacheDirectory":"/tmp/ccls"
-         },
-         "client": {
-            "snippetSupport": true
-        }
-      },
     "golang": {
-        "command": "gopls",
-        "rootPatterns": ["go.mod"],
-        "disableWorkspaceFolders": true,
-        "filetypes": ["go"]
-      },
-      "bash":{
-         "command":"bash-language-server",
-         "args":["start"],
-         "filetypes":["sh"],
-         "ignoredRootPaths":["~"]
-      }
+      "command": "gopls",
+      "rootPatterns": ["go.mod", ".git/"],
+      "filetypes": ["go"]
+    }
    },
   "suggest.completionItemKindLabels": {
     "function": "\uf794 ",
