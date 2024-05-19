@@ -1,16 +1,10 @@
 silent! if plug#begin('~/.vim/plugged')
-    Plug 'junegunn/vim-easy-align',       { 'on': ['<Plug>(EasyAlign)', 'EasyAlign'] }
-
-    Plug 'neoclide/coc.nvim', {'branch': 'release'}
-
-    Plug 'romainl/vim-cool'
-
-    " Edit
+    Plug 'junegunn/vim-easy-align', { 'on': ['<Plug>(EasyAlign)', 'EasyAlign'] }
+    Plug 'neoclide/coc.nvim', { 'branch': 'release' }
+    Plug 'dense-analysis/ale'
+    Plug 'preservim/nerdcommenter'
     Plug 'tpope/vim-repeat'
     Plug 'tpope/vim-surround'
-
-    " Lint
-    Plug 'dense-analysis/ale'
 
     Plug 'liuchengxu/eleline.vim'
     Plug 'liuchengxu/space-vim-theme'
@@ -28,13 +22,19 @@ color space_vim_theme
 let g:mapleader      = "\<Space>"
 let g:maplocalleader = ','
 
-nnoremap <Leader>rc :%s/\<<C-R><C-W>\>/<C-R><C-W>
+let g:NERDSpaceDelims=1
+
+nmap <Leader>;; <Plug>NERDCommenterToggle
+omap <Leader>;; <Plug>NERDCommenterToggle
+vmap <Leader>;; <Plug>NERDCommenterToggle
 
 " Disable ALE by default, can be enabled again later.
 let g:ale_enabled = 0
 let g:ale_hover_cursor = v:false
 
 let g:coc_global_extensions = ['coc-rust-analyzer', 'coc-explorer']
+" let g:node_client_debug = 1
+" let $NODE_CLIENT_LOG_FILE = '/tmp/coc.log'
 
 " Use tab for trigger completion with characters ahead and navigate
 " NOTE: There's always complete item selected by default, you may want to enable
@@ -155,39 +155,19 @@ command! ProfileStop  call ProfileStop()
 let g:eleline_slim = v:true
 let g:clap_plugin_experimental = v:true
 let g:clap_enable_icon = v:true
+let g:clap_layout = { 'relative': 'editor' }
 let g:clap_theme = 'material_theme_dark'
 let g:clap_provider_quick_open = {
             \ 'source': [
             \    '~/.vimrc',
             \    '~/.config/alacritty/alacritty.toml',
+            \    '~/.config/vimclap/config.toml',
             \    '~/.config/nvim/init.vim',
             \    '~/.config/wezterm/wezterm.lua',
             \ ],
             \ 'sink': 'e',
+            \ 'mode': 'quick_pick',
             \ }
-
-let g:clap_provider_clap_actions = {
-            \ 'source': { -> get(g:, 'clap_actions', []) },
-            \ 'sink': { line -> clap#client#notify(line, []) },
-            \ }
-
-function! ClapAction(bang, action) abort
-  call clap#client#notify(a:action, [])
-endfunction
-
-command! -bang -nargs=* -bar -range -complete=customlist,ClapActionList ClapAction call ClapAction(<bang>0, <f-args>)
-
-function! ClapActionList(A, L, P) abort
-  if !exists('g:clap_actions')
-      echoerr '`g:clap_actions` not found'
-      return []
-  endif
-  if empty(a:A)
-    return g:clap_actions
-  else
-    return filter(g:clap_actions, printf('v:val =~ "^%s"', a:A))
-  endif
-endfunction
 
 function! ClapCopyToClipboard(...) abort
   if get(a:000, 0, v:null) is v:null
@@ -195,7 +175,7 @@ function! ClapCopyToClipboard(...) abort
   else
     let selection = a:000[0]
   endif
-  call clap#client#notify('__copy-to-clipboard', [string(selection)])
+  call clap#client#notify('__copyToClipboard', [string(selection)])
 endfunction
 
 nnoremap <C-c> :call ClapCopyToClipboard()<CR>
@@ -204,17 +184,26 @@ nnoremap <C-f> :Clap files<CR>
 """ Grep
 nnoremap <C-p> :Clap grep<CR>
 
+nnoremap <LocalLeader>a :Clap clap_actions<CR>
 nnoremap <LocalLeader>v :Clap quick_open<CR>
-nnoremap <LocalLeader>= :ClapAction linter/format<CR>
+nnoremap <LocalLeader>= :ClapAction linter.format<CR>
 
+""" ef: jump to First error
+nnoremap <Leader>ef :ClapAction diagnostics.firstError<CR>
+""" el: jump to Last error
+nnoremap <Leader>el :ClapAction diagnostics.lastError<CR>
 """ en: jump to Next error
-nnoremap <Leader>en :ClapAction linter/next-error<CR>
+nnoremap <Leader>en :ClapAction diagnostics.nextError<CR>
 """ ep: jump to Prev error
-nnoremap <Leader>ep :ClapAction linter/prev-error<CR>
+nnoremap <Leader>ep :ClapAction diagnostics.prevError<CR>
+""" wf: jump to First warning
+nnoremap <Leader>wf :ClapAction diagnostics.firstWarn<CR>
+""" wl: jump to Last warning
+nnoremap <Leader>wl :ClapAction diagnostics.lastWarn<CR>
 """ wn: jump to Next warning
-nnoremap <Leader>wn :ClapAction linter/next-warn<CR>
+nnoremap <Leader>wn :ClapAction diagnostics.nextWarn<CR>
 """ wp: jump to Prev warning
-nnoremap <Leader>wp :ClapAction linter/prev-warn<CR>
+nnoremap <Leader>wp :ClapAction diagnostics.prevWarn<CR>
 """ sb: search lines in current Buffer
 nnoremap <Leader>sb :Clap blines<CR>
 """ sr: search Recent files
@@ -225,6 +214,10 @@ nnoremap <Leader>ft :call execute(printf('CocCommand explorer --toggle --width=%
 nnoremap <Leader>fd :call execute(printf('CocCommand explorer --reveal %s --width=%d', expand('%:p'), &columns/5))<CR>
 """ pw: grep Word under cursor
 nnoremap <Leader>pw :call execute(printf('Clap grep --query \"%s', expand('<cword>')))<CR>
+""" rc: replace Cursor word
+nnoremap <Leader>rc :%s/\<<C-R><C-W>\>/<C-R><C-W>
+""" st: strip Trailing whitespaces
+nnoremap <Leader>st :let _s=@/<Bar>:%s/\s\+$//e<Bar>:let @/=_s<Bar><CR>
 
 set timeoutlen=500
 nnoremap <silent> <Leader> :WhichKey '<Space>'<CR>
@@ -234,9 +227,10 @@ augroup XLC
     autocmd!
 
     autocmd VimEnter * call which_key#register('<Space>', 'g:which_key_map')
-    autocmd VimEnter * call clap#client#notify('__configure-vim-which-key',[
+    autocmd VimEnter * call clap#client#notify('__configureVimWhichKey',[
                 \ 'g:which_key_map',
                 \ expand('~/.vimrc'),
                 \ expand('~/.vim/plugged/vim-better-default/plugin/default.vim'),
                 \ ])
+    autocmd VimEnter * call clap#client#notify('syntax.treeSitterHighlight', [])
 augroup END

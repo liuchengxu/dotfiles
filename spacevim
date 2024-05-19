@@ -65,10 +65,13 @@ function! UserConfig()
   let g:which_key_floating_relative_win = 1
 
   let g:clap_theme = 'material_design_dark'
-  let g:clap_layout = { 'relative': 'editor' }
+  let g:clap_layout = { 'relative': 'editor', 'width': '48%', 'height':'80%', 'col': '3%', 'row': '10%' }
   let g:clap_provider_yanks_history = '~/.clap_yanks.history'
   let g:clap_search_box_border_style = 'nil'
+  " let g:clap_preview_direction = 'UD'
+  " let g:clap_layout = { 'relative': 'editor', 'width': '80%', 'height':'20%', 'col': '3%', 'row': '10%' }
   let g:clap_disable_bottom_top = 1
+  let g:clap_preview = { 'scrollbar': { 'fill_char': '▌' } }
 
   function! GotoFile() abort
     let git_dir = system('git rev-parse --git-dir')
@@ -80,15 +83,19 @@ function! UserConfig()
   endfunction
 
   tnoremap <Esc> <C-\><C-n>
-  vnoremap <C-P> :Clap grep ++query=@visual<CR>
+  vnoremap <C-P> :Clap grep --query=@visual<CR>
 
   nnoremap <C-A> ggVG
 
   nnoremap <C-G>       :call spacevim#vim#file#CtrlG()<CR>
   nnoremap <C-f>       :Clap files<CR>
   nnoremap <C-p>       :Clap grep<CR>
-  nnoremap <Leader>pw  :Clap dumb_jump ++query=<cword><CR>
+  nnoremap <Leader>pw  :call SearchCursorWord()<CR>
   nnoremap <silent> gf :call GotoFile()<CR>
+
+  function! SearchCursorWord()
+    execute 'Clap grep --query=\"'.expand("<cword>")
+  endfunction
 
   let g:ale_linters = {'rust': ['cargo', 'analyzer']}
   let g:ale_echo_cursor = 0
@@ -101,9 +108,32 @@ function! UserConfig()
   highlight ALEErrorSign ctermfg=9 guifg=#C30500
   highlight ALEWarningSign ctermfg=11 guifg=#ED6237
 
-  let g:coc_node_path = '/usr/bin/node'
+  let g:coc_node_path = '/home/xlc/bin/node'
   let g:coc_force_debug = 1
   hi link CocHighlightText Pmemu
+
+  " Use tab for trigger completion with characters ahead and navigate
+  " NOTE: There's always complete item selected by default, you may want to enable
+  " no select by `"suggest.noselect": true` in your configuration file
+  " NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
+  " other plugin before putting this into your config
+  inoremap <silent><expr> <TAB>
+        \ coc#pum#visible() ? coc#pum#next(1) :
+        \ CheckBackspace() ? "\<Tab>" :
+        \ coc#refresh()
+  inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
+
+  " Make <CR> to accept selected completion item or notify coc.nvim to format
+  " <C-g>u breaks current undo, please make your own choice
+  inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
+                                \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+
+  function! CheckBackspace() abort
+    let col = col('.') - 1
+    return !col || getline('.')[col - 1]  =~# '\s'
+  endfunction
+
+  hi link CocInlayHint Pmenu
 
   nmap <silent> gd <Plug>(coc-definition)
   nmap <silent> gy <Plug>(coc-type-definition)
@@ -145,14 +175,37 @@ function! UserConfig()
       autocmd CursorHold * silent call CocActionAsync('highlight')
     endif
 
-    autocmd VimEnter * call timer_start(100, { -> vista#RunForNearestMethodOrFunction()})
+    " autocmd VimEnter * call timer_start(100, { -> vista#RunForNearestMethodOrFunction()})
 
-    autocmd BufEnter *spacevim setlocal ft=vim
+    autocmd BufEnter *spacevim    setlocal ft=vim
     autocmd BufEnter bashrc-extra setlocal ft=sh
 
-    autocmd BufWritePre *.rs call TryRustfmt()
+    " autocmd BufWritePre *.rs call TryRustfmt()
+
+    autocmd BufWritePost *.md call clap#client#notify('update-toc')
+
+    autocmd FileType qf call SetQuickfixStatusline()
   augroup END
 
+  set efm=%f:%l:%c:%m
+
+  let g:clap_plugin_experimental = 1
+
+endfunction
+
+function! ClapAction(bang, action) abort
+  call clap#client#notify(a:action, [])
+endfunction
+
+command! -bang -nargs=* -bar -range -complete=customlist,ClapActionList ClapAction call ClapAction(<bang>0, <f-args>)
+
+function! ClapActionList(A, L, P) abort
+  let actions = get(g:, 'clap_actions', ['open-config'])
+  if empty(a:A)
+    return actions
+  else
+    return filter(actions, printf('v:val =~ "^%s"', a:A))
+  endif
 endfunction
 
 function! TryRustfmt() abort
@@ -161,4 +214,9 @@ function! TryRustfmt() abort
   else
     call spacevim#lang#util#Format()
   endif
+endfunction
+
+function! SetQuickfixStatusline() abort
+  let l:bufnr_winnr = printf('%%#%s#%%{%s()}%%*', 'ElelineBufnrWinnr', 'ElelineBufnrWinnr')
+  let &l:statusline = l:bufnr_winnr."%{exists('w:quickfix_title')? ' '.w:quickfix_title : ''} %l/%L %p"
 endfunction
