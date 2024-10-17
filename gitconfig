@@ -18,12 +18,7 @@
   changed   = yellow
   untracked = red
   nobranch  = red
-[filter "lfs"]
-	clean = git-lfs clean -- %f
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-	required = true
 [http "https://github.com"]
-    #proxy = socks5://127.0.0.1:1080
+    proxy = socks5://127.0.0.1:7891
 [credential]
     helper = store

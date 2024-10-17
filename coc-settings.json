@@ -1,10 +1,12 @@
 {
    "rust-analyzer.lruCapacity": 100,
+   "rust-analyzer.cachePriming.enable": false,
    "rust-analyzer.featureFlags": {
        "lsp.diagnostics": false
    },
    "rust-analyzer.serverPath": "/home/xlc/Data1/github.com/ra-multiplex/target/release/ra-multiplex",
    "rust-analyzer.checkOnSave": false,
+   "rust-analyzer.numThreads": 8,
    "rust-analyzer.inlayHints.enable": false,
    "rust-analyzer.inlayHints.chainingHints": false,
    "rust-analyzer.inlayHints.parameterHints.enable": false,

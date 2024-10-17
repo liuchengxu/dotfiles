@@ -186,7 +186,8 @@ nnoremap <C-p> :Clap grep<CR>
 
 nnoremap <LocalLeader>a :Clap clap_actions<CR>
 nnoremap <LocalLeader>v :Clap quick_open<CR>
-nnoremap <LocalLeader>= :ClapAction linter.format<CR>
+" nnoremap <LocalLeader>= :ClapAction linter.format<CR>
+nnoremap <LocalLeader>= :call CocActionAsync('format')<CR>
 
 """ ef: jump to First error
 nnoremap <Leader>ef :ClapAction diagnostics.firstError<CR>

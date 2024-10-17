@@ -38,4 +38,9 @@ install_font() {
 # install_font InconsolataGo
 # install_font Monofur
 # install_font JetBrainsMono
-install_font CascadiaCode
+# install_font CascadiaCode
+# install_font SourceCodePro
+# install_font Monaspace
+# install_font IosevkaTermSlab Nerd Font
+# install_font MesloLG Nerd Font
+install_font AnonymousPro
