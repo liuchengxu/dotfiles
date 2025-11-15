@@ -1,0 +1,47 @@
+{
+  "alwaysThinkingEnabled": false,
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/scripts/skill-activation-prompt.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/scripts/rust-auto-format.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/scripts/error-handling-reminder.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/scripts/final-rust-checks.sh",
+            "timeout": 60000
+          }
+        ]
+      }
+    ]
+  }
+}

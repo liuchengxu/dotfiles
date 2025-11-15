@@ -1,0 +1,82 @@
+{
+  "version": "1.0",
+  "description": "Skill activation rules for Rust and blockchain development",
+  "skills": {
+    "rust-blockchain-dev": {
+      "name": "rust-blockchain-dev",
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Rust and blockchain development conventions including formatting, imports, checked arithmetic, error handling, and documentation",
+      "promptTriggers": {
+        "keywords": [
+          "rust",
+          "cargo",
+          "clippy",
+          "rustfmt",
+          "format string",
+          "format!",
+          "println!",
+          "blockchain",
+          "solana",
+          "ethereum",
+          "substrate",
+          "consensus",
+          "transaction",
+          "smart contract",
+          "checked arithmetic",
+          "unwrap",
+          "expect",
+          "unsafe",
+          "borrow checker",
+          "lifetime",
+          "trait",
+          "impl",
+          "async",
+          "tokio",
+          "Cargo.toml",
+          "dependencies",
+          "workspace"
+        ],
+        "intentPatterns": [
+          "write.*rust",
+          "create.*rust.*project",
+          "fix.*rust.*error",
+          "format.*rust",
+          "add.*dependency",
+          "run.*cargo",
+          "implement.*trait",
+          "fix.*borrow",
+          "fix.*lifetime",
+          "blockchain.*contract",
+          "consensus.*implement",
+          "state.*machine",
+          "create.*transaction"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "**/*.rs",
+          "**/Cargo.toml",
+          "**/Cargo.lock",
+          "**/src/**/*.rs",
+          "**/tests/**/*.rs",
+          "**/examples/**/*.rs",
+          "**/benches/**/*.rs"
+        ],
+        "contentPatterns": [
+          "use.*std::",
+          "fn.*main\\(\\)",
+          "impl.*for",
+          "cargo.*fmt",
+          "cargo.*clippy",
+          "async fn",
+          "#\\[derive\\(",
+          "pub struct",
+          "pub enum",
+          "pub trait"
+        ]
+      }
+    }
+  }
+}
