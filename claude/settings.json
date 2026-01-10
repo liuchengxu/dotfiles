@@ -1,5 +1,10 @@
 {
   "alwaysThinkingEnabled": false,
+  "statusLine": {
+    "type": "command",
+    "command": "$HOME/.claude/statusline.sh",
+    "padding": 0
+  },
   "hooks": {
     "UserPromptSubmit": [
       {
