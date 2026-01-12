@@ -63,19 +63,37 @@ else
     CTX_FG="$FG_RED"
 fi
 
-# Get OS metrics
-CPU_USAGE=$(ps -A -o %cpu | awk '{sum+=$1} END {printf "%.0f", sum}')
-MEM_PRESSURE=$(memory_pressure 2>/dev/null | grep "System-wide memory free percentage" | awk '{printf "%.0f", 100-$5}')
-if [ -z "$MEM_PRESSURE" ]; then
-    MEM_PRESSURE=$(vm_stat | awk '/Pages active|Pages wired/ {sum+=$NF} END {printf "%.0f", sum*4096/1024/1024/1024*100/16}')
+# Get OS metrics (cross-platform)
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Linux: use /proc/stat for CPU and /proc/meminfo for memory
+    CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{printf "%.0f", $2 + $4}')
+    MEM_PRESSURE=$(free | awk '/Mem:/ {printf "%.0f", $3/$2 * 100}')
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    CPU_USAGE=$(ps -A -o %cpu | awk '{sum+=$1} END {printf "%.0f", sum}')
+    MEM_PRESSURE=$(memory_pressure 2>/dev/null | grep "System-wide memory free percentage" | awk '{printf "%.0f", 100-$5}')
+    if [ -z "$MEM_PRESSURE" ]; then
+        MEM_PRESSURE=$(vm_stat | awk '/Pages active|Pages wired/ {sum+=$NF} END {printf "%.0f", sum*4096/1024/1024/1024*100/16}')
+    fi
+else
+    CPU_USAGE="?"
+    MEM_PRESSURE="?"
 fi
 
-# Get short directory name and git branch
+# Get git repo name and branch
 if [ -n "$CWD" ]; then
-    DIR_NAME=$(basename "$CWD")
-    GIT_BRANCH=$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null)
-    if [ "$GIT_BRANCH" = "HEAD" ]; then
-        GIT_BRANCH=$(git -C "$CWD" rev-parse --short HEAD 2>/dev/null)
+    GIT_ROOT=$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null)
+    if [ -n "$GIT_ROOT" ]; then
+        # Show git repo name
+        DIR_NAME=$(basename "$GIT_ROOT")
+        GIT_BRANCH=$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null)
+        if [ "$GIT_BRANCH" = "HEAD" ]; then
+            GIT_BRANCH=$(git -C "$CWD" rev-parse --short HEAD 2>/dev/null)
+        fi
+    else
+        # Fallback to current directory if not in a git repo
+        DIR_NAME=$(basename "$CWD")
+        GIT_BRANCH=""
     fi
 else
     DIR_NAME=""
