@@ -303,6 +303,25 @@ cargo clippy
 
 Both must complete with zero warnings or changes.
 
+### Commit Signing
+
+**All commits must be signed using SSH.**
+
+The git configuration for SSH signing is already set up:
+```bash
+git config gpg.format ssh
+git config user.signingkey ~/.ssh/id_ed25519.pub
+git config commit.gpgsign true
+```
+
+When committing, git will automatically sign with the SSH key. If commits need to be re-signed (e.g., after rebase):
+```bash
+git rebase --exec 'git commit --amend --no-edit -S' origin/main
+git push --force-with-lease
+```
+
+**Note:** The SSH key at `~/.ssh/id_ed25519.pub` is registered on GitHub as both an authentication key and a signing key.
+
 ## Pull Requests
 
 ### Testing
@@ -414,6 +433,10 @@ When writing or modifying Rust code:
 8. **Prefer** obvious code over clever code
 9. Run `cargo clippy` and fix all warnings before committing
 10. Follow existing code conventions in the project
+
+When committing:
+- **Always** sign commits with SSH (git is configured with `commit.gpgsign true`)
+- If commits need re-signing after rebase: `git rebase --exec 'git commit --amend --no-edit -S' origin/main`
 
 When using GitHub CLI:
 - **Always** use `--repo babylonlabs-io/btc-vault` flag for `gh` commands on this machine

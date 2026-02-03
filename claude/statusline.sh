@@ -6,6 +6,8 @@ input=$(cat)
 
 # Extract data using jq
 MODEL=$(echo "$input" | jq -r '.model.display_name // "Unknown"')
+SESSION_ID=$(echo "$input" | jq -r '.session_id // ""')
+SESSION_SHORT="${SESSION_ID:0:8}"
 CONTEXT_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // 0')
 USAGE=$(echo "$input" | jq '.context_window.current_usage // null')
 CWD=$(echo "$input" | jq -r '.cwd // ""')
@@ -29,6 +31,7 @@ ICON_CPU="󰻠"    # chip/cpu icon
 ICON_MEM="󰍛"    # memory icon
 ICON_DIR=""    # folder icon
 ICON_GIT=""    # git branch icon
+ICON_SESSION="󰖟"  # session/link icon
 
 # Color codes - foreground
 RESET="\033[0m"
@@ -106,7 +109,11 @@ FG_DGRAY="\033[38;5;24m"
 
 # Section 1: Model (magenta)
 SEC1="${BG_MAGENTA}${FG_BLACK} ${ICON_MODEL} ${MODEL} ${RESET}"
-SEP1="${FG_MAGENTA}${BG_DGRAY}${SEP}${RESET}"
+SEP1="${FG_MAGENTA}${BG_GRAY}${SEP}${RESET}"
+
+# Section 1b: Session ID (gray)
+SEC1B="${BG_GRAY}${FG_WHITE} ${ICON_SESSION} ${SESSION_SHORT} ${RESET}"
+SEP1B="${FG_GRAY}${BG_DGRAY}${SEP}${RESET}"
 
 # Section 2: Context (dynamic color based on usage)
 SEC2="${CTX_BG}${FG_BLACK} ${ICON_CTX} ${PERCENT_USED}% ${RESET}"
@@ -134,4 +141,4 @@ else
 fi
 
 # Output statusline
-echo -e "${SEC1}${SEP1}${SEC3}${SEP3}${SEC4}${SEP4}${SEC5}${SEP5}${SEC6}"
+echo -e "${SEC1}${SEP1}${SEC1B}${SEP1B}${SEC3}${SEP3}${SEC4}${SEP4}${SEC5}${SEP5}${SEC6}"
