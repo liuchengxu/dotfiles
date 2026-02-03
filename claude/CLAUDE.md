@@ -292,6 +292,27 @@ git add .      # NEVER - adds untracked files
 
 **Rationale:** Only commit files that are part of your changes. Untracked files (new documentation drafts, config files, etc.) should not be accidentally committed.
 
+### Commit Signing
+
+**All commits MUST be signed with the SSH signing key.**
+
+Git is configured to use SSH signing:
+```bash
+git config gpg.format ssh
+git config user.signingkey ~/.ssh/id_ed25519.pub
+git config commit.gpgsign true
+```
+
+When committing, always use the `-S` flag to ensure signing:
+```bash
+git commit -S -m "commit message"
+```
+
+To re-sign existing commits on a branch:
+```bash
+git rebase --exec "git commit --amend --no-edit -S" origin/main
+```
+
 ### Before Committing
 
 **Always run these commands before committing:**
@@ -420,6 +441,13 @@ gh pr edit 582 --body "..."
 
 **For btc-vault repository:** Use `--repo babylonlabs-io/btc-vault`
 
+## Commit Attribution
+
+**Do NOT add any attribution to commits or PRs.** The `settings.json` has `"attribution": {"commit": "", "pr": ""}` which means:
+- No "Generated with Claude Code" lines
+- No "Co-Authored-By: Claude" lines
+- Just plain commit messages with the actual content
+
 ## Notes for Claude Code
 
 When writing or modifying Rust code:
@@ -428,11 +456,12 @@ When writing or modifying Rust code:
 3. **Always** use checked arithmetic for value operations
 4. **Always** document public APIs
 5. **Always** run `cargo +nightly fmt --all` before committing
-6. **Avoid** `unsafe` unless absolutely necessary
-7. **Avoid** `.unwrap()` - prefer `.expect()` with clear reasoning or `Result`
-8. **Prefer** obvious code over clever code
-9. Run `cargo clippy` and fix all warnings before committing
-10. Follow existing code conventions in the project
+6. **Always** sign commits with `-S` flag (SSH signing is configured)
+7. **Avoid** `unsafe` unless absolutely necessary
+8. **Avoid** `.unwrap()` - prefer `.expect()` with clear reasoning or `Result`
+9. **Prefer** obvious code over clever code
+10. Run `cargo clippy` and fix all warnings before committing
+11. Follow existing code conventions in the project
 
 When committing:
 - **Always** sign commits with SSH (git is configured with `commit.gpgsign true`)
