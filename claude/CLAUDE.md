@@ -448,6 +448,33 @@ gh pr edit 582 --body "..."
 - No "Co-Authored-By: Claude" lines
 - Just plain commit messages with the actual content
 
+## Design Principles
+
+**Prefer the simplest possible solution first.**
+
+- Do NOT introduce traits, closures, generics, or architectural patterns unless explicitly requested
+- When extracting code, default to simple free functions rather than methods on structs
+- When the user specifies a design (e.g., "simple free function"), implement exactly that — do not propose alternatives
+- If multiple approaches exist, ask which one the user prefers before implementing
+
+## Code Editing Rules
+
+**Always confirm you are editing the correct file before making changes.**
+
+- In multi-crate workspaces or multi-package projects, verify the target file path matches the user's intent
+- If ambiguous (e.g., similar filenames in different crates/packages), ask which one
+- When the user specifies where to place code (e.g., "in command.rs as a free function"), place it exactly there — do not relocate to a different module or struct
+- Before editing, state which file you're about to modify so the user can catch mistakes early
+
+## Git Workflow
+
+**Confirm the intended git approach before starting multi-step operations.**
+
+- For cherry-picks vs manual ports, rebases vs merges — confirm the strategy first
+- If a git approach causes conflicts, suggest switching strategies rather than fighting through
+- For force pushes: never force push unless the user explicitly requests it
+- Prefer `--force-with-lease` over `--force` when force push is needed
+
 ## Notes for Claude Code
 
 When writing or modifying Rust code:
