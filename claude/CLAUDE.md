@@ -31,8 +31,8 @@ Never use bare `+`, `-`, `*` for value-related operations.
 
 - **Never** `git add -A` or `git add .` — stage files explicitly or use `git add -u`
 - Run `cargo +nightly fmt --all && cargo clippy` before committing
-- **babylonlabs-io repos**: `git -c user.signingkey=~/.ssh/yubikey-primary.pub commit -S -m "message"`
-- **All other repos**: `git -c commit.gpgsign=false commit -m "message"`
+- **babylonlabs-io repos** (only if `~/.ssh/yubikey-primary.pub` exists): `git -c user.signingkey=~/.ssh/yubikey-primary.pub commit -S -m "message"`
+- **All other repos** (or no yubikey): `git -c commit.gpgsign=false commit -m "message"`
 - Confirm strategy before multi-step git operations (rebase vs merge, cherry-pick vs manual port)
 - Never force push unless explicitly requested; prefer `--force-with-lease`
 
