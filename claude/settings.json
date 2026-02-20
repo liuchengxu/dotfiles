@@ -9,7 +9,11 @@
   "permissions": {
     "allow": [
       "Bash(git:*)",
-      "Bash(cargo:*)",
+      "Bash(cargo +nightly fmt:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo tree:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(cargo locate-project:*)",
       "Bash(gh:*)",
       "Bash(ls:*)",
       "Bash(wc:*)",
