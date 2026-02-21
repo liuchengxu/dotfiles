@@ -16,6 +16,17 @@ Never use positional `{}` placeholders. Applies to all formatting macros: `print
 
 All `use` statements in a single consolidated group at the top of each file. Never split imports mid-file or place inside functions.
 
+## Checked Arithmetic
+
+Always use checked arithmetic for value operations:
+
+```rust
+let result = value.checked_add(amount).ok_or(Error::Overflow)?;
+let difference = total.checked_sub(fee).ok_or(Error::InsufficientFunds)?;
+```
+
+Never use bare `+`, `-`, `*` for value-related operations.
+
 ## Git Rules
 
 - **Never** `git add -A` or `git add .` — stage files explicitly or use `git add -u`

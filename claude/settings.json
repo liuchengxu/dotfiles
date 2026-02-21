@@ -1,6 +1,7 @@
 {
   "env": {
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000",
+    "MAX_THINKING_TOKENS": "31999"
   },
   "attribution": {
     "commit": "",
@@ -8,29 +9,164 @@
   },
   "permissions": {
     "allow": [
-      "Bash(git:*)",
-      "Bash(cargo +nightly fmt:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git --no-pager log:*)",
+      "Bash(git diff:*)",
+      "Bash(git --no-pager diff:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git ls-remote:*)",
+      "Bash(git remote:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git describe:*)",
+      "Bash(git tag:*)",
+      "Bash(git config --get:*)",
+      "Bash(git config --list:*)",
+      "Bash(git blame:*)",
+      "Bash(git shortlog:*)",
+      "Bash(git grep:*)",
+      "Bash(git --no-pager grep:*)",
+      "Bash(git submodule status:*)",
+      "Bash(git stash list:*)",
+      "Bash(git reflog:*)",
+      "Bash(git cat-file:*)",
+      "Bash(git name-rev:*)",
+      "Bash(git worktree:*)",
+      "Bash(git merge:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push origin:*)",
+      "Bash(git push -u:*)",
+      "Bash(git push --set-upstream:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git rebase:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git stash:*)",
+      "Bash(git reset:*)",
+      "Bash(git restore:*)",
       "Bash(cargo check:*)",
+      "Bash(cargo +nightly fmt:*)",
+      "Bash(cargo fmt:*)",
       "Bash(cargo tree:*)",
       "Bash(cargo metadata:*)",
       "Bash(cargo locate-project:*)",
-      "Bash(gh:*)",
       "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(tac:*)",
       "Bash(wc:*)",
       "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
       "Bash(which:*)",
       "Bash(pwd)",
+      "Bash(echo:*)",
+      "Bash(tee:*)",
       "Bash(mkdir:*)",
-      "Bash(ln:*)",
+      "Bash(touch:*)",
+      "Bash(xargs:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(cut:*)",
+      "Bash(sed:*)",
+      "Bash(awk:*)",
+      "Bash(diff:*)",
       "Bash(file:*)",
       "Bash(stat:*)",
       "Bash(readlink:*)",
       "Bash(realpath:*)",
+      "Bash(dirname:*)",
+      "Bash(basename:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh api:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh workflow view:*)",
+      "Bash(gh workflow list:*)",
+      "Bash(gh workflow run:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run watch:*)",
+      "Bash(gh run download:*)",
+      "Bash(gh issue edit:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue close:*)",
+      "Bash(gh issue reopen:*)",
+      "Bash(gh issue comment:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh pr checkout:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr review:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr close:*)",
+      "Bash(gh pr reopen:*)",
+      "Bash(gh run rerun:*)",
+      "Bash(gh run cancel:*)",
+      "Bash(gh label list:*)",
+      "Bash(gh project list:*)",
+      "Bash(gh project view:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.rs)",
       "WebFetch(domain:doc.rust-lang.org)",
       "WebFetch(domain:crates.io)",
       "WebSearch"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/scripts/skill-activation-prompt.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/scripts/rust-auto-format.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/scripts/error-handling-reminder.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/scripts/final-rust-checks.sh",
+            "timeout": 60000
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
