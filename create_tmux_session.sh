@@ -3,12 +3,13 @@
 # Name of the new tmux session
 SESSION_NAME="amd"
 
+# "~/Data1/github.com/ra-multiplex/target/release/ra-multiplex server"
 # Array of commands to run in different panels
 commands=(
-    "~/Downloads/clash-linux-amd64-v3 -f ~/.config/clash/flyingbird.pro.yaml"
-    "~/Data1/github.com/ra-multiplex/target/release/ra-multiplex server"
-    "cd ~/src/github.com/Dreamacro/clash-dashboard && pnpm start"
-    "~/Data1/github.com/alacritty/target/release/alacritty"
+    "~/bin/clash-nyanpasu_1.6.1_amd64.AppImage"
+    "~/Code/src/github.com/alacritty/alacritty/target/release/alacritty"
+    "~/Code/src/github.com/pr2502/ra-multiplex/target/release/ra-multiplex server"
+    "ghostty"
 )
 
 # Create a new tmux session

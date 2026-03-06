@@ -12,6 +12,8 @@ silent! if plug#begin('~/.vim/plugged')
     Plug 'liuchengxu/vim-clap'
     Plug 'liuchengxu/vim-which-key'
     Plug 'liuchengxu/vista.vim'
+    Plug 'liuchengxu/vista.vim'
+    Plug 'liuchengxu/graphviz.vim'
 
     call plug#end()
 endif
@@ -224,6 +226,13 @@ set timeoutlen=500
 nnoremap <silent> <Leader> :WhichKey '<Space>'<CR>
 nnoremap <silent> <LocalLeader> :WhichKey ','<CR>
 
+function! DisableCocForPaths()
+  " Disable coc.nvim for certain paths
+  if expand('%:p') =~ 'polkadot-sdk'
+    let b:coc_enabled = 0
+  endif
+endfunction
+
 augroup XLC
     autocmd!
 
@@ -234,4 +243,31 @@ augroup XLC
                 \ expand('~/.vim/plugged/vim-better-default/plugin/default.vim'),
                 \ ])
     autocmd VimEnter * call clap#client#notify('syntax.treeSitterHighlight', [])
+
+    " Autocmd to trigger the function
+    autocmd BufAdd,BufEnter * call DisableCocForPaths()
 augroup END
+
+" set list listchars=trail:·
+match Error /\s\+$/
+
+" Trim trailing whitespace; optional ! also removes blank lines at EOF
+function! TrimWhitespace(range_start, range_end, kill_eof) abort
+  let l:view = winsaveview()
+  let l:search = @/
+
+  " Trim trailing spaces in the given range (default: whole buffer)
+  execute printf('silent! keepjumps keeppatterns %d,%ds/\s\+$//e', a:range_start, a:range_end)
+
+  " With :Trim! also remove extra blank lines at end of file
+  if a:kill_eof
+    silent! keepjumps keeppatterns %s#\($\n\)\+\%$##e
+  endif
+
+  let @/ = l:search
+  call winrestview(l:view)
+endfunction
+
+" :Trim      → trim trailing spaces in buffer or selection
+" :Trim!     → also collapse blank lines at EOF
+command! -range=% -bang Trim call TrimWhitespace(<line1>, <line2>, <bang>0)

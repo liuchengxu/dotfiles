@@ -7,7 +7,8 @@ REPO="ryanoasis/nerd-fonts"
 latest_release() {
   local repo=$1
   local result=$(curl --silent "https://api.github.com/repos/$repo/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")')
-  echo "$result"
+  echo 'v3.2.1'
+  # echo "$result"
 }
 
 echo "==> Fetching latest release version of $REPO"
@@ -34,13 +35,14 @@ install_font() {
 # install_font FantasqueSansMono
 # install_font Lekton
 # install_font Inconsolata
-# install_font VictorMono
+install_font VictorMono
 # install_font InconsolataGo
 # install_font Monofur
 # install_font JetBrainsMono
 # install_font CascadiaCode
 # install_font SourceCodePro
+# install_font JuliaMono
 # install_font Monaspace
 # install_font IosevkaTermSlab Nerd Font
 # install_font MesloLG Nerd Font
-install_font AnonymousPro
+# install_font AnonymousPro
