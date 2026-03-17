@@ -26,6 +26,15 @@ return {
                 end),
             },
         },
+        { key = '1', mods = 'CMD', action = act.ActivateTab(0) },
+        { key = '2', mods = 'CMD', action = act.ActivateTab(1) },
+        { key = '3', mods = 'CMD', action = act.ActivateTab(2) },
+        { key = '4', mods = 'CMD', action = act.ActivateTab(3) },
+        { key = '5', mods = 'CMD', action = act.ActivateTab(4) },
+        { key = '6', mods = 'CMD', action = act.ActivateTab(5) },
+        { key = '7', mods = 'CMD', action = act.ActivateTab(6) },
+        { key = '8', mods = 'CMD', action = act.ActivateTab(7) },
+        { key = '9', mods = 'CMD', action = act.ActivateTab(8) },
     },
 
     -- font = wezterm.font_with_fallback({
@@ -41,7 +50,7 @@ return {
         -- { family="PT Mono", weight="Regular" },
         -- { family="JuliaMono", weight="Regular" },
         -- { family="VictorMono Nerd Font Mono", weight="Regular" },
-        { family="FantasqueSansM Nerd Font", weight="Regular" },
+        { family="FantasqueSansM Nerd Font Mono Thin", weight="Regular" },
         -- { family="IosevkaInput", weight="Regular" },
         -- { family="FiraCode Nerd Font", weight="Regular" },
         -- { family="Monaspace Neon", weight="Regular" },
@@ -53,6 +62,10 @@ return {
     }),
 
     warn_about_missing_glyphs = false,
+
+    line_height = 1.1,
+    cell_width = 1.05,
+    freetype_load_target = "Light",
 
     font_rules = {
         {
