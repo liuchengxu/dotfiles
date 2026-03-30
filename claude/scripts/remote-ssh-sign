@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# Remote SSH signing proxy for FIDO YubiKey on a remote Mac.
+#
+# Git with gpg.format=ssh calls:
+#   ssh-keygen -Y sign -f <keyfile> -n git <buffer_file>
+# and expects <buffer_file>.sig to be created.
+#
+# This script intercepts sign operations and runs them on the remote Mac
+# where the YubiKey is physically connected. All other ssh-keygen operations
+# are passed through to the local ssh-keygen.
+
+REMOTE_HOST="xuliucheng@192.168.0.65"
+REMOTE_SSH_KEYGEN="/opt/homebrew/bin/ssh-keygen"
+REMOTE_KEY="/Users/xuliucheng/.ssh/yubikey-primary.pub"
+LOCAL_SSH_KEYGEN="/usr/bin/ssh-keygen"
+
+# Check if this is a sign operation
+is_sign=false
+for arg in "$@"; do
+    if [ "$arg" = "sign" ]; then
+        is_sign=true
+        break
+    fi
+done
+
+if ! $is_sign; then
+    # Not a sign operation — pass through to local ssh-keygen
+    exec "$LOCAL_SSH_KEYGEN" "$@"
+fi
+
+# Parse arguments to find the buffer file (last positional argument)
+# git calls: ssh-keygen -Y sign -f <key> -n <namespace> <buffer_file>
+buffer_file=""
+namespace="git"
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+    case "${args[$i]}" in
+        -n)
+            namespace="${args[$((i+1))]}"
+            ((i++))
+            ;;
+        -f)
+            # Skip the key file argument (we use the remote key)
+            ((i++))
+            ;;
+        -Y)
+            # Skip "sign"
+            ((i++))
+            ;;
+        *)
+            # Last unrecognized arg is the buffer file
+            buffer_file="${args[$i]}"
+            ;;
+    esac
+done
+
+if [ -z "$buffer_file" ] || [ ! -f "$buffer_file" ]; then
+    echo "Error: could not find buffer file to sign" >&2
+    exit 1
+fi
+
+# Copy the buffer file to the remote Mac
+remote_tmp=$(ssh "$REMOTE_HOST" "mktemp /tmp/git-sign-XXXXXX")
+if [ $? -ne 0 ]; then
+    echo "Error: failed to create remote temp file" >&2
+    exit 1
+fi
+
+scp -q "$buffer_file" "${REMOTE_HOST}:${remote_tmp}"
+if [ $? -ne 0 ]; then
+    echo "Error: failed to copy buffer file to remote" >&2
+    ssh "$REMOTE_HOST" "rm -f '$remote_tmp'" 2>/dev/null
+    exit 1
+fi
+
+# Run ssh-keygen -Y sign on the remote Mac with askpass for PIN
+ssh "$REMOTE_HOST" "SSH_ASKPASS=\$HOME/.local/bin/ssh-askpass SSH_ASKPASS_REQUIRE=force $REMOTE_SSH_KEYGEN -Y sign -f $REMOTE_KEY -n $namespace $remote_tmp"
+sign_result=$?
+
+if [ $sign_result -ne 0 ]; then
+    echo "Error: remote signing failed" >&2
+    ssh "$REMOTE_HOST" "rm -f '$remote_tmp' '${remote_tmp}.sig'" 2>/dev/null
+    exit 1
+fi
+
+# Copy the signature file back
+scp -q "${REMOTE_HOST}:${remote_tmp}.sig" "${buffer_file}.sig"
+copy_result=$?
+
+# Clean up remote temp files
+ssh "$REMOTE_HOST" "rm -f '$remote_tmp' '${remote_tmp}.sig'" 2>/dev/null
+
+if [ $copy_result -ne 0 ]; then
+    echo "Error: failed to copy signature back" >&2
+    exit 1
+fi
+
+exit 0
