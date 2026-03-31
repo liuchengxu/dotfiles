@@ -88,6 +88,7 @@ Never use bare `+`, `-`, `*` for value-related operations.
 
 ## GitHub PR Comments
 
+- **Never post PR review comments without explicit user approval.** Always show the comment content and ask before posting.
 - When responding to PR review comments, **reply in the comment thread** (use `gh api repos/{owner}/{repo}/pulls/comments/{comment_id}/replies`) — never as a top-level PR comment.
 
 ## Scratch Notes

@@ -10,7 +10,7 @@
 # where the YubiKey is physically connected. All other ssh-keygen operations
 # are passed through to the local ssh-keygen.
 
-REMOTE_HOST="xuliucheng@192.168.0.65"
+REMOTE_HOST="xuliucheng@100.73.172.11"
 REMOTE_SSH_KEYGEN="/opt/homebrew/bin/ssh-keygen"
 REMOTE_KEY="/Users/xuliucheng/.ssh/yubikey-primary.pub"
 LOCAL_SSH_KEYGEN="/usr/bin/ssh-keygen"
