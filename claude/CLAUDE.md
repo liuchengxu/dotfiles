@@ -63,6 +63,7 @@ Never use bare `+`, `-`, `*` for value-related operations.
 - Always identify the root cause before applying a fix — no blind patching or temporary workarounds.
 - Be able to clearly answer **why** the bug occurred before proposing a solution.
 - During investigation, only surface findings directly relevant to the decision at hand — skip noise.
+- **Bug fixes require regression tests.** Every fix must include a test that reproduces the bug and verifies the fix. Write the test first when possible — confirm it fails without the fix, then passes with it.
 
 ## Subagents
 
