@@ -1,7 +1,8 @@
 # Development Rules
 
 ## Approach Guidelines
-- Do NOT over-engineer solutions. Prefer simple, minimal implementations first. Avoid full e2e tests when a focused unit test suffices.
+- Do NOT over-engineer solutions. Avoid full e2e tests when a focused unit test suffices.
+- Prefer the **most correct and idiomatic** solution, not just the simplest. Quick hacks (dummy files, `#[allow]` suppressions, placeholder values) accumulate tech debt. When multiple approaches exist and the right one isn't obvious, ask the user before proceeding.
 - When the user corrects your framing or approach, fully reset — don't try to salvage the wrong direction.
 - Never amend commits on main. Always create separate commits for fixes.
 
