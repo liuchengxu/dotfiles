@@ -37,5 +37,6 @@
   },
   "alwaysThinkingEnabled": true,
   "autoUpdatesChannel": "latest",
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "model": "opus[1m]"
 }
