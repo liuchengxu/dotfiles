@@ -14,6 +14,7 @@
     ],
     "ask": []
   },
+  "model": "claude-opus-4-6[1m]",
   "statusLine": {
     "type": "command",
     "command": "bash -c '\"$(command -v bun || command -v node)\" \"$(ls -td ~/.claude/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | head -1)src/index.ts\"'"
@@ -36,7 +37,7 @@
     }
   },
   "alwaysThinkingEnabled": true,
+  "fastMode": true,
   "autoUpdatesChannel": "latest",
-  "voiceEnabled": true,
-  "model": "opus[1m]"
+  "voiceEnabled": true
 }
