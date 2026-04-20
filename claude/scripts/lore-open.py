@@ -9,6 +9,16 @@ import subprocess
 import sys
 
 
+def try_connect(sock_path):
+    """Try to connect to a socket, return the socket or None."""
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(sock_path)
+        return s
+    except (FileNotFoundError, ConnectionRefusedError, OSError):
+        return None
+
+
 def main():
     if len(sys.argv) < 2:
         sys.exit("Usage: lore-open.py [--diff] <path>")
@@ -25,13 +35,24 @@ def main():
         sys.exit("Usage: lore-open.py [--diff] <path>")
 
     xdg = os.environ.get("XDG_RUNTIME_DIR")
-    if xdg:
-        sock_path = xdg + "/lore/rpc.sock"
-    else:
-        sock_path = "/tmp/lore-" + str(os.getuid()) + "/rpc.sock"
+    uid = str(os.getuid())
 
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.connect(sock_path)
+    # Try lore-next (new React app) first, then fall back to lore (old desktop app)
+    candidates = []
+    if xdg:
+        candidates.append(xdg + "/lore-next/rpc.sock")
+        candidates.append(xdg + "/lore/rpc.sock")
+    candidates.append("/tmp/lore-next-" + uid + "/rpc.sock")
+    candidates.append("/tmp/lore-" + uid + "/rpc.sock")
+
+    s = None
+    for sock_path in candidates:
+        s = try_connect(sock_path)
+        if s:
+            break
+
+    if not s:
+        sys.exit("Could not connect to Lore. Is the app running?")
 
     path = os.path.abspath(os.path.expanduser(args[0]))
     request = json.dumps({
@@ -61,12 +82,15 @@ def main():
         print("Opened in Lore:", result.get("file_path", "ok"))
 
     if platform.system() != "Darwin":
-        out = subprocess.check_output(["wmctrl", "-l"], text=True)
-        for line in out.splitlines():
-            if "Lore" in line:
-                wid = line.split()[0]
-                subprocess.run(["wmctrl", "-i", "-a", wid])
-                break
+        try:
+            out = subprocess.check_output(["wmctrl", "-l"], text=True)
+            for line in out.splitlines():
+                if "Lore" in line:
+                    wid = line.split()[0]
+                    subprocess.run(["wmctrl", "-i", "-a", wid])
+                    break
+        except FileNotFoundError:
+            pass
     else:
         subprocess.run(
             ["open", "-a", "Lore"],

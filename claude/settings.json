@@ -26,7 +26,8 @@
     "frontend-design@claude-plugins-official": true,
     "claude-hud@claude-hud": true,
     "superpowers@claude-plugins-official": true,
-    "codex@openai-codex": true
+    "codex@openai-codex": true,
+    "warp@claude-code-warp": true
   },
   "extraKnownMarketplaces": {
     "openai-codex": {
@@ -34,9 +35,16 @@
         "source": "github",
         "repo": "openai/codex-plugin-cc"
       }
+    },
+    "claude-code-warp": {
+      "source": {
+        "source": "github",
+        "repo": "warpdotdev/claude-code-warp"
+      }
     }
   },
   "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
   "fastMode": true,
   "autoUpdatesChannel": "latest",
   "voiceEnabled": true
