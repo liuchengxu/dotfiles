@@ -44,8 +44,7 @@
     }
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "high",
-  "fastMode": true,
+  "effortLevel": "xhigh",
   "autoUpdatesChannel": "latest",
   "voiceEnabled": true
 }
