@@ -1,0 +1,517 @@
+#!/usr/bin/env python3
+import argparse
+import concurrent.futures
+import datetime as dt
+import http.client
+import json
+import os
+import re
+import shutil
+import socket
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+
+SOCKET = "/tmp/verge/verge-mihomo.sock"
+CONFIG = os.path.expanduser(
+    "~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml"
+)
+DEFAULT_URL = "https://www.gstatic.com/generate_204"
+CLAUDE_URL = "https://api.anthropic.com/v1/messages"
+PROBE_TIMEOUT_S = 8
+CLAUDE_RULES = [
+    ("DOMAIN-SUFFIX", "claude.ai"),
+    ("DOMAIN-SUFFIX", "anthropic.com"),
+    ("DOMAIN-SUFFIX", "claudeusercontent.com"),
+    ("DOMAIN-KEYWORD", "anthropic"),
+    ("DOMAIN-KEYWORD", "claude"),
+]
+GROUP_TYPES = {"Selector", "URLTest", "Fallback", "LoadBalance"}
+EXAMPLES = """examples:
+  Show current routing and Claude rules:
+    vpnctl status
+
+  Measure all concrete nodes in the default Proxies selector:
+    vpnctl list
+
+  Switch the default Proxies selector to the fastest reachable node:
+    vpnctl fastest
+
+  Switch the default Proxies selector to the fastest non-HK node:
+    vpnctl fastest --exclude 'HK|Hong Kong|香港|🇭🇰'
+
+  Check candidate nodes against Anthropic without changing anything:
+    vpnctl claude-list
+
+  Route Claude/Anthropic to the fastest non-HK node and reload Clash:
+    vpnctl claude-fastest
+
+  Check whether the current Claude node actually reaches Anthropic:
+    vpnctl claude-check
+
+  Route Claude/Anthropic to the fastest node that actually reaches Anthropic:
+    vpnctl claude-best
+
+  Force Claude/Anthropic rules back to a selector, such as TW:
+    vpnctl ensure-claude --target TW
+"""
+
+
+class UnixHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, socket_path: str):
+        super().__init__("localhost")
+        self.socket_path = socket_path
+
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect(self.socket_path)
+
+
+class Mihomo:
+    def __init__(self, socket_path: str):
+        self.socket_path = socket_path
+
+    def request(self, method: str, path: str, body=None):
+        conn = UnixHTTPConnection(self.socket_path)
+        data = None if body is None else json.dumps(body).encode()
+        headers = {}
+        if data is not None:
+            headers["Content-Type"] = "application/json"
+        conn.request(method, path, body=data, headers=headers)
+        resp = conn.getresponse()
+        payload = resp.read()
+        conn.close()
+        if resp.status >= 400:
+            raise RuntimeError(f"{method} {path} failed: HTTP {resp.status} {payload[:200]!r}")
+        if not payload:
+            return None
+        return json.loads(payload)
+
+    def get(self, path: str):
+        return self.request("GET", path)
+
+    def put(self, path: str, body):
+        return self.request("PUT", path, body)
+
+    def delete(self, path: str):
+        return self.request("DELETE", path)
+
+    def proxies(self):
+        return self.get("/proxies")["proxies"]
+
+    def rules(self):
+        return self.get("/rules")["rules"]
+
+    def mixed_port(self):
+        cfg = self.get("/configs") or {}
+        return cfg.get("mixed-port") or cfg.get("port")
+
+    def switch(self, selector: str, name: str):
+        enc = urllib.parse.quote(selector, safe="")
+        self.put(f"/proxies/{enc}", {"name": name})
+
+    def delay(self, name: str, url: str, timeout_ms: int):
+        enc = urllib.parse.quote(name, safe="")
+        q = urllib.parse.urlencode({"timeout": str(timeout_ms), "url": url})
+        try:
+            data = self.get(f"/proxies/{enc}/delay?{q}")
+            delay = data.get("delay") if isinstance(data, dict) else None
+            return name, delay if isinstance(delay, int) else None, None
+        except Exception as exc:
+            return name, None, str(exc)
+
+    def reload_config(self, config_path: str):
+        self.put("/configs", {"path": config_path, "force": True})
+
+
+def die(msg: str):
+    print(f"error: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def selector_candidates(proxies, selector, include_groups=False):
+    if selector not in proxies:
+        die(f"selector not found: {selector}")
+    names = proxies[selector].get("all") or []
+    out = []
+    for name in names:
+        if name in {"DIRECT", "REJECT"}:
+            continue
+        typ = proxies.get(name, {}).get("type", "")
+        if not include_groups and typ in GROUP_TYPES:
+            continue
+        out.append(name)
+    return out
+
+
+def measure(client, names, url, timeout_ms, jobs):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+        futs = [pool.submit(client.delay, name, url, timeout_ms) for name in names]
+        return [f.result() for f in concurrent.futures.as_completed(futs)]
+
+
+def sorted_results(results):
+    return sorted(results, key=lambda r: (r[1] is None, r[1] if r[1] is not None else 10**9, r[0]))
+
+
+def print_results(results, proxies, current):
+    print(f"{'delay':>7}  {'status':<6}  {'cur':<3}  {'type':<14}  name")
+    for name, delay, err in sorted_results(results):
+        typ = proxies.get(name, {}).get("type", "")
+        cur = "*" if name == current else ""
+        if delay is None:
+            print(f"{'ERR':>7}  {'fail':<6}  {cur:<3}  {typ:<14}  {name}")
+        else:
+            print(f"{delay:>7}  {'ok':<6}  {cur:<3}  {typ:<14}  {name}")
+
+
+def choose_fastest(results, exclude):
+    pattern = re.compile(exclude) if exclude else None
+    usable = []
+    for name, delay, _ in results:
+        if delay is None:
+            continue
+        if pattern and pattern.search(name):
+            continue
+        usable.append((delay, name))
+    if not usable:
+        return None
+    usable.sort()
+    return usable[0][1], usable[0][0]
+
+
+def command_list(args):
+    client = Mihomo(args.socket)
+    proxies = client.proxies()
+    current = proxies[args.selector].get("now", "")
+    names = selector_candidates(proxies, args.selector, args.include_groups)
+    results = measure(client, names, args.url, args.timeout, args.jobs)
+    print_results(results, proxies, current)
+
+
+def command_fastest(args):
+    client = Mihomo(args.socket)
+    proxies = client.proxies()
+    names = selector_candidates(proxies, args.selector, args.include_groups)
+    results = measure(client, names, args.url, args.timeout, args.jobs)
+    choice = choose_fastest(results, args.exclude)
+    print_results(results, proxies, proxies[args.selector].get("now", ""))
+    if not choice:
+        die("no reachable candidate matched the filters")
+    name, delay = choice
+    client.switch(args.selector, name)
+    if args.close_connections:
+        client.delete("/connections")
+    print(f"\nswitched {args.selector} -> {name} ({delay} ms)")
+
+
+def command_status(args):
+    client = Mihomo(args.socket)
+    proxies = client.proxies()
+    for selector in args.selectors:
+        if selector in proxies:
+            print(f"{selector}: {proxies[selector].get('now', '')}")
+    print("\nClaude rules:")
+    for rule in client.rules()[:20]:
+        payload = rule.get("payload", "")
+        proxy = rule.get("proxy", "")
+        if "claude" in payload.lower() or "anthropic" in payload.lower():
+            now = proxies.get(proxy, {}).get("now", proxy)
+            blocked = bool(re.search(args.blocked, f"{proxy} {now}"))
+            flag = " BLOCKED?" if blocked else ""
+            print(f"{rule.get('type')} {payload} -> {proxy} ({now}){flag}")
+
+
+CLAUDE_RULE_RE = re.compile(
+    r"^-\s+(DOMAIN-SUFFIX|DOMAIN-KEYWORD),(claude|anthropic|claudeusercontent)[^,]*,"
+)
+
+
+def read_config_lines(config_path: str):
+    if not os.path.exists(config_path):
+        die(f"config not found: {config_path}")
+    with open(config_path, "r", encoding="utf-8") as fh:
+        return fh.readlines()
+
+
+def rewrite_claude_rules_lines(lines, target: str):
+    filtered = [line for line in lines if not CLAUDE_RULE_RE.match(line.strip())]
+    try:
+        idx = next(i for i, line in enumerate(filtered) if line.strip() == "rules:")
+    except StopIteration:
+        die("could not find rules: section in config")
+    insert = [f"- {kind},{payload},{target}\n" for kind, payload in CLAUDE_RULES]
+    return filtered[: idx + 1] + insert + filtered[idx + 1 :]
+
+
+def backup_config(config_path: str):
+    stamp = dt.datetime.now().strftime("%Y%m%d%H%M%S")
+    backup = f"{config_path}.vpnctl-backup-{stamp}"
+    shutil.copy2(config_path, backup)
+    return backup
+
+
+def write_config_lines(config_path: str, lines):
+    with open(config_path, "w", encoding="utf-8") as fh:
+        fh.writelines(lines)
+
+
+def update_claude_rules(config_path: str, target: str):
+    lines = read_config_lines(config_path)
+    new_lines = rewrite_claude_rules_lines(lines, target)
+    if new_lines == lines:
+        print("Claude rules already up to date")
+        return False
+    backup = backup_config(config_path)
+    write_config_lines(config_path, new_lines)
+    print(f"updated Claude rules -> {target}")
+    print(f"backup: {backup}")
+    return True
+
+
+def current_claude_node(client):
+    for rule in client.rules():
+        payload = rule.get("payload", "").lower()
+        if "claude" in payload or "anthropic" in payload:
+            return rule.get("proxy", "")
+    return None
+
+
+def anthropic_probe(mixed_port, timeout_s=PROBE_TIMEOUT_S):
+    proxy = f"http://127.0.0.1:{mixed_port}"
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+    )
+    try:
+        resp = opener.open(CLAUDE_URL, timeout=timeout_s)
+        status, body = resp.status, resp.read(512)
+    except urllib.error.HTTPError as exc:
+        status, body = exc.code, exc.read(512)
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+    try:
+        data = json.loads(body)
+    except Exception:
+        return False, f"HTTP {status} non-JSON {body[:60]!r}"
+    if isinstance(data, dict) and data.get("type") == "error":
+        return True, f"HTTP {status} anthropic error envelope"
+    return False, f"HTTP {status} unexpected JSON"
+
+
+def command_ensure_claude(args):
+    if re.search(args.blocked, args.target):
+        die(f"target matches blocked country pattern: {args.target}")
+    update_claude_rules(args.config, args.target)
+
+    client = Mihomo(args.socket)
+    client.reload_config(args.config)
+    client.delete("/connections")
+    print("reloaded config and closed existing connections")
+
+
+def command_claude_fastest(args):
+    client = Mihomo(args.socket)
+    proxies = client.proxies()
+    names = selector_candidates(proxies, args.selector, args.include_groups)
+    results = measure(client, names, CLAUDE_URL, args.timeout, args.jobs)
+    choice = choose_fastest(results, args.blocked)
+    print_results(results, proxies, "")
+    if not choice:
+        die("no reachable non-blocked Claude candidate found")
+    name, delay = choice
+    if re.search(args.blocked, name):
+        die(f"chosen node unexpectedly matches blocked pattern: {name}")
+    update_claude_rules(args.config, name)
+    client.reload_config(args.config)
+    client.delete("/connections")
+    print(f"\nClaude/Anthropic routed to {name} ({delay} ms)")
+    print("reloaded config and closed existing connections")
+
+
+def command_claude_check(args):
+    client = Mihomo(args.socket)
+    port = client.mixed_port()
+    if not port:
+        die("mihomo has no mixed-port/port listener; cannot probe")
+    node = current_claude_node(client)
+    ok, detail = anthropic_probe(port, args.probe_timeout)
+    print(f"current Claude node: {node or '(no claude/anthropic rule found)'}")
+    print(f"probe: {'USABLE' if ok else 'BLOCKED'} ({detail})")
+    if not ok:
+        sys.exit(1)
+
+
+def command_claude_best(args):
+    client = Mihomo(args.socket)
+    port = client.mixed_port()
+    if not port:
+        die("mihomo has no mixed-port/port listener; cannot probe")
+    proxies = client.proxies()
+    names = selector_candidates(proxies, args.selector, args.include_groups)
+    results = measure(client, names, CLAUDE_URL, args.timeout, args.jobs)
+    print_results(results, proxies, "")
+
+    blocked = re.compile(args.blocked) if args.blocked else None
+    ranked = sorted(
+        (delay, name)
+        for name, delay, _ in results
+        if delay is not None and not (blocked and blocked.search(name))
+    )
+    candidates = ranked[: args.top]
+    if not candidates:
+        die("no reachable non-blocked candidate to verify")
+
+    original = current_claude_node(client)
+    backup = backup_config(args.config)
+    print(f"\nbackup: {backup}")
+    print(f"verifying top {len(candidates)} fastest against Anthropic:")
+
+    winner = None
+    for delay, name in candidates:
+        lines = rewrite_claude_rules_lines(read_config_lines(args.config), name)
+        write_config_lines(args.config, lines)
+        client.reload_config(args.config)
+        ok, detail = anthropic_probe(port, args.probe_timeout)
+        status = "USABLE" if ok else "BLOCKED"
+        print(f"  {delay:>5} ms  {status:<7}  {name}  ({detail})")
+        if ok:
+            winner = (name, delay)
+            break
+
+    if not winner:
+        if original is not None:
+            restored = rewrite_claude_rules_lines(read_config_lines(args.config), original)
+            write_config_lines(args.config, restored)
+            client.reload_config(args.config)
+        client.delete("/connections")
+        die(f"no usable node among the top {len(candidates)}; restored previous routing (backup: {backup})")
+
+    client.delete("/connections")
+    name, delay = winner
+    print(f"\nClaude/Anthropic routed to {name} ({delay} ms, verified)")
+    print("reloaded config and closed existing connections")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Inspect and switch Clash Verge/mihomo VPN nodes.",
+        epilog=EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--socket", default=SOCKET)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--selector", default="Proxies")
+    common.add_argument("--url", default=DEFAULT_URL)
+    common.add_argument("--timeout", type=int, default=5000)
+    common.add_argument("--jobs", type=int, default=8)
+    common.add_argument("--include-groups", action="store_true")
+
+    p = sub.add_parser(
+        "list",
+        parents=[common],
+        help="measure available providers",
+        epilog="example: vpnctl list",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.set_defaults(func=command_list)
+
+    p = sub.add_parser(
+        "fastest",
+        parents=[common],
+        help="switch selector to fastest reachable provider",
+        epilog="""examples:
+  vpnctl fastest
+  vpnctl fastest --exclude 'HK|Hong Kong|香港|🇭🇰'
+  vpnctl fastest --selector TW --url https://api.anthropic.com/v1/messages
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--exclude", default="")
+    p.add_argument("--keep-connections", dest="close_connections", action="store_false")
+    p.set_defaults(close_connections=True, func=command_fastest)
+
+    p = sub.add_parser(
+        "status",
+        help="show current selectors and Claude routing",
+        epilog="example: vpnctl status",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--selectors", nargs="*", default=["Proxies", "HK", "JP", "SG", "TW", "US", "Apple", "OpenAI", "Final"])
+    p.add_argument("--blocked", default="HK|Hong Kong|香港|🇭🇰")
+    p.set_defaults(func=command_status)
+
+    p = sub.add_parser(
+        "ensure-claude",
+        help="route Claude/Anthropic away from blocked countries",
+        epilog="""examples:
+  vpnctl ensure-claude --target TW
+  vpnctl ensure-claude --target '🇨🇳 台湾标准 IEPL 专线 3'
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--config", default=CONFIG)
+    p.add_argument("--target", default="TW")
+    p.add_argument("--blocked", default="HK|Hong Kong|香港|🇭🇰")
+    p.set_defaults(func=command_ensure_claude)
+
+    p = sub.add_parser(
+        "claude-list",
+        parents=[common],
+        help="measure providers against Anthropic",
+        epilog="example: vpnctl claude-list",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.set_defaults(url=CLAUDE_URL, func=command_list)
+
+    p = sub.add_parser(
+        "claude-fastest",
+        parents=[common],
+        help="route Claude/Anthropic to fastest non-blocked provider",
+        epilog="""examples:
+  vpnctl claude-fastest
+  vpnctl claude-fastest --blocked 'HK|香港|🇭🇰|SG|新加坡|🇸🇬'
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--config", default=CONFIG)
+    p.add_argument("--blocked", default="HK|Hong Kong|香港|🇭🇰")
+    p.set_defaults(func=command_claude_fastest)
+
+    p = sub.add_parser(
+        "claude-check",
+        help="probe whether the current Claude node actually reaches Anthropic",
+        epilog="example: vpnctl claude-check",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--probe-timeout", type=int, default=PROBE_TIMEOUT_S, help="probe timeout in seconds")
+    p.set_defaults(func=command_claude_check)
+
+    p = sub.add_parser(
+        "claude-best",
+        parents=[common],
+        help="route Claude/Anthropic to fastest node that actually reaches Anthropic",
+        epilog="""examples:
+  vpnctl claude-best
+  vpnctl claude-best --top 8
+  vpnctl claude-best --blocked 'HK|香港|🇭🇰|SG|新加坡|🇸🇬'
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--config", default=CONFIG)
+    p.add_argument("--blocked", default="HK|Hong Kong|香港|🇭🇰")
+    p.add_argument("--top", type=int, default=5, help="verify this many fastest candidates")
+    p.add_argument("--probe-timeout", type=int, default=PROBE_TIMEOUT_S, help="probe timeout in seconds")
+    p.set_defaults(func=command_claude_best)
+
+    args = parser.parse_args()
+    if not os.path.exists(args.socket):
+        die(f"mihomo socket not found: {args.socket}")
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
