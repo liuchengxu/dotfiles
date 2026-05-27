@@ -5,6 +5,7 @@ hyperShift = {'ctrl', 'cmd', 'shift'}
 require "launch"
 require "window"
 require "input_method"
+require "focus_indicator"
 
 hs.loadSpoon('SpeedMenu')
 
