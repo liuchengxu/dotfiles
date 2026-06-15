@@ -1,0 +1,2 @@
+- [User role](user_role.md) — liucheng / liuchengxu, Babylon Labs engineer on SP1 vault provers
+- [Babylon SP1 prover infra](project_babylon_sp1_provers.md) — Succinct Prover Network primary + self-hosted GPU fallback; production-bound; needs prover diversity for permissionless vault providers

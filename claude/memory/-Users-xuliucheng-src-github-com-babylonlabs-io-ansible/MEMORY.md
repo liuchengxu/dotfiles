@@ -1,0 +1,1 @@
+- [Prefer minimal, targeted instrumentation](feedback_minimal_instrumentation.md) — bump existing log levels first; avoid phase-by-phase macros unless asked
