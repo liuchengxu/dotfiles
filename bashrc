@@ -424,8 +424,11 @@ fcof() {
 }
 
 nop() {
-  http_proxy= https_proxy= "$@"
+  http_proxy= https_proxy= all_proxy= HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= "$@"
 }
+
+export no_proxy="localhost,127.0.0.1,::1,.local,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12"
+export NO_PROXY="$no_proxy"
 
 export XDG_CONFIG_HOME="$HOME/.config"
 
@@ -452,3 +455,12 @@ export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || pr
 # BEGIN_KITTY_SHELL_INTEGRATION
 if test -e "$HOME/src/github.com/kovidgoyal/kitty/shell-integration/kitty.bash"; then source "$HOME/src/github.com/kovidgoyal/kitty/shell-integration/kitty.bash"; fi
 # END_KITTY_SHELL_INTEGRATION
+
+export PATH="$PATH:/Users/xuliucheng/.sp1/bin"
+
+# opencode
+export PATH=/Users/xuliucheng/.opencode/bin:$PATH
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/xuliucheng/.lmstudio/bin"
+# End of LM Studio CLI section

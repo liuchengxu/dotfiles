@@ -18,7 +18,11 @@
   changed   = yellow
   untracked = red
   nobranch  = red
-[http "https://github.com"]
-    proxy = socks5://127.0.0.1:7891
 [credential]
     helper = store
+[gpg]
+	format = ssh
+[http "https://github.com"]
+	proxy = socks5://127.0.0.1:7890
+[url "git@github.com:"]
+	insteadOf = https://github.com/

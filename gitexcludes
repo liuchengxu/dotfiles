@@ -28,3 +28,6 @@ obj
 *.o
 *.pyc
 *.so
+
+.claude/settings.local.json
+.cocoindex_code

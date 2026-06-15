@@ -50,7 +50,12 @@ return {
         -- { family="PT Mono", weight="Regular" },
         -- { family="JuliaMono", weight="Regular" },
         -- { family="VictorMono Nerd Font Mono", weight="Regular" },
-        { family="FantasqueSansM Nerd Font Mono Thin", weight="Regular" },
+        -- { family="FantasqueSansM Nerd Font Mono Thin40", weight="Regular" },
+        { family="FantasqueSansM Nerd Font Mono Thin20", weight="Regular" },
+        -- { family="UbuntuMono Nerd Font Mono", weight="Regular" },
+        -- { family="UbuntuMono Nerd Font Mono Light", weight="Regular" },
+        -- { family="IosevkaSS16 Nerd Font Writer", weight="Regular" },
+        -- { family="MonaspiceAr Nerd Font Mono", weight="Regular" },
         -- { family="IosevkaInput", weight="Regular" },
         -- { family="FiraCode Nerd Font", weight="Regular" },
         -- { family="Monaspace Neon", weight="Regular" },
@@ -63,9 +68,10 @@ return {
 
     warn_about_missing_glyphs = false,
 
-    line_height = 1.1,
-    cell_width = 1.05,
+    line_height = 1.3,
+    cell_width = 0.9,
     freetype_load_target = "Light",
+    freetype_load_flags = "NO_HINTING",
 
     font_rules = {
         {
@@ -100,7 +106,8 @@ return {
       inactive_titlebar_bg = "#333333",
     },
 
+    color_scheme = "Catppuccin Mocha",
     colors = {
-        background = "#292b2e"
+        background = "#292b2e",
     }
 }

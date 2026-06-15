@@ -1,15 +1,11 @@
--- Flash a viewfinder-style indicator on the monitor that just received focus:
--- bold L-shaped corner brackets with a glow halo over a full edge outline.
--- Only fires when focus crosses to a different screen, then pulses and fades.
+-- Flash a glowing line across the top edge of the monitor that just received
+-- focus, with a soft glow falling off downward. Only fires when focus crosses
+-- to a different screen, then pulses and fades.
 
 local COLOR = { red = 1.0, green = 0.15, blue = 0.15, alpha = 1.0 }
-local BRACKET_THICKNESS = 14 -- corner bracket line weight
-local BRACKET_LENGTH = 120 -- length of each bracket arm
-local EDGE_THICKNESS = 5 -- full-border weight
-local EDGE_ALPHA = 0.45 -- full-border opacity (relative to COLOR)
-local GLOW_SPREAD = 12 -- soft halo width around lines
-local GLOW_ALPHA = 0.4 -- halo opacity
-local CORNER_RADIUS = 16
+local LINE_THICKNESS = 3 -- top line weight
+local FADE_FRACTION = 0.3 -- portion of each side that fades to transparent
+local SEGMENTS = 100 -- horizontal resolution of the side fades
 
 local FADE_IN = 0.10 -- seconds to ramp up
 local PULSE_DUR = 0.28 -- seconds for the attention pulse
@@ -54,56 +50,24 @@ local function envelope(t)
     return -1.0 -- done
 end
 
-local function tint(alpha)
-    local c = {}
-    for k, v in pairs(COLOR) do
-        c[k] = v
-    end
-    c.alpha = alpha
-    return c
-end
-
-local function segments(coords, color, width)
-    return {
-        type = "segments",
-        action = "stroke",
-        strokeColor = color,
-        strokeWidth = width,
-        strokeCapStyle = "round",
-        strokeJoinStyle = "round",
-        coordinates = coords,
-    }
-end
-
-local function edge(color, width, w, h)
-    return {
-        type = "rectangle",
-        action = "stroke",
-        strokeColor = color,
-        strokeWidth = width,
-        roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS },
-        frame = { x = 0, y = 0, w = w, h = h },
-    }
-end
-
-local function elements(w, h)
-    local m = BRACKET_THICKNESS / 2 + GLOW_SPREAD -- inset so glow stays on-screen
-    local len = BRACKET_LENGTH
-    local corners = {
-        { { x = m, y = m + len }, { x = m, y = m }, { x = m + len, y = m } },
-        { { x = w - m - len, y = m }, { x = w - m, y = m }, { x = w - m, y = m + len } },
-        { { x = w - m, y = h - m - len }, { x = w - m, y = h - m }, { x = w - m - len, y = h - m } },
-        { { x = m + len, y = h - m }, { x = m, y = h - m }, { x = m, y = h - m - len } },
-    }
-    local els = {
-        edge(tint(EDGE_ALPHA * 0.5), (EDGE_THICKNESS + GLOW_SPREAD) * 2, w, h), -- edge glow
-        edge(tint(EDGE_ALPHA), EDGE_THICKNESS * 2, w, h), -- edge line
-    }
-    for _, c in ipairs(corners) do -- bracket glows first, sharp lines on top
-        els[#els + 1] = segments(c, tint(GLOW_ALPHA), BRACKET_THICKNESS + GLOW_SPREAD * 2)
-    end
-    for _, c in ipairs(corners) do
-        els[#els + 1] = segments(c, COLOR, BRACKET_THICKNESS)
+-- A top-edge line at full strength across the middle, fading to transparent at
+-- the left and right ends. Built as thin segments since a single canvas
+-- gradient supports only two color stops.
+local function elements(w)
+    local seg = w / SEGMENTS
+    local els = {}
+    for i = 0, SEGMENTS - 1 do
+        local u = (i + 0.5) / SEGMENTS -- normalized x of this segment
+        local a = math.min(u, 1 - u) / FADE_FRACTION -- 0 at edges, ramps to 1
+        if a > 1 then
+            a = 1
+        end
+        els[#els + 1] = {
+            type = "rectangle",
+            action = "fill",
+            fillColor = { red = COLOR.red, green = COLOR.green, blue = COLOR.blue, alpha = COLOR.alpha * a },
+            frame = { x = i * seg, y = 0, w = seg + 1, h = LINE_THICKNESS }, -- +1 avoids hairline gaps
+        }
     end
     return els
 end
@@ -112,7 +76,7 @@ local function flash(screen)
     clear()
     local f = screen:fullFrame()
     canvas = hs.canvas.new(f)
-    canvas:appendElements(elements(f.w, f.h))
+    canvas:appendElements(elements(f.w))
     canvas:level(hs.canvas.windowLevels.overlay)
     canvas:alpha(0)
     canvas:show()

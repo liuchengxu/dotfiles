@@ -1,7 +1,6 @@
 #!/usr/bin/env fontforge -script
 import fontforge
 import os
-
 import sys
 
 if sys.platform == "darwin":
@@ -11,47 +10,54 @@ else:
 
 # Allow override via environment variable
 FONT_DIR = os.environ.get("FONT_DIR", FONT_DIR)
-THIN_REGULAR = -40  # thinning for Regular/Italic
-THIN_BOLD = -10     # gentler thinning for Bold variants to preserve weight contrast
 
-variants = [
-    ("FantasqueSansMNerdFontMono-Regular.ttf", THIN_REGULAR),
-    ("FantasqueSansMNerdFontMono-Bold.ttf", THIN_BOLD),
-    ("FantasqueSansMNerdFontMono-Italic.ttf", THIN_REGULAR),
-    ("FantasqueSansMNerdFontMono-BoldItalic.ttf", THIN_BOLD),
+# Each profile: (suffix, regular_amount, bold_amount)
+profiles = [
+    ("Thin20", -20, -10),
+    ("Thin40", -40, -10),
 ]
 
-for variant, thin_amount in variants:
-    src = os.path.join(FONT_DIR, variant)
-    if not os.path.exists(src):
-        print("Skipping (not found): " + src)
-        continue
+base_variants = [
+    ("FantasqueSansMNerdFontMono-Regular.ttf", False),
+    ("FantasqueSansMNerdFontMono-Bold.ttf", True),
+    ("FantasqueSansMNerdFontMono-Italic.ttf", False),
+    ("FantasqueSansMNerdFontMono-BoldItalic.ttf", True),
+]
 
-    print("Processing: " + variant + " (amount: " + str(thin_amount) + ")")
-    font = fontforge.open(src)
+for suffix, regular_amount, bold_amount in profiles:
+    family_name = "FantasqueSansM Nerd Font Mono " + suffix
 
-    for glyph in font.glyphs():
-        if glyph.isWorthOutputting():
-            glyph.changeWeight(thin_amount, "auto", 0, 0, "auto")
-            glyph.autoHint()
+    for variant, is_bold in base_variants:
+        src = os.path.join(FONT_DIR, variant)
+        if not os.path.exists(src):
+            print("Skipping (not found): " + src)
+            continue
 
-    # Rename the font family so it installs alongside the original
-    font.familyname = "FantasqueSansM Nerd Font Mono Thin"
-    font.fontname = font.fontname.replace("FantasqueSansMNFM", "FantasqueSansMNFMThin")
-    font.fullname = font.fullname.replace("FantasqueSansM Nerd Font Mono", "FantasqueSansM Nerd Font Mono Thin")
+        thin_amount = bold_amount if is_bold else regular_amount
+        print("Processing: " + variant + " -> " + suffix + " (amount: " + str(thin_amount) + ")")
+        font = fontforge.open(src)
 
-    # Update name table entries for OS recognition
-    for record in font.sfnt_names:
-        # record is (lang, strid, string)
-        pass  # We'll set them explicitly below
+        for glyph in font.glyphs():
+            if glyph.isWorthOutputting():
+                glyph.changeWeight(thin_amount, "auto", 0, 0, "auto")
+                glyph.autoHint()
 
-    font.appendSFNTName("English (US)", "Family", "FantasqueSansM Nerd Font Mono Thin")
-    font.appendSFNTName("English (US)", "Preferred Family", "FantasqueSansM Nerd Font Mono Thin")
+        font.familyname = family_name
+        font.fontname = font.fontname.replace("FantasqueSansMNFM", "FantasqueSansMNFM" + suffix)
+        font.fullname = font.fullname.replace("FantasqueSansM Nerd Font Mono", family_name)
 
-    out_name = variant.replace("FantasqueSansMNerdFontMono", "FantasqueSansMNerdFontMonoThin")
-    out_path = os.path.join(FONT_DIR, out_name)
-    font.generate(out_path)
-    print("Generated: " + out_path)
-    font.close()
+        font.appendSFNTName("English (US)", "Family", family_name)
+        font.appendSFNTName("English (US)", "Preferred Family", family_name)
 
-print("Done!")
+        out_name = variant.replace("FantasqueSansMNerdFontMono", "FantasqueSansMNerdFontMono" + suffix)
+        out_path = os.path.join(FONT_DIR, out_name)
+        font.generate(out_path)
+        print("Generated: " + out_path)
+        font.close()
+
+    print("Finished profile: " + suffix + " -> font family: " + family_name)
+    print("")
+
+print("Done! Available font families:")
+for suffix, _, _ in profiles:
+    print("  - FantasqueSansM Nerd Font Mono " + suffix)
