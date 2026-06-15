@@ -50,3 +50,4 @@
 - [vaultBTC is not fungible](project_vaultbtc_not_fungible.md) — transfer-restricted ERC-20 (no direct EOA transfers); backing has per-vault identity, so uniqueness invariants are valid — don't assume fungibility
 - [CHANGELOG entries are one-line](feedback_changelog_one_line.md) — `* [#N](url) Verb-phrase; fixes Sherlock #M.` — never multi-sentence; corrected twice (#430, #174)
 - [Global TODO file](feedback_global_todo_file.md) — personal TODOs live in ~/.claude/TODO.md; read on demand, append observed follow-ups
+- [Dotfiles sync + memory backup](feedback_dotfiles_sync.md) — no auto-sync; memory backed up via claude/scripts/sync-memory.sh; commit/push manually, no signing
