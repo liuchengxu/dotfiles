@@ -5,15 +5,16 @@ description: >
   for redundancy, inconsistency, clarity, and density. Apply the general
   rules first, then the type-specific addendum for the doc's genre.
   TRIGGER when: user asks to "review", "audit", "clean up", "tighten",
-  "compress", or "check" a markdown / documentation file; user pastes a
-  doc and asks for an editorial pass; user asks if a specific reviewer
-  comment is "addressed".
+  "compress", or "check" a markdown / documentation file (including a
+  proposal, pitch, or decision memo); user pastes a doc and asks for an
+  editorial pass; user asks if a specific reviewer comment is
+  "addressed".
   DO NOT TRIGGER when: user wants substantive technical correctness
-  review of an algorithm, protocol, or implementation (use code-review
-  or domain reasoning instead); user is drafting fresh prose from
-  scratch (this skill is for review passes, not generation). Design docs
-  may still trigger for structure, readability, and spec/runbook
-  alignment.
+  review of a design, algorithm, or protocol (use adversarial-review),
+  or review of a code diff or implementation (use code-review); user is
+  drafting fresh prose from scratch (this skill is for review passes,
+  not generation). Design docs and proposals may still trigger for
+  structure, readability, and claim/ask calibration.
 ---
 
 # Doc Review Skill
@@ -25,15 +26,18 @@ specific doc type.
 
 ### 0. Identify reader, purpose, and next action
 
-Before reviewing prose, name the intended reader and the action they
-should be able to take after reading. A doc that is clear for auditors
+Before reviewing prose, name the intended reader and the intended use
+or next action they should be able to take after reading. A doc that is clear for auditors
 may be too slow for operators; a doc that is concise for maintainers
 may be underspecified for new contributors.
 
 ### 1. One source of truth per fact
 
-If a fact appears in the preamble, §1, and §2 intro — cut two. Each
-restatement erodes signal and creates drift risk when facts change.
+If a fact appears in the preamble, §1, and §2 intro — cut two. Keep
+the fact in the narrowest authoritative section that owns it;
+elsewhere, delete it or replace it with a cross-reference when readers
+need navigation. Each restatement erodes signal and creates drift risk
+when facts change.
 
 ### 2. No re-explanation of self-explanatory output
 
@@ -109,7 +113,12 @@ to", "now" over "at this point in time". Jargon only when it's the
 
 Identify the doc's genre, then apply the matching subsection's rules
 **on top of** Part A. Most docs fit one genre; some (e.g. a runbook
-with extensive theory) need two.
+with extensive theory) need two. If no subsection clearly matches,
+apply Part A only and say so. Mapping hints: ADRs → B.2; RFCs → B.2
+(plus B.8 when requesting approval); tutorials → B.3 (plus B.1 when
+they contain executable steps). B.9 is an overlay, not a genre: apply
+it alongside any genre whenever the doc synthesizes or compresses
+claims from multiple authoritative sources.
 
 ### B.1 Operational runbook / test plan
 
@@ -147,9 +156,8 @@ to achieve a defined outcome.
 
 ### B.2 Design doc / architectural spec
 
-The genre: a proposal for how a system *will* (or *should*) be
-shaped, written for future readers who need to understand the
-decision.
+The genre: explains how a system *will* (or *should*) be shaped,
+written for future readers who need to understand the decision.
 
 - **Structure as problem → constraints → approach → tradeoffs.**
   Don't bury the problem; don't omit the tradeoffs.
@@ -230,24 +238,135 @@ specification or decision record.
 - **Deviation accounting:** elaborating an underspecified area is fine;
   silently replacing a spec decision is not.
 
+### B.8 Proposal / decision-request doc
+
+The genre: asks a decider to approve, fund, staff, adopt, or trial a
+course of action. Discriminator vs B.2: apply B.8 when the doc asks
+for a decision now; B.2 when it primarily explains a design; both when
+a proposal carries substantial architecture. Technical soundness of
+the proposed design stays with adversarial-review. A proposal that
+compresses an existing corpus also gets B.9.
+
+- **Lead with the decision requested.** Name the decider, the ask, its
+  scope, resources, and the decision deadline in the opening section.
+- **Keep one approval boundary.** Split independently rejectable asks;
+  when several deliverables form one decision, state their coupling and
+  whether partial approval is meaningful.
+- **Bound the commitment.** When uncertainty can be reduced by trial,
+  prefer a time-boxed pilot to open-ended adoption. State what
+  approval does and does not authorize; the body must not quietly ask
+  for more than the opening ask.
+- **Decision evidence before implementation depth.** A skeptic should
+  meet "this was tested, here is what happened" before the tutorial.
+- **State costs in named buckets.** One-time / initial rollout /
+  recurring; mark estimates and unmeasured costs honestly; state the
+  cost of inaction when material and supportable.
+- **Compare the status quo and alternatives fairly.** Same criteria for
+  each; answer the audience's two or three predictable objections
+  without artificially weakening the rejected options.
+- **Define the pilot contract.** Owner, duration, participants,
+  resources, success metrics (outcomes, not activity), stop conditions,
+  and the post-pilot default (expire, continue, or trigger adoption).
+- **Separate authorization unknowns from pilot questions.** Resolve or
+  bound the facts needed to approve now (a deferred resource ask needs
+  a range, ceiling, or second-stage gate); give pilot-resolvable
+  questions an owner, an evaluation criterion, and a stop or default.
+- **State transition consequences, reversibility, and expiry.** Name
+  which people, workflows, and commitments change, who bears the
+  transition cost, what becomes hard to undo, and when the decision is
+  revisited.
+- **Name material risks and dependencies with owners.** Do not hide
+  adoption risk inside implementation detail.
+- **Standalone test.** Assume the decider has read none of the corpus:
+  define unfamiliar terms near first use, remove references to working
+  files, ensure evidence and images travel with the doc.
+- **Record the resolution, not a ceremonial lifecycle.** After the
+  decision, preserve the outcome, date, decider, conditions, and a
+  canonical decision link; require status/discussion metadata only for
+  proposals that genuinely stay live.
+
+### B.9 Assembled / source-derived document
+
+The genre: synthesizes or compresses claims from multiple
+authoritative sources into one artifact — a compendium, summary,
+synthesis, or migration guide. An overlay: apply alongside the content
+genre.
+
+- **Ledger material claims against their sources.** For claims in the
+  title, summary, headings, tables, and conclusion:
+  `claim | doc wording | strongest supported wording | disposition`.
+  Check later corrections, not just the first matching text.
+- **Do not strengthen the corpus.** Flag lost qualifiers, broader
+  scope, stronger causality, or proposed rules presented as current
+  behavior. Label new assumptions and estimates explicitly.
+- **Make evidence reconcile.** Totals, denominators, units, time
+  windows, and sample sizes must add up; if a total does not
+  reconcile, mark the table unverified — one broken sum discounts the
+  whole table. Separate observations from forecasts and anecdotes.
+- **Sweep for stale source references.** Prose names of source files
+  and sections ("the design draft", "the spec doc §6") must be
+  rewritten to internal references; mechanical rewrites leave
+  double-wrapped artifacts — grep for them.
+- **Check cross-part agreement.** A load-bearing number or claim
+  restated in two assembled parts must match; verify counts by
+  command, not by eye.
+- **Front matter must match contents.** Check the reading guide's
+  description of each part against what the part actually contains.
+- **Verbatim blocks get banners, not edits.** A historical record that
+  contradicts the doc's current state is reframed with a dated banner;
+  its body stays untouched.
+
 ## Review output format
 
-If the user provides an explicit output contract, follow that over this
-default format.
+If the user provides an explicit output contract, follow it over this
+default. Use this format for substantive reviews; typo, single-comment,
+and narrow copyedit passes may stay in prose.
 
-When applying this skill, surface findings in this order:
+Start with one line:
 
-1. **List findings** found, grouped by category and ordered by impact:
-   inconsistencies, redundancies, low-value content, source mismatches,
-   missing success criteria, unsafe operations, unclear prerequisites,
-   or spec/runbook deltas. Include file/line references when reviewing
-   a local file. State the rule that's being violated; quote the
-   offending passage briefly.
-2. **Proposed fix** — show the rewritten passage or the deletion.
-3. **Ask before applying** for any substantive rewrite. Surface
-   findings first; the user may want to fix some and not others.
-4. After applying, **re-run a final pass** (Part A item 9) before
-   declaring the doc clean.
+`VERDICT: EDITORIALLY READY | FIX (<n> integrity, <m> action) | RESTRUCTURE`
+
+- **EDITORIALLY READY** — no blocking finding survived review. Open
+  polish findings may remain; they do not affect the verdict or its
+  counts.
+- **FIX** — one or more blocking findings, each with an independently
+  applicable repair.
+- **RESTRUCTURE** — repair requires replacing the organizing model,
+  changing the primary purpose or genre, or reordering multiple
+  load-bearing sections — not editing within them.
+
+Before publishing a finding, cite the passage, identify an applicable
+Part A / B rule, and name a concrete reader or decision consequence.
+Check nearby context and authoritative sources where relevant. Use
+**Open Questions** only when missing context prevents classification;
+name the evidence or decision needed. A credible integrity or action
+risk stays blocking until resolved — never park it in Open Questions
+to reach a clean verdict.
+
+Render each finding as:
+
+### [F-01] `blocking-integrity · B.9` One-line finding
+**Where:** `file:line` or § — brief offending passage
+**Why:** concrete reader, operational, or decision risk
+**Fix:** smallest sufficient rewrite, deletion, or relocation
+
+Use `blocking-integrity` when the reader may act or decide on false,
+misleading, contradictory, unsafe, or unbounded content. Use
+`blocking-action` when the intended reader cannot complete the
+document's intended use: act, decide, implement, or reason correctly.
+Use `polish` for non-blocking redundancy, hedging, and terminology
+drift.
+
+Order findings blocking-integrity → blocking-action → polish, grouped
+by root cause. Keep finding IDs stable across follow-up rounds. Ask
+before applying substantive rewrites; exact replacement prose is
+optional unless the repair is local and unambiguous. After applying,
+re-run Part A item 9.
+
+Editorial readiness does not certify material technical or decision
+claims for publication. Route changed or unverified material claims to
+the appropriate substantive reviewer (adversarial-review, an
+external-model consult, or a domain owner).
 
 ## When NOT to apply
 

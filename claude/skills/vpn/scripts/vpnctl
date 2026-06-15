@@ -146,6 +146,31 @@ def selector_candidates(proxies, selector, include_groups=False):
     return out
 
 
+def primary_selector(proxies, rules):
+    target = next((r.get("proxy") for r in rules if r.get("type") == "Match"), None)
+    last_group = None
+    seen = set()
+    while target and target in proxies and target not in seen:
+        seen.add(target)
+        if proxies[target].get("type") not in GROUP_TYPES:
+            break
+        last_group = target
+        target = proxies[target].get("now")
+    return last_group
+
+
+def resolve_selector(client, proxies, selector):
+    if selector:
+        return selector
+    auto = primary_selector(proxies, client.rules())
+    if auto:
+        return auto
+    if "Proxies" in proxies:
+        return "Proxies"
+    groups = ", ".join(n for n, p in proxies.items() if p.get("type") in GROUP_TYPES)
+    die(f"could not auto-detect a selector; pass --selector. available groups: {groups}")
+
+
 def measure(client, names, url, timeout_ms, jobs):
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
         futs = [pool.submit(client.delay, name, url, timeout_ms) for name in names]
@@ -185,6 +210,7 @@ def choose_fastest(results, exclude):
 def command_list(args):
     client = Mihomo(args.socket)
     proxies = client.proxies()
+    args.selector = resolve_selector(client, proxies, args.selector)
     current = proxies[args.selector].get("now", "")
     names = selector_candidates(proxies, args.selector, args.include_groups)
     results = measure(client, names, args.url, args.timeout, args.jobs)
@@ -194,6 +220,7 @@ def command_list(args):
 def command_fastest(args):
     client = Mihomo(args.socket)
     proxies = client.proxies()
+    args.selector = resolve_selector(client, proxies, args.selector)
     names = selector_candidates(proxies, args.selector, args.include_groups)
     results = measure(client, names, args.url, args.timeout, args.jobs)
     choice = choose_fastest(results, args.exclude)
@@ -314,6 +341,7 @@ def command_ensure_claude(args):
 def command_claude_fastest(args):
     client = Mihomo(args.socket)
     proxies = client.proxies()
+    args.selector = resolve_selector(client, proxies, args.selector)
     names = selector_candidates(proxies, args.selector, args.include_groups)
     results = measure(client, names, CLAUDE_URL, args.timeout, args.jobs)
     choice = choose_fastest(results, args.blocked)
