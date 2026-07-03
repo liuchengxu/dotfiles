@@ -14,6 +14,12 @@ Create the `docs/adr/` directory lazily — only when the first ADR is needed.
 
 That's it. An ADR can be a single paragraph. The value is in recording *that* a decision was made and *why* — not in filling out sections.
 
+## Scope and length
+
+- An ADR captures **a decision and its rationale**, not a full design. Include only the topology, state transitions, alternatives, and trade-offs needed to justify the decision. Field-level schemas, SQL DDL, pseudocode, API contracts, and per-component I/O or failure-mode breakdowns belong in a follow-up RFC or implementation doc.
+- Diagrams identify structure or transitions, not carry prose. Keep Mermaid edge labels short; put detail in a table or short prose below.
+- Match the length range of existing ADRs in the repo. If a draft needs deeply nested subsections or passes ~400 lines, stop and ask whether to split it into an ADR plus RFC/implementation doc.
+
 ## Optional sections
 
 Only include these when they add genuine value. Most ADRs won't need them.

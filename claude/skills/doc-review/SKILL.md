@@ -8,19 +8,22 @@ description: >
   "compress", or "check" a markdown / documentation file (including a
   proposal, pitch, or decision memo); user pastes a doc and asks for an
   editorial pass; user asks if a specific reviewer comment is
-  "addressed".
+  "addressed"; about to DRAFT a design doc, proposal, planning doc,
+  or RFC (apply Part C's authoring defaults, then self-review).
   DO NOT TRIGGER when: user wants substantive technical correctness
   review of a design, algorithm, or protocol (use adversarial-review),
-  or review of a code diff or implementation (use code-review); user is
-  drafting fresh prose from scratch (this skill is for review passes,
-  not generation). Design docs and proposals may still trigger for
-  structure, readability, and claim/ask calibration.
+  or review of a code diff or implementation (use code-review); writing
+  a GitHub issue or PR body (use writing-issues-and-prs). Design docs
+  and proposals may still trigger for structure, readability, and
+  claim/ask calibration.
 ---
 
 # Doc Review Skill
 
 Two-tier lens. **Always apply Part A.** Then layer on **Part B** for the
-specific doc type.
+specific doc type. When *drafting* a new doc rather than reviewing one,
+start from **Part C**, then self-review the draft with Parts A and B
+before presenting it.
 
 ## Part A — General rules (every doc)
 
@@ -316,6 +319,46 @@ genre.
   contradicts the doc's current state is reframed with a dated banner;
   its body stays untouched.
 
+## Part C — Authoring defaults (deadly simple)
+
+Default shape when drafting a design doc, planning doc, tracking
+issue, or RFC from scratch:
+
+- For design/proposal docs and RFCs, open with `## Problem`: 2-4 terse
+  bullets naming only why the work exists — what changed, what cannot
+  change, what must still hold; state the incompatibility/issue itself,
+  one causal step per bullet. No background paragraph; mechanism
+  details, solution seams, and encoding/spec specifics belong in
+  `## Proposal` or later sections.
+- Follow with `## Proposal`: one sentence naming the artifact/path and
+  what it does, then a numbered list of the main points, one or two
+  lines each.
+- Use `Decisions` / `Decision N` only for choices already agreed by
+  stakeholders.
+- For tracking issues and simple planning docs, skip `Problem` unless
+  alignment context is load-bearing; open with the goal and the
+  ordered work.
+- Target ~50 lines for a fresh doc. Past ~150 lines, ask whether to
+  split or cut.
+- Drop sections that describe unchanged state — readers already know
+  what hasn't moved.
+- No FTE/bandwidth estimates, no iteration history, no exhaustive
+  risks list unless explicitly requested.
+- Short tables only when comparison is the point.
+- Save longer detail (per-crate checklists, schema fields, build
+  wiring) only when asked.
+- Avoid robotic templates, emoji headers, and decorative sectioning;
+  use headings only when they help the reader act.
+
+Exceptions: when the user explicitly asks for, or the artifact is
+clearly, an external API reference, runbook, post-mortem, security
+analysis, audit checklist/report, comprehensive spec, or formal RFC,
+treat the request literally and include the detail the genre requires
+(and draft against the matching Part B genre rules).
+
+For ADRs, follow `../grill-with-docs/ADR-FORMAT.md` instead — it is
+the single source for ADR shape, scope, and length.
+
 ## Review output format
 
 If the user provides an explicit output contract, follow it over this
@@ -370,8 +413,7 @@ external-model consult, or a domain owner).
 
 ## When NOT to apply
 
-- **Drafting from scratch**: this skill is for review, not
-  generation. Use general writing principles instead.
+- **GitHub issue / PR bodies**: use writing-issues-and-prs.
 - **Technical correctness review**: if the question is "is this
   algorithm right" or "does this approach work", that's a different
   skill / domain reasoning. This skill can still be used for the
