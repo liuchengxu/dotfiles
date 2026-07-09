@@ -123,6 +123,10 @@ PR descriptions, commit messages, design docs, and prose explanations describe t
 
 When drafting or reviewing a design doc, proposal, planning doc, or RFC, invoke the `doc-review` skill — its authoring defaults carry the deadly-simple shape (Problem/Proposal structure, ~50-line target, no iteration history or FTE estimates).
 
+The context-closure gate below is shared verbatim with Codex (`~/.codex/AGENTS.md`, generated) — keep it model-agnostic.
+
+@/Users/xuliucheng/.dotfiles/ai-rules/documentation-context-closure.md
+
 ## ADRs
 
 Do not create an ADR unless explicitly asked for a decision record. When asked, follow `~/.claude/skills/grill-with-docs/ADR-FORMAT.md` — the single source for ADR shape, scope, and length.
