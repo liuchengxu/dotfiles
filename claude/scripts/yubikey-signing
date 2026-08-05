@@ -1,0 +1,27 @@
+#!/bin/bash
+# Sticky YubiKey signing switch shared with yubikey-sign and ssh-askpass.
+# status exits 0 when signing is enabled, 1 when disabled.
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/yubikey-signing"
+MARKER="$STATE_DIR/declined"
+
+case "${1:-status}" in
+  status)
+    if [ -e "$MARKER" ]; then
+        echo "signing disabled (declined $(cat "$MARKER" 2>/dev/null))"
+        exit 1
+    fi
+    echo "signing enabled"
+    ;;
+  disable)
+    (umask 077; mkdir -p "$STATE_DIR" && date -u +%Y-%m-%dT%H:%M:%SZ > "$MARKER") \
+        && echo "signing disabled"
+    ;;
+  enable)
+    rm -f "$MARKER" && echo "signing enabled"
+    ;;
+  *)
+    echo "usage: yubikey-signing [status|disable|enable]" >&2
+    exit 2
+    ;;
+esac

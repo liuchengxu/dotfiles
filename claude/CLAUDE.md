@@ -5,6 +5,8 @@
 - For non-trivial or multi-step work, set a verifiable success criterion before writing code: turn "add validation" into "reject a malformed email with a 400 and a clear message; test the valid and the invalid case." State the plan first so a wrong approach is caught before it is built.
 - Flag concerns even when you did exactly what was asked, and state uncertainty precisely — "I have not verified this library supports streaming" carries more information than "I think this works."
 - In chat replies, keep only decision-relevant signal: no preamble, postamble, decorative closers, or tool-output narration. Keep substantive concerns, caveats, uncertainty, and disagreement.
+- Essence by default, in every artifact (reply, PR/issue body, commit message, comment, doc): lead with the answer and carry the minimum sufficient content — problem, decision, consequence. Keep detail in the artifact that owns it (contract → spec, mechanics → diff/code, proof → evidence record); cite rather than restate, and never delegate to a home that doesn't exist. Compression preserves load-bearing caveats, constraints, and verification evidence — minimum sufficient, not minimum. Genres the reader must act on or verify against (specs, runbooks, audits, security reports, checklists) own their detail: keep them complete. Replies: core ideas as short numbered points or a small flow diagram; expand when asked.
+- Plain register, in every artifact: use common words, active verbs, and one idea per sentence. Rewrite nominalizations — verbs turned into nouns — when they hide who does what ("the two disagree", not "the divergence"). Keep jargon and domain terms only when they are the reader's precise term.
 
 ## Planning vs Implementation
 
@@ -34,7 +36,7 @@ Name the pattern when you catch yourself in one, then stop — don't push throug
 - Use subagents to keep the main context window clean — offload research, exploration, and parallel analysis.
 - One focused task per subagent for best results.
 - When I say "ask codex", "let codex review", "consult codex" (or similar), always run it in the background via a subagent that invokes the codex tool — never block the foreground on it. Keep working while it runs, then relay Codex's verbatim answer plus a short summary when it returns.
-- Codex model: always pass `model: gpt-5.5` to the codex tool. The `gpt-5.*-codex` models (gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, etc.) are gated on this ChatGPT account and error with "model not supported".
+- Codex model: always pass `model: gpt-5.6-sol` to the codex tool. This is also the default in `~/.codex/config.toml`. Siblings `gpt-5.6-luna` and `gpt-5.6-terra` exist in the local model cache if a variant is ever needed. The `gpt-5.*-codex` models (gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, etc.) are gated on this ChatGPT account and error with "model not supported".
 - When relaying a Codex consultation: lead with a one-line **Verdict**, then Codex's answer (verbatim for design/code reviews, trimmed for quick fact-checks), then my own read that explicitly flags where I agree/disagree with Codex and tags findings as blocking vs optional.
 
 ## Design Principles
@@ -96,13 +98,19 @@ Never use bare `+`, `-`, `*` for value-related operations.
 
 Code comments describe the **current invariant**, not how the code got there. Same rule as Written Artifacts, applied at the smallest unit. The bullets below are concrete applications.
 
+Default to no comments. Add one only when it explains a non-obvious current invariant, hidden constraint, workaround, or behavior that would surprise a reader.
+
+Comments are opt-in, not decorative. Enforced after the code settles: before committing, the `comment-cleanup` skill (triggered by `comment-diff-gate.sh`) prunes the diff's added comments against these rules — since duplication and redundancy-with-code only become visible once the code is final.
+
 When writing comments and docstrings:
 
-- Keep comments proportional to the code. Prefer one clear sentence over a multi-paragraph rationale.
+- Keep comments proportional to the code. Prefer one clear sentence over a multi-paragraph rationale; if it truly needs a paragraph, put it in a doc-comment on the item or a design doc.
 - Avoid loud emphasis: do not use all-caps words like ONLY, SAME, WRONG, FIRST, AFTER, ACCEPTS, or DIFFERS.
 - Avoid repeating the same rationale across sibling items. Put shared context in the module header or a helper comment, then keep each item's comment local.
 - A comment should say what property the code pins or what invariant it enforces, not narrate every execution step.
-- Do not restate the identifier name in prose. Explain only the non-obvious invariant or why the shape matters.
+- Do not describe what the next line does or restate the identifier name in prose. Explain only the non-obvious invariant or why the shape matters.
+- State invariants affirmatively — describe the rule the code enforces, not a contrast with an unchosen alternative ("checked, not saturating"; "selected by slots, not branch length"; "set to 0 rather than computed"). Prefer "the target slot must precede the finalized slot; panic otherwise." This is not a ban on "not": stating what invalid input does ("other branch lengths panic") is affirmative enforcement, and adversarial rationale in security code ("a prover-supplied X would let an attacker Y") explains the invariant — both stay.
+- Do not name call sites, tasks, PRs, issues, or temporary flows in comments (`used by X`, `handles #123`); that context belongs in the PR description or an enduring design note.
 - Do not use stale function names or old architecture references in comments. Check the current code before naming helpers.
 - Avoid archaeology comments such as "added by PR X", "previously", or "now". Comments describe the current invariant.
 - Match the file's existing punctuation convention. If the file uses em-dashes and curly quotes, use them; if it uses ASCII-only, stay ASCII.
@@ -117,15 +125,18 @@ When writing test comments specifically:
 PR descriptions, commit messages, design docs, and prose explanations describe the **final state**, not the path that got there.
 
 - Don't narrate dropped iterations, rejected approaches, or "we tried X then Y". The reviewer is trying to understand what *is*, not what was considered.
+- Describe the accepted design as an affirmative contract, not by contrast with the implementation you didn't choose. Rejected alternatives belong only in an explicit Alternatives section when the comparison is the artifact's purpose.
 - Cut pedagogical scaffolding that justifies the design against debates the reader wasn't part of. If the diff already shows the *what*, the prose only needs the one nonobvious *why*.
 - Iteration history belongs in `git log`, chat transcripts, or notes docs (see Notes: Scratch vs Durable) — never in the merged artifact.
 - This applies after every iterative review/refactor cycle: when an artifact accumulates prose defending revisions, do a final pass that rewrites it as if the final shape were the original plan.
 
 When drafting or reviewing a design doc, proposal, planning doc, or RFC, invoke the `doc-review` skill — its authoring defaults carry the deadly-simple shape (Problem/Proposal structure, ~50-line target, no iteration history or FTE estimates).
 
-The context-closure gate below is shared verbatim with Codex (`~/.codex/AGENTS.md`, generated) — keep it model-agnostic.
+The context-closure gate and HTML-views contract below are shared verbatim with Codex (`~/.codex/AGENTS.md`, generated) — keep them model-agnostic.
 
 @/Users/xuliucheng/.dotfiles/ai-rules/documentation-context-closure.md
+
+@/Users/xuliucheng/.dotfiles/ai-rules/html-views.md
 
 ## ADRs
 
@@ -146,6 +157,7 @@ Rules:
 - Durable notes start with minimal frontmatter: `branch`, `commit` (the stable anchor once the branch is deleted), and `session` link when available. Title is the H1; the date lives in the filename.
 - Never encode branch or worktree names in the durable directory structure — they belong in frontmatter.
 - Never create loose `.md` files in the repo root — only `CLAUDE.md`, `README.md`, and other standard project files belong there.
+- **HTML artifacts**: markdown stays canonical; HTML is a view or a tool. Scratch HTML lives in worktree `notes/*.html` and dies with it — export findings to md before cleanup. Durable HTML follows `~/notes/CLAUDE.md` (same-slug canonical md note, `snapshot|tool` kind, self-contained/no secrets, data sidecars). Repo-committed docs stay markdown.
 
 ## Research
 
@@ -160,9 +172,11 @@ Rules:
 - **Never** `git add -A` or `git add .` — stage files explicitly or use `git add -u`
 - Never amend commits on main. Always create separate commits for fixes.
 - Run `cargo +nightly fmt --all && cargo clippy` before committing
+- A global pre-commit hook runs the comment gate on `git commit`. When it blocks the commit (added/edited code comments in agent context), run the `comment-cleanup` skill on them, then re-commit with `COMMENT_CLEANUP_DONE=1` set (e.g. `COMMENT_CLEANUP_DONE=1 git -c commit.gpgsign=false commit ...`).
 - **babylonlabs-io repos** (YubiKey signing required):
-  - **macOS (local YubiKey):** `SSH_ASKPASS="$HOME/.local/bin/ssh-askpass" SSH_ASKPASS_REQUIRE=force git -c gpg.format=ssh -c user.signingkey=~/.ssh/yubikey-primary.pub commit -S -m "message"`. The osascript askpass wrapper shows a macOS dialog for PIN input. Always set `SSH_ASKPASS` and `SSH_ASKPASS_REQUIRE=force` env vars, and pass `-c gpg.format=ssh` to git. Run the signing command directly via Bash — do NOT tell the user to run it in their terminal.
-  - **Linux (remote YubiKey):** Just use `git commit -S -m "message"`. Signing is auto-configured via `~/.gitconfig` `includeIf` → `~/.gitconfig-babylonlabs` (sets `gpg.ssh.program` to `~/.claude/scripts/remote-ssh-sign`, symlinked from `~/.local/bin/`). The proxy SSHs to the Mac and signs there. A PIN dialog appears on the Mac and the user must tap the YubiKey.
+  - **macOS (local YubiKey):** `git -c user.signingkey=~/.ssh/yubikey-primary.pub commit -S -m "message"`. Global gitconfig routes signing through the `yubikey-sign` gate (`gpg.format=ssh` + `gpg.ssh.program`), which surfaces the osascript PIN dialog itself — do not set `SSH_ASKPASS` manually or point `gpg.ssh.program` at raw `ssh-keygen`; that bypasses the decline switch. Run the signing command directly via Bash — do NOT tell the user to run it in their terminal.
+  - **Linux (remote YubiKey):** Just use `git commit -S -m "message"`. Signing is auto-configured via `~/.gitconfig` `includeIf` → `~/.gitconfig-babylonlabs` (sets `gpg.ssh.program` to `~/.claude/scripts/remote-ssh-sign`, symlinked from `~/.local/bin/`). The proxy SSHs to the Mac and signs through the same `yubikey-sign` gate there. A PIN dialog appears on the Mac and the user must tap the YubiKey.
+  - **Declined signing (both platforms):** a failure containing `YUBIKEY_SIGNING_DISABLED` means the user cancelled the PIN dialog and signing is sticky-off. Abort the whole operation (`git rebase --abort` if mid-rebase), do not retry any signing attempt, and never fall back to an unsigned commit. Resume only when the user explicitly asks to sign again: run `yubikey-signing enable` (from Linux: run it on the Mac over ssh), then retry. Tap-timeout errors ("incorrect passphrase", "invalid format") remain retryable as before.
 - **All other repos**: always use `git -c commit.gpgsign=false commit -m "message"` — never use `-S` or signing flags outside babylonlabs-io
 - Confirm strategy before multi-step git operations (rebase vs merge, cherry-pick vs manual port)
 - Never force push unless explicitly requested; prefer `--force-with-lease`

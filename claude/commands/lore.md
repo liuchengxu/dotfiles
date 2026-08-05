@@ -1,6 +1,6 @@
 Open a file or directory in the Lore desktop app via its Unix domain socket RPC, then raise the Lore window.
 
-- **File preview**: `$ARGUMENTS` is a file path → opens in the Preview tab
+- **File preview**: `$ARGUMENTS` is a file path (markdown, PDF, or HTML) → opens in the Preview tab
 - **Branch diff**: `$ARGUMENTS` starts with `--diff` → opens the directory in the Branch Diff tab
 
 Use the Bash tool to run:

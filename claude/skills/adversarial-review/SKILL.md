@@ -63,30 +63,43 @@ Confidence never inflates severity; severity never substitutes for evidence.
      a frozen shape that can't absorb a named planned change, and
      speculative abstraction with no current or named near-term consumer
      and no boundary rationale.
-5. **Disprove.** For each candidate, actively search for the guard that
-   neutralizes it: upstream validation, downstream rejection, consensus
-   enforcement, caller preconditions — or, for architecture, an existing
-   seam, concrete consumer, documented exception, or rationale that
-   answers the concern. For PRs, determine whether the change introduced
-   or worsened the issue: only issues the PR introduces, exposes, worsens,
-   depends on, or freezes enter its findings and verdict; omit unrelated
-   pre-existing issues or mention them as unnumbered non-verdict notes.
-   Reproduce high-impact candidates with a focused test when feasible. If
-   not executed, label them Code-traced unless the violation is directly
-   entailed by protocol or consensus rules. A finding that survives disproof is
-   worth publishing; one you didn't try to kill is a guess.
+5. **Disprove.** Kill candidates; only survivors become findings.
+
+   - **Assume false.** For each candidate, treat it as untrue and build the
+     strongest case for why it can't happen. Search for the neutralizing
+     guard with the same effort you spent generating the candidate:
+     upstream validation, downstream rejection, consensus enforcement,
+     caller preconditions, the PR's own tests — or, for architecture, an
+     existing seam, concrete consumer, documented exception, or rationale
+     that answers the concern.
+   - **Merge symptoms.** If the candidate is a consequence rather than a
+     root cause, combine it into the root cause finding. One root cause,
+     one finding; symptoms are supporting evidence.
+   - **Provenance-check (PRs).** Determine whether the change introduced or
+     worsened the issue: only issues the PR introduces, exposes, worsens,
+     depends on, or freezes enter its findings and verdict. Omit unrelated
+     pre-existing issues or mention them as unnumbered non-verdict notes.
+   - **Reproduce when high-impact.** Write a focused test for
+     high-severity candidates when feasible. Candidates not executed are
+     labeled Code-traced unless the violation is directly entailed by
+     protocol or consensus rules.
+
+   A finding that survives disproof is worth publishing; one you didn't try
+   to kill is a guess.
 6. **Gate and classify.** Apply the evidence gate in taxonomy.md, then
    assign severity, impact class, and action. Architecture findings need a
    named change scenario, a contradicted stated principle or rationale, or
    a concrete present cost — never taste. Candidates that fail the gate go
    under **Open Questions** and never affect the verdict.
-7. **Challenge the verdict.** In a separate pass, treat every provisional
-   Blocking finding as false. Starting from its cited evidence, rebuild its
-   trace or change scenario and recheck its prerequisites, neutralizing
-   guards or seams, PR provenance, and action mapping. Demote or reclassify
-   any finding whose Blocking case cannot be rebuilt without relying on its
-   own conclusion. In multi-reviewer reviews, this pass must be performed
-   by someone other than the finding's originator.
+7. **Challenge the verdict.** After gate-and-classify, treat every
+   provisional finding as false one more time. Starting from its cited
+   evidence, rebuild its trace or change scenario and recheck its
+   prerequisites, neutralizing guards or seams, PR provenance, and action
+   mapping. Demote or reclassify any finding whose case cannot be rebuilt
+   without relying on its own conclusion. If the disprove attempt in step 5
+   was rigorous, this pass should be thin — the residual bias or
+   assumption the honest disprove missed. In multi-reviewer reviews, this
+   pass must be performed by someone other than the finding's originator.
 8. **Render.** Verdict first, findings labeled and ordered Blocking →
    Should-fix → Optional, then Critical → High → Medium → Low, grouped by
    root cause (not one finding per downstream symptom),

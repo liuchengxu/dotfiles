@@ -26,8 +26,8 @@ Use `gh pr view $PR --repo <owner/repo> --json headRefName,title,body,commits` t
 
 - Identify the base branch (usually `origin/main`) and count commits: `git log --oneline origin/main..HEAD`
 - Show the user the list of commits that will be re-signed and ask for confirmation.
-- Re-sign using: `SSH_ASKPASS="$HOME/.local/bin/ssh-askpass" SSH_ASKPASS_REQUIRE=force git -c user.signingkey=~/.ssh/yubikey-primary.pub rebase --exec 'sleep 2 && git commit --amend --no-edit -S' origin/main`
-- **Important:** `SSH_ASKPASS` must be set on the outer `git rebase` process, not just inside `--exec`. When `commit.gpgsign=true` is set globally, the `pick` (cherry-pick) steps also attempt signing — if they can't reach the YubiKey PIN dialog, the rebase fails. The `sleep 2` prevents back-to-back PIN prompts from overwhelming the YubiKey.
+- Re-sign using: `git -c user.signingkey=~/.ssh/yubikey-primary.pub rebase --exec 'sleep 2 && git commit --amend --no-edit -S' origin/main`
+- Signing runs through the `yubikey-sign` gate (global `gpg.ssh.program`), which surfaces the PIN dialog and serializes prompts for both the `pick` steps and the `--exec` commits. The `sleep 2` prevents back-to-back PIN prompts from overwhelming the YubiKey.
 - Verify signatures exist: `git cat-file commit HEAD | grep "BEGIN SSH SIGNATURE"`
 
 ### 5. Push
@@ -38,7 +38,7 @@ Use `gh pr view $PR --repo <owner/repo> --json headRefName,title,body,commits` t
 
 ## Rules
 
-- Always use `SSH_ASKPASS="$HOME/.local/bin/ssh-askpass"` and `SSH_ASKPASS_REQUIRE=force` for YubiKey signing.
+- If any step fails with `YUBIKEY_SIGNING_DISABLED`, the user declined signing: run `git rebase --abort`, stop the task, and resume only when the user explicitly asks (after `yubikey-signing enable`).
 - Always use `--force-with-lease`, never `--force`.
 - Inside worktrees, `gh` needs `--repo <owner/repo>` since `.git` is a file, not a directory.
 - Never modify commit messages during re-signing (use `--no-edit`).

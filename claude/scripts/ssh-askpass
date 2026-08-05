@@ -1,0 +1,148 @@
+#!/bin/bash
+# SSH_ASKPASS_PROMPT values (set by OpenSSH):
+#   (unset) = passphrase/PIN input needed → show hidden text dialog
+#   confirm = yes/no question (host key verification) → show Yes/No dialog
+#   none    = informational message (e.g. "Confirm user presence") → no dialog
+#
+# Context env vars rendered as multi-line text in the dialog body:
+#   SSH_ASKPASS_ORIGIN              hostname when forwarded from a remote
+#                                   machine via remote-ssh-sign
+#   SSH_ASKPASS_ORIGIN_PATH         absolute worktree path on the origin
+#   SSH_ASKPASS_ORIGIN_REPO         repo (worktree dir) name on the origin
+#   SSH_ASKPASS_ORIGIN_BRANCH       branch checked out on the origin
+#   SSH_ASKPASS_ORIGIN_TERM         $TERM_PROGRAM on the origin
+#   SSH_ASKPASS_ORIGIN_CLAUDE       "1" if Claude Code drove the sign
+#   YUBIKEY_SIGN_DECLINE_MARKER     set by yubikey-sign: marker path to write
+#                                   when the user cancels the PIN dialog
+# When invoked locally (no SSH_ASKPASS_ORIGIN), path/repo/branch are
+# resolved from $PWD, and $TERM_PROGRAM / $CLAUDECODE are read from the
+# inherited environment.
+#
+# A PIN stored in the login Keychain under KEYCHAIN_SERVICE turns the entry
+# dialog into a consent click: the dialog still gates each signature and still
+# records a decline, but nothing is typed. Absent that item, entry falls back to
+# hidden text. The PIN alone cannot sign; the key still requires a tap.
+
+KEYCHAIN_SERVICE="yubikey-fido-pin"
+KEYCHAIN_ACCOUNT="$USER"
+
+detect_terminal() {
+    # Multiplexers wipe parent-terminal context, so name them and stop.
+    [ -n "$TMUX" ] && { printf 'tmux'; return; }
+    [ -n "$STY" ]  && { printf 'screen'; return; }
+    # Standardized var (set by iTerm2, WezTerm, Warp, VS Code, Apple Terminal,
+    # Hyper, Ghostty, etc.). Some values get a friendlier display name.
+    if [ -n "$TERM_PROGRAM" ]; then
+        case "$TERM_PROGRAM" in
+            WarpTerminal) printf 'Warp' ;;
+            *)            printf '%s' "$TERM_PROGRAM" ;;
+        esac
+        return
+    fi
+    # Terminal-specific vars for terminals that don't set TERM_PROGRAM.
+    { [ -n "$KITTY_WINDOW_ID" ] || [ "$TERM" = "xterm-kitty" ]; } \
+        && { printf 'Kitty'; return; }
+    { [ -n "$ALACRITTY_WINDOW_ID" ] || [ -n "$ALACRITTY_SOCKET" ] || [ "$TERM" = "alacritty" ]; } \
+        && { printf 'Alacritty'; return; }
+    [ -n "$KONSOLE_VERSION" ] && { printf 'Konsole'; return; }
+    { [ -n "$GNOME_TERMINAL_SCREEN" ] || [ -n "$VTE_VERSION" ]; } \
+        && { printf 'GNOME Terminal'; return; }
+    [ -n "$TERM" ] && printf '%s' "$TERM"
+}
+
+path=$SSH_ASKPASS_ORIGIN_PATH
+repo=$SSH_ASKPASS_ORIGIN_REPO
+branch=$SSH_ASKPASS_ORIGIN_BRANCH
+if [ -z "$path" ] && [ -z "$repo" ] && [ -z "$branch" ]; then
+    if toplevel=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); then
+        path=$toplevel
+        repo=$(basename "$toplevel")
+        branch=$(git -C "$PWD" rev-parse --abbrev-ref HEAD 2>/dev/null)
+    fi
+fi
+term_program=${SSH_ASKPASS_ORIGIN_TERM:-$(detect_terminal)}
+claude=${SSH_ASKPASS_ORIGIN_CLAUDE:-$CLAUDECODE}
+
+# Title stays short so it fits the macOS dialog title bar; everything else
+# goes into the dialog body where line breaks render properly.
+if [ -n "$SSH_ASKPASS_ORIGIN" ]; then
+    title="🔑 YubiKey Sign (remote: $SSH_ASKPASS_ORIGIN)"
+else
+    title="🔑 YubiKey Sign"
+fi
+
+context_lines=()
+[ -n "$repo" ] && context_lines+=("📦 Repo:    $repo")
+if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
+    context_lines+=("🌿 Branch:  $branch")
+fi
+session_parts=()
+[ -n "$term_program" ] && session_parts+=("$term_program")
+[ "$claude" = "1" ]    && session_parts+=("Claude")
+if [ ${#session_parts[@]} -gt 0 ]; then
+    printf -v session_line "%s · " "${session_parts[@]}"
+    context_lines+=("💻 Session: ${session_line% · }")
+fi
+[ -n "$path" ] && context_lines+=("📂 Path:    $path")
+
+context=""
+for line in "${context_lines[@]}"; do
+    context+="$line"$'\n'
+done
+[ -n "$context" ] && context+=$'\n'
+
+# Escape quotes for AppleScript (newlines pass through fine).
+title=${title//\"/\\\"}
+prompt_text="${context}$1"
+prompt_text=${prompt_text//\"/\\\"}
+
+case "$SSH_ASKPASS_PROMPT" in
+  none)
+    exit 0
+    ;;
+  confirm)
+    /usr/bin/osascript \
+      -e "display dialog \"$prompt_text\" with title \"$title\" buttons {\"No\", \"Yes\"} default button \"Yes\"" \
+      -e "button returned of result" 2>/dev/null \
+      | tr '[:upper:]' '[:lower:]'
+    ;;
+  *)
+    # In the signing context the cancel-designated button is the sticky
+    # decline, so label it accordingly; clicking it (or pressing Esc)
+    # raises AppleScript -128.
+    cancel_label="Cancel"
+    [ -n "$YUBIKEY_SIGN_DECLINE_MARKER" ] && cancel_label="Decline"
+    err_file=$(mktemp)
+    cached_pin=$(security find-generic-password \
+        -a "$KEYCHAIN_ACCOUNT" -s "$KEYCHAIN_SERVICE" -w 2>/dev/null)
+    if [ -n "$cached_pin" ]; then
+        # Buttons only. Esc and the cancel-designated button still raise -128,
+        # so the decline path below is reached identically to typed entry.
+        /usr/bin/osascript \
+          -e "display dialog \"$prompt_text\" with title \"$title\" buttons {\"$cancel_label\", \"Sign\"} default button \"Sign\" cancel button \"$cancel_label\"" \
+          >/dev/null 2>"$err_file"
+        rc=$?
+        pin=$cached_pin
+    else
+        pin=$(/usr/bin/osascript \
+          -e "display dialog \"$prompt_text\" with title \"$title\" default answer \"\" with hidden answer buttons {\"$cancel_label\", \"OK\"} default button \"OK\" cancel button \"$cancel_label\"" \
+          -e "text returned of result" 2>"$err_file")
+        rc=$?
+    fi
+    if [ "$rc" -ne 0 ]; then
+        # Only AppleScript -128 (the Cancel button) becomes a sticky decline,
+        # and only when a signing gate exported the marker path; every other
+        # osascript failure is transient and leaves decline state untouched.
+        if [ -n "$YUBIKEY_SIGN_DECLINE_MARKER" ] && grep -q -- '(-128)' "$err_file"; then
+            if ! (umask 077; mkdir -p "$(dirname "$YUBIKEY_SIGN_DECLINE_MARKER")" \
+                    && date -u +%Y-%m-%dT%H:%M:%SZ > "$YUBIKEY_SIGN_DECLINE_MARKER"); then
+                echo "YUBIKEY_SIGNING_STATE_ERROR: could not record decline" >&2
+            fi
+        fi
+        rm -f "$err_file"
+        exit 1
+    fi
+    rm -f "$err_file"
+    printf '%s\n' "$pin"
+    ;;
+esac

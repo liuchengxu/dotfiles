@@ -5,6 +5,7 @@
 	excludesfile = /Users/xuliucheng/.gitexcludes
   # I have no idea why the python3 feature is broken when committing with vim
   editor       = nvim
+	hooksPath = /Users/xuliucheng/.claude/git-hooks
 [color "branch"]
   current   = bold green
   local     = yellow
@@ -26,3 +27,5 @@
 	proxy = socks5://127.0.0.1:7890
 [url "git@github.com:"]
 	insteadOf = https://github.com/
+[gpg "ssh"]
+	program = /Users/xuliucheng/.local/bin/yubikey-sign

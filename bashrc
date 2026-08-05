@@ -84,6 +84,7 @@ alias lip="ipconfig getifaddr en0"
 alias www='python3 -m SimpleHTTPServer 8000'
 alias n="nvim"
 alias grepi='grep -i'
+alias note='nvim ~/notes/inbox.md'
 
 ### Tmux
 alias tmux="tmux -2"
@@ -464,3 +465,60 @@ export PATH=/Users/xuliucheng/.opencode/bin:$PATH
 # Added by LM Studio CLI (lms)
 export PATH="$PATH:/Users/xuliucheng/.lmstudio/bin"
 # End of LM Studio CLI section
+
+# Go 1.25 for moon-bridge (keg-only, not linked)
+add_to_path "/opt/homebrew/Cellar/go@1.25/1.25.11/bin"
+
+# API keys — single source of truth
+[ -f ~/.config/secrets/keys.env ] && source ~/.config/secrets/keys.env
+
+# _start_moonbridge: generates a runtime config with real API keys and starts moon-bridge
+_start_moonbridge() {
+  local template=~/src/github.com/ZhiYi-R/moon-bridge/config.yml
+  local runtime=/tmp/moonbridge-runtime.yml
+  sed -e "s/__DEEPSEEK_API_KEY__/${DEEPSEEK_API_KEY}/g" \
+      -e "s/__KIMI_API_KEY__/${KIMI_API_KEY}/g" \
+      "$template" > "$runtime"
+  echo "Starting moon-bridge..."
+  (cd ~/src/github.com/ZhiYi-R/moon-bridge && moonbridge --config "$runtime" &)
+  for i in $(seq 1 30); do
+    sleep 0.1
+    lsof -i :38440 >/dev/null 2>&1 && break
+  done
+  echo "moon-bridge ready on :38440"
+}
+
+# codex-ds: start moon-bridge if not running, then launch codex --profile deepseek
+codex-ds() {
+  if ! lsof -i :38440 >/dev/null 2>&1; then
+    _start_moonbridge
+  fi
+  codex --profile deepseek "$@"
+}
+
+# claude-kimi: launch Claude Code with Kimi K3 via api.moonshot.ai
+claude-kimi() {
+  export ANTHROPIC_BASE_URL="https://api.moonshot.ai/anthropic"
+  export ANTHROPIC_AUTH_TOKEN="$KIMI_API_KEY"
+  export ANTHROPIC_MODEL="kimi-k3[1m]"
+  export ANTHROPIC_DEFAULT_OPUS_MODEL="kimi-k3[1m]"
+  export ANTHROPIC_DEFAULT_SONNET_MODEL="kimi-k3[1m]"
+  export ANTHROPIC_DEFAULT_HAIKU_MODEL="kimi-k3[1m]"
+  export ANTHROPIC_DEFAULT_FABLE_MODEL="kimi-k3[1m]"
+  export CLAUDE_CODE_SUBAGENT_MODEL="kimi-k3[1m]"
+  export ENABLE_TOOL_SEARCH="false"
+  export CLAUDE_CODE_AUTO_COMPACT_WINDOW="1048576"
+  export CLAUDE_CODE_EFFORT_LEVEL="max"
+  claude "$@"
+}
+
+# gdiff: use delta for git diff without modifying git config
+gdiff() { git diff "$@" | delta --paging=never; }
+
+# codex-kimi: start moon-bridge if not running, then launch codex --profile kimi
+codex-kimi() {
+  if ! lsof -i :38440 >/dev/null 2>&1; then
+    _start_moonbridge
+  fi
+  codex --profile kimi "$@"
+}

@@ -34,6 +34,11 @@ or next action they should be able to take after reading. A doc that is clear fo
 may be too slow for operators; a doc that is concise for maintainers
 may be underspecified for new contributors.
 
+Apply the cold-reader test before compression: the reader has the doc
+and linked sources, not the session. Expand session shorthand, define
+unfamiliar terms near first use, and state the current source/state the
+prose depends on.
+
 ### 1. One source of truth per fact
 
 If a fact appears in the preamble, §1, and §2 intro — cut two. Keep
@@ -72,15 +77,26 @@ ideas. Move them into the section body or cut the redundant ones.
 - Casing convention for filenames / headers stays uniform within
   the doc's directory.
 
-### 6. Compression — three deletion classes
+### 6. Compression preserves semantic force
 
-- **Hedge language**: "you may want to", "if useful", "optional but
-  recommended" — usually deletable. Either it's worth doing or it
-  isn't.
-- **Self-referential commentary**: "this section discusses X" before
-  discussing X.
-- **Restated goal**: a goal stated in the preamble does not need a
-  Goal: line in the section that fulfills it.
+Clarity, simplification, compression, and synthesis must not silently
+change a claim or requirement.
+
+- **Calibrated qualifiers**: preserve language that encodes
+  uncertainty, scope, conditions, attribution, causality, or
+  verification status ("I have not verified X", "probably, because
+  Y"). Delete a hedge only when its removal changes neither the
+  proposition nor the reader's warranted confidence.
+- **Requirement force**: preserve distinctions among optional,
+  recommended, required, and prohibited behavior. When a document
+  adopts BCP 14 (RFC 2119/8174), never add, remove, recase, or
+  substitute a normative keyword as an editorial change; flag an
+  intended requirement change for substantive review.
+- **Deletion candidates**: empty hedges ("you may want to", "if
+  useful"), self-referential commentary ("this section discusses X"
+  before discussing X), and a goal restated in the section that
+  fulfills it. Do not assume discretion language is empty merely
+  because it is indirect.
 
 ### 7. Simpler language
 
@@ -119,7 +135,7 @@ Identify the doc's genre, then apply the matching subsection's rules
 with extensive theory) need two. If no subsection clearly matches,
 apply Part A only and say so. Mapping hints: ADRs → B.2; RFCs → B.2
 (plus B.8 when requesting approval); tutorials → B.3 (plus B.1 when
-they contain executable steps). B.9 is an overlay, not a genre: apply
+they contain executable steps); spec-derived runbooks → B.1 plus B.7. B.9 is an overlay, not a genre: apply
 it alongside any genre whenever the doc synthesizes or compresses
 claims from multiple authoritative sources.
 
@@ -141,6 +157,19 @@ to achieve a defined outcome.
   output files, captured logs, CI links, transaction IDs, or state
   snapshots. Use `tee <step>.log` where safe, but do not log secrets or
   force log capture when another artifact is already authoritative.
+- **Audited runs need an evidence inventory.** For UAT, migration,
+  release, proving, deployment, and on-chain runbooks, name the durable
+  evidence the run will leave: command logs, manifests, output
+  artifacts, checksums, transaction IDs, state snapshots, verification
+  results.
+- **Use an artifact-handoff table when artifacts cross phases.** For
+  multi-step procedures, include
+  `artifact | produced by | consumed by | verified via` so the reader
+  sees which output proves each phase and which later step depends
+  on it.
+- **Separate planned inputs from runtime-recorded inputs.** Values
+  known only during execution go in a provenance worksheet or manifest
+  field, not pretended into the static runbook.
 - **State the success criterion before cleanup.** The reader should
   know exactly what output, file, log line, or state transition proves
   the procedure worked.
@@ -156,6 +185,15 @@ to achieve a defined outcome.
   `release-v0.4.0-eth-agg-update` over `release-v0.4.0-dev`.
 - **Descriptive filenames** over codenames. `ETH_AGGREGATION_UPGRADE_TEST_PLAN.md`
   over `RELEASE_A_TEST_PLAN.md`. Codenames force the reader to decode.
+- **Keep procedural steps atomic.** Give each numbered step one
+  primary operator action. Put a condition before the action it
+  governs ("If the gate is red, stop" — never "Stop if the gate is
+  red"). Use imperative voice for operator actions; name the
+  responsible role when roles change. After a state-changing or
+  failure-prone action, state an observable expected result or
+  verification. Aim for 20 words or fewer per prose sentence,
+  excluding code and identifiers. Split "and then" when it joins two
+  operator actions.
 
 ### B.2 Design doc / architectural spec
 
@@ -349,6 +387,9 @@ issue, or RFC from scratch:
   wiring) only when asked.
 - Avoid robotic templates, emoji headers, and decorative sectioning;
   use headings only when they help the reader act.
+- Length and compression targets never justify omitting load-bearing
+  constraints, calibrated uncertainty, requirement levels, safety
+  conditions, or genre-required evidence.
 
 Exceptions: when the user explicitly asks for, or the artifact is
 clearly, an external API reference, runbook, post-mortem, security

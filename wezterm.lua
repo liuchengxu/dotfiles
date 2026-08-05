@@ -13,6 +13,10 @@ wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_wid
 end)
 
 return {
+    -- Match key assignments by physical key position; the active CJK input
+    -- source otherwise fails to resolve letter keys, breaking Cmd+C copy.
+    key_map_preference = 'Physical',
+
     keys = {
         {
             key = 'E',
@@ -42,6 +46,11 @@ return {
         -- "FuraCode Nerd Font"
     -- }),
 
+    -- Scan this dir with wezterm's own font parser so the FantasqueSansM
+    -- …Thin20/30/40 variants resolve even though macOS CoreText dedups them
+    -- against the base family. Added to the system locator, not replacing it.
+    font_dirs = { os.getenv('HOME') .. '/Library/Fonts' },
+
     font = wezterm.font_with_fallback({
         -- { family="JetBrains Mono", weight="Light" },
         -- { family = "iA Writer Mono S", weight="Regular" },
@@ -51,7 +60,9 @@ return {
         -- { family="JuliaMono", weight="Regular" },
         -- { family="VictorMono Nerd Font Mono", weight="Regular" },
         -- { family="FantasqueSansM Nerd Font Mono Thin40", weight="Regular" },
-        { family="FantasqueSansM Nerd Font Mono Thin20", weight="Regular" },
+        -- wezterm infers weight="Thin" from the "Thin20" name token (the real
+        -- OS/2 weight is 400), so select it as Thin, not Regular.
+        { family="FantasqueSansM Nerd Font Mono Thin20", weight="Thin" },
         -- { family="UbuntuMono Nerd Font Mono", weight="Regular" },
         -- { family="UbuntuMono Nerd Font Mono Light", weight="Regular" },
         -- { family="IosevkaSS16 Nerd Font Writer", weight="Regular" },

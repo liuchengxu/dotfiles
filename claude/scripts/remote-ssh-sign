@@ -11,7 +11,6 @@
 # are passed through to the local ssh-keygen.
 
 REMOTE_HOST="xuliucheng@100.73.172.11"
-REMOTE_SSH_KEYGEN="/opt/homebrew/bin/ssh-keygen"
 REMOTE_KEY="/Users/xuliucheng/.ssh/yubikey-primary.pub"
 LOCAL_SSH_KEYGEN="/usr/bin/ssh-keygen"
 
@@ -74,10 +73,18 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Run ssh-keygen -Y sign on the remote Mac with askpass for PIN
-ssh "$REMOTE_HOST" "SSH_ASKPASS=\$HOME/.local/bin/ssh-askpass SSH_ASKPASS_REQUIRE=force $REMOTE_SSH_KEYGEN -Y sign -f $REMOTE_KEY -n $namespace $remote_tmp"
+# Sign through the Mac-side yubikey-sign gate: it owns the askpass dialog,
+# the sticky decline switch, and dialog serialization.
+ssh "$REMOTE_HOST" "\$HOME/.local/bin/yubikey-sign -Y sign -f $REMOTE_KEY -n $namespace $remote_tmp"
 sign_result=$?
 
+if [ $sign_result -eq 97 ]; then
+    # Reserved decline exit code from yubikey-sign. Re-emit the canonical
+    # token locally so git surfaces it even if remote stderr was lost.
+    echo "YUBIKEY_SIGNING_DISABLED: user declined signing; run 'yubikey-signing enable' on the Mac only after an explicit user request" >&2
+    ssh "$REMOTE_HOST" "rm -f '$remote_tmp' '${remote_tmp}.sig'" 2>/dev/null
+    exit 1
+fi
 if [ $sign_result -ne 0 ]; then
     echo "Error: remote signing failed" >&2
     ssh "$REMOTE_HOST" "rm -f '$remote_tmp' '${remote_tmp}.sig'" 2>/dev/null

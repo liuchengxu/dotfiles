@@ -1,0 +1,67 @@
+#!/bin/bash
+# Git SSH signing gate for the YubiKey (macOS side). Global gitconfig points
+# gpg.ssh.program here; non-signing ssh-keygen operations pass through.
+#
+# Enforces the sticky decline switch (`yubikey-signing`): while the marker
+# exists, every sign attempt fails fast with the YUBIKEY_SIGNING_DISABLED
+# token and exit code 97 — no dialog. Cancelling the PIN dialog writes the
+# marker (see ssh-askpass), so one decline silences all further attempts
+# until `yubikey-signing enable`. The marker is a consent circuit breaker,
+# not a security boundary — the YubiKey PIN + tap remain the real controls.
+
+SSH_KEYGEN="/opt/homebrew/opt/openssh/bin/ssh-keygen"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/yubikey-signing"
+MARKER="$STATE_DIR/declined"
+LOCK_DIR="$STATE_DIR/lock.d"
+TOKEN="YUBIKEY_SIGNING_DISABLED: user declined signing; run 'yubikey-signing enable' only after an explicit user request"
+EXIT_DECLINED=97
+
+is_sign=0 prev=""
+for arg in "$@"; do
+    [ "$prev" = "-Y" ] && [ "$arg" = "sign" ] && is_sign=1
+    prev=$arg
+done
+[ "$is_sign" = 1 ] || exec "$SSH_KEYGEN" "$@"
+
+decline_check() {
+    if [ -e "$MARKER" ]; then
+        echo "$TOKEN" >&2
+        exit "$EXIT_DECLINED"
+    fi
+}
+decline_check
+
+(umask 077; mkdir -p "$STATE_DIR")
+
+# One dialog at a time: mkdir is the atomic lock. A lock whose recorded pid
+# is dead is reclaimed, covering SIGKILL where the EXIT trap can't run.
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    owner=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+        rm -rf "$LOCK_DIR"
+        continue
+    fi
+    if [ "$SECONDS" -ge 180 ]; then
+        echo "yubikey-sign: timed out waiting for another signing dialog" >&2
+        exit 1
+    fi
+    sleep 0.2
+done
+echo $$ > "$LOCK_DIR/pid"
+trap 'rm -rf "$LOCK_DIR"' EXIT
+
+# A decline may have landed while this attempt waited on the lock.
+decline_check
+
+SSH_AUTH_SOCK= \
+SSH_ASKPASS="$HOME/.local/bin/ssh-askpass" \
+SSH_ASKPASS_REQUIRE=force \
+YUBIKEY_SIGN_DECLINE_MARKER="$MARKER" \
+"$SSH_KEYGEN" "$@"
+rc=$?
+
+if [ "$rc" -ne 0 ] && [ -e "$MARKER" ]; then
+    echo "$TOKEN" >&2
+    exit "$EXIT_DECLINED"
+fi
+exit "$rc"

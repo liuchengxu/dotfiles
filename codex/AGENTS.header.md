@@ -6,23 +6,19 @@ create signed commits with the local YubiKey.
 Use this macOS signing command:
 
 ```bash
-SSH_ASKPASS="$HOME/.local/bin/ssh-askpass" SSH_ASKPASS_REQUIRE=force \
-  git -c gpg.format=ssh \
-      -c user.signingkey=~/.ssh/yubikey-primary.pub \
-      commit -S -m "message"
+git -c user.signingkey=~/.ssh/yubikey-primary.pub commit -S -m "message"
 ```
 
-If signing fails with `No FIDO SecurityKeyProvider specified?` or the
-system `/usr/bin/ssh-keygen` cannot use the security key, force Git to use
-Homebrew OpenSSH:
+Global gitconfig routes signing through the `yubikey-sign` gate
+(`gpg.format=ssh` + `gpg.ssh.program`), which wraps Homebrew OpenSSH and
+surfaces the macOS PIN dialog itself — do not set `SSH_ASKPASS` manually
+or point `gpg.ssh.program` at raw `ssh-keygen`; that bypasses the user's
+decline switch.
 
-```bash
-SSH_ASKPASS="$HOME/.local/bin/ssh-askpass" SSH_ASKPASS_REQUIRE=force \
-  git -c gpg.format=ssh \
-      -c gpg.ssh.program=/opt/homebrew/bin/ssh-keygen \
-      -c user.signingkey=~/.ssh/yubikey-primary.pub \
-      commit -S -m "message"
-```
+If a signing attempt fails with `YUBIKEY_SIGNING_DISABLED`, the user
+declined signing: abort the operation, do not retry signed or unsigned,
+and resume only after the user explicitly asks and `yubikey-signing
+enable` has been run.
 
 Do not make unsigned commits in babylonlabs-io repos unless the user
 explicitly asks for that exception.

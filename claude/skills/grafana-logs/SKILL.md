@@ -8,19 +8,22 @@ description: >
   DO NOT TRIGGER when: user is writing code that uses the word "log" in a
   programming context (e.g., log::info, tracing).
 allowed-tools: >
-  mcp__teleport-mcp-grafana-mcp-tooling__query_loki_logs,
-  mcp__teleport-mcp-grafana-mcp-tooling__list_loki_label_names,
-  mcp__teleport-mcp-grafana-mcp-tooling__list_loki_label_values,
-  mcp__teleport-mcp-grafana-mcp-tooling__list_datasources,
-  mcp__teleport-mcp-grafana-mcp-tooling__query_loki_patterns,
-  mcp__teleport-mcp-grafana-mcp-tooling__query_loki_stats,
-  mcp__teleport-mcp-grafana-mcp-tooling__query_prometheus,
-  mcp__teleport-mcp-grafana-mcp-tooling__list_prometheus_metric_names,
-  mcp__teleport-mcp-grafana-mcp-tooling__list_prometheus_label_values,
-  mcp__teleport-mcp-grafana-mcp-tooling__search_dashboards
+  mcp__grafana__query_loki_logs,
+  mcp__grafana__list_loki_label_names,
+  mcp__grafana__list_loki_label_values,
+  mcp__grafana__list_datasources,
+  mcp__grafana__query_loki_patterns,
+  mcp__grafana__query_loki_stats,
+  mcp__grafana__query_prometheus,
+  mcp__grafana__list_prometheus_metric_names,
+  mcp__grafana__list_prometheus_label_values,
+  mcp__grafana__search_dashboards
 ---
 # Grafana Logs & Metrics Skill
 ## Datasource UIDs
+If a UID below returns nothing or 404, call `list_datasources` to rediscover
+before concluding there is no data — UIDs rotate when datasources are
+recreated.
 ### Loki
 | Environment | UID | Trigger keywords |
 |---|---|---|

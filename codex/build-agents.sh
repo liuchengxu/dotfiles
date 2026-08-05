@@ -3,6 +3,7 @@
 # model-agnostic AI rules. Edit the sources, not the generated file:
 #   ~/.dotfiles/codex/AGENTS.header.md              (Codex-only: git signing, FIDO fallback)
 #   ~/.dotfiles/ai-rules/documentation-context-closure.md   (shared with Claude via @import)
+#   ~/.dotfiles/ai-rules/html-views.md                       (shared with Claude via @import)
 set -euo pipefail
 
 dotfiles="${DOTFILES_HOME:-$HOME/.dotfiles}"
@@ -14,6 +15,8 @@ mkdir -p "$HOME/.codex"
   cat "$dotfiles/codex/AGENTS.header.md"
   printf '\n\n'
   cat "$dotfiles/ai-rules/documentation-context-closure.md"
+  printf '\n\n'
+  cat "$dotfiles/ai-rules/html-views.md"
   printf '\n'
 } > "$out.tmp"
 
