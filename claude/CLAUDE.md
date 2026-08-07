@@ -67,32 +67,7 @@ Name the pattern when you catch yourself in one, then stop — don't push throug
 
 ## Rust Conventions
 
-### String Formatting
-
-**Always use inline variable interpolation in format strings:**
-
-```rust
-println!("Hello {name}");
-format!("Processing {block_number} at slot {slot}");
-error!("Failed to load {path}: {error}");
-```
-
-Never use positional `{}` placeholders. Applies to all formatting macros: `println!`, `format!`, `info!`, `warn!`, `error!`, `debug!`, `trace!`, `panic!`, `assert!`, `write!`.
-
-### Import Organization
-
-All `use` statements in a single consolidated group at the top of each file. Never split imports mid-file or place inside functions.
-
-### Checked Arithmetic
-
-Always use checked arithmetic for value operations:
-
-```rust
-let result = value.checked_add(amount).ok_or(Error::Overflow)?;
-let difference = total.checked_sub(fee).ok_or(Error::InsufficientFunds)?;
-```
-
-Never use bare `+`, `-`, `*` for value-related operations.
+Rust work follows the `rust-conventions` skill — inline format-string interpolation, one consolidated import group, checked arithmetic for value operations, and the fmt/clippy gate before committing.
 
 ## Comment Style
 
@@ -151,7 +126,6 @@ Rules:
 
 - **Never** `git add -A` or `git add .` — stage files explicitly or use `git add -u`
 - Never amend commits on main. Always create separate commits for fixes.
-- Run `cargo +nightly fmt --all && cargo clippy` before committing
 - **babylonlabs-io repos** (YubiKey signing required):
   - **macOS (local YubiKey):** `git -c user.signingkey=~/.ssh/yubikey-primary.pub commit -S -m "message"`. Global gitconfig routes signing through the `yubikey-sign` gate (`gpg.format=ssh` + `gpg.ssh.program`), which surfaces the osascript PIN dialog itself — do not set `SSH_ASKPASS` manually or point `gpg.ssh.program` at raw `ssh-keygen`; that bypasses the decline switch. Run the signing command directly via Bash — do NOT tell the user to run it in their terminal.
   - **Linux (remote YubiKey):** Just use `git commit -S -m "message"`. Signing is auto-configured via `~/.gitconfig` `includeIf` → `~/.gitconfig-babylonlabs` (sets `gpg.ssh.program` to `~/.claude/scripts/remote-ssh-sign`, symlinked from `~/.local/bin/`). The proxy SSHs to the Mac and signs through the same `yubikey-sign` gate there. A PIN dialog appears on the Mac and the user must tap the YubiKey.
