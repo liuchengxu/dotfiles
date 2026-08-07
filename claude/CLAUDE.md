@@ -36,7 +36,7 @@ Name the pattern when you catch yourself in one, then stop — don't push throug
 - Use subagents to keep the main context window clean — offload research, exploration, and parallel analysis.
 - One focused task per subagent for best results.
 - When I say "ask codex", "let codex review", "consult codex" (or similar), always run it in the background via a subagent that invokes the codex tool — never block the foreground on it. Keep working while it runs, then relay Codex's verbatim answer plus a short summary when it returns.
-- Codex model: always pass `model: gpt-5.6-sol` to the codex tool. This is also the default in `~/.codex/config.toml`. Siblings `gpt-5.6-luna` and `gpt-5.6-terra` exist in the local model cache if a variant is ever needed. The `gpt-5.*-codex` models (gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, etc.) are gated on this ChatGPT account and error with "model not supported".
+- Codex model: always pass `model: gpt-5.6-sol` to the codex tool (also the default in `~/.codex/config.toml`). The `gpt-5.*-codex` models are gated on this account and error with "model not supported".
 - When relaying a Codex consultation: lead with a one-line **Verdict**, then Codex's answer (verbatim for design/code reviews, trimmed for quick fact-checks), then my own read that explicitly flags where I agree/disagree with Codex and tags findings as blocking vs optional.
 
 ## Design Principles
@@ -152,7 +152,6 @@ Rules:
 - **Never** `git add -A` or `git add .` — stage files explicitly or use `git add -u`
 - Never amend commits on main. Always create separate commits for fixes.
 - Run `cargo +nightly fmt --all && cargo clippy` before committing
-- A global pre-commit hook runs the comment gate on `git commit`. When it blocks the commit (added/edited code comments in agent context), run the `comment-cleanup` skill on them, then re-commit with `COMMENT_CLEANUP_DONE=1` set (e.g. `COMMENT_CLEANUP_DONE=1 git -c commit.gpgsign=false commit ...`).
 - **babylonlabs-io repos** (YubiKey signing required):
   - **macOS (local YubiKey):** `git -c user.signingkey=~/.ssh/yubikey-primary.pub commit -S -m "message"`. Global gitconfig routes signing through the `yubikey-sign` gate (`gpg.format=ssh` + `gpg.ssh.program`), which surfaces the osascript PIN dialog itself — do not set `SSH_ASKPASS` manually or point `gpg.ssh.program` at raw `ssh-keygen`; that bypasses the decline switch. Run the signing command directly via Bash — do NOT tell the user to run it in their terminal.
   - **Linux (remote YubiKey):** Just use `git commit -S -m "message"`. Signing is auto-configured via `~/.gitconfig` `includeIf` → `~/.gitconfig-babylonlabs` (sets `gpg.ssh.program` to `~/.claude/scripts/remote-ssh-sign`, symlinked from `~/.local/bin/`). The proxy SSHs to the Mac and signs through the same `yubikey-sign` gate there. A PIN dialog appears on the Mac and the user must tap the YubiKey.
