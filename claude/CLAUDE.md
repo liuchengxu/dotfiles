@@ -58,29 +58,15 @@ Name the pattern when you catch yourself in one, then stop — don't push throug
 - Confirm you are editing the correct file in multi-crate workspaces before making changes.
 - When the user specifies placement, implement exactly there — do not relocate.
 
-## Code Layout
-
-Function bodies follow the `code-layout` skill — bindings next to their first use, single-use values inlined unless a name earns its keep.
-
-## Rust Conventions
-
-Rust work follows the `rust-conventions` skill — inline format-string interpolation, one consolidated import group, checked arithmetic for value operations, and the fmt/clippy gate before committing.
-
 ## Comment Style
 
 Default to no comments. Add one only when it explains a non-obvious invariant, hidden constraint, workaround, or behavior that would surprise a reader.
-
-The `comment-cleanup` skill owns the full rules — what to delete, what is protected, and how to rewrite what you keep. It runs on the final diff before committing, enforced by `comment-diff-gate.sh`.
 
 ## Written Artifacts
 
 PR descriptions, commit messages, design docs, and prose explanations describe the **final state**, not the path that got there.
 
-- Don't narrate dropped iterations, rejected approaches, or "we tried X then Y". The reviewer is trying to understand what *is*, not what was considered.
-- Describe the accepted design as an affirmative contract, not by contrast with the implementation you didn't choose. Rejected alternatives belong only in an explicit Alternatives section when the comparison is the artifact's purpose.
-- Cut pedagogical scaffolding that justifies the design against debates the reader wasn't part of. If the diff already shows the *what*, the prose only needs the one nonobvious *why*.
-- Iteration history belongs in `git log`, chat transcripts, or notes docs (see Notes: Scratch vs Durable) — never in the merged artifact.
-- This applies after every iterative review/refactor cycle: when an artifact accumulates prose defending revisions, do a final pass that rewrites it as if the final shape were the original plan.
+No dropped iterations, no rejected approaches, no prose defending revisions. Describe the accepted design as an affirmative contract; rejected alternatives belong only in an explicit Alternatives section when the comparison is the artifact's purpose. If the diff already shows the *what*, the prose needs only the one nonobvious *why*. Iteration history belongs in `git log`, chat transcripts, or notes docs.
 
 When drafting or reviewing a design doc, proposal, planning doc, or RFC, invoke the `doc-review` skill — its authoring defaults carry the deadly-simple shape (Problem/Proposal structure, ~50-line target, no iteration history or FTE estimates).
 
@@ -96,28 +82,7 @@ Do not create an ADR unless explicitly asked for a decision record. When asked, 
 
 ## Notes: Scratch vs Durable
 
-Agent-created `.md` docs go to one of two tiers:
-
-- **Scratch** — `notes/` at the repo/worktree root (create it if missing; globally gitignored). Command dumps, iteration drafts, raw scratchpads. It dies with the worktree — that's intentional.
-- **Durable** — `~/notes/<owner>/<repo>/YYYY-MM-DD-<slug>.md` (plain directory, not git-tracked). Decisions and their rationale, design docs, investigation findings, postmortems — anything that still matters after the branch merges.
-
-Rules:
-
-- Litmus test at write time: "will this matter after the branch merges?" If clearly yes, write it to `~/notes/...` directly at creation — don't park it in scratch and rely on cleanup.
-- Before ending a task (or removing a worktree), scan the worktree `notes/` and **move** anything durable to `~/notes/<owner>/<repo>/`; the rest dies with the worktree. This sweep is a backstop, not the primary mechanism.
-- Never overwrite an existing durable note — on filename collision append `-2`, `-3`.
-- Durable notes start with minimal frontmatter: `branch`, `commit` (the stable anchor once the branch is deleted), and `session` link when available. Title is the H1; the date lives in the filename.
-- Never encode branch or worktree names in the durable directory structure — they belong in frontmatter.
-- Never create loose `.md` files in the repo root — only `CLAUDE.md`, `README.md`, and other standard project files belong there.
-- **HTML artifacts**: markdown stays canonical; HTML is a view or a tool. Scratch HTML lives in worktree `notes/*.html` and dies with it — export findings to md before cleanup. Durable HTML follows `~/notes/CLAUDE.md` (same-slug canonical md note, `snapshot|tool` kind, self-contained/no secrets, data sidecars). Repo-committed docs stay markdown.
-
-## Research
-
-- When producing research or analysis docs, **validate every factual claim** against a primary source (official docs, on-chain data, GitHub repos, post-mortems). Do not rely on training data alone.
-- Include source links for every non-trivial claim. Prefer primary sources (contract addresses on Etherscan, GitHub commits, official forum posts) over secondary summaries.
-- If a claim cannot be validated, explicitly mark it as unverified rather than presenting it as fact.
-- When citing contract addresses or transaction hashes, verify they exist on-chain before including them.
-- Place in-progress research in scratch `notes/` and finished research in `~/notes/<owner>/<repo>/` (see Notes: Scratch vs Durable), or in dedicated directories if it will be committed (e.g., `poc/`, `docs/`).
+Agent-created docs go to scratch `notes/`, which dies with the worktree, or durable `~/notes/<owner>/<repo>/`, which outlives the branch. Write durable work straight to `~/notes/` at creation. Before ending a task or removing a worktree, sweep the worktree `notes/` and move anything durable out — whatever stays is destroyed with the worktree.
 
 ## Git Rules
 
