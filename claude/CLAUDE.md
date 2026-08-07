@@ -96,29 +96,9 @@ Never use bare `+`, `-`, `*` for value-related operations.
 
 ## Comment Style
 
-Code comments describe the **current invariant**, not how the code got there. Same rule as Written Artifacts, applied at the smallest unit. The bullets below are concrete applications.
+Default to no comments. Add one only when it explains a non-obvious invariant, hidden constraint, workaround, or behavior that would surprise a reader.
 
-Default to no comments. Add one only when it explains a non-obvious current invariant, hidden constraint, workaround, or behavior that would surprise a reader.
-
-Comments are opt-in, not decorative. Enforced after the code settles: before committing, the `comment-cleanup` skill (triggered by `comment-diff-gate.sh`) prunes the diff's added comments against these rules — since duplication and redundancy-with-code only become visible once the code is final.
-
-When writing comments and docstrings:
-
-- Keep comments proportional to the code. Prefer one clear sentence over a multi-paragraph rationale; if it truly needs a paragraph, put it in a doc-comment on the item or a design doc.
-- Avoid loud emphasis: do not use all-caps words like ONLY, SAME, WRONG, FIRST, AFTER, ACCEPTS, or DIFFERS.
-- Avoid repeating the same rationale across sibling items. Put shared context in the module header or a helper comment, then keep each item's comment local.
-- A comment should say what property the code pins or what invariant it enforces, not narrate every execution step.
-- Do not describe what the next line does or restate the identifier name in prose. Explain only the non-obvious invariant or why the shape matters.
-- State invariants affirmatively — describe the rule the code enforces, not a contrast with an unchosen alternative ("checked, not saturating"; "selected by slots, not branch length"; "set to 0 rather than computed"). Prefer "the target slot must precede the finalized slot; panic otherwise." This is not a ban on "not": stating what invalid input does ("other branch lengths panic") is affirmative enforcement, and adversarial rationale in security code ("a prover-supplied X would let an attacker Y") explains the invariant — both stay.
-- Do not name call sites, tasks, PRs, issues, or temporary flows in comments (`used by X`, `handles #123`); that context belongs in the PR description or an enduring design note.
-- Do not use stale function names or old architecture references in comments. Check the current code before naming helpers.
-- Avoid archaeology comments such as "added by PR X", "previously", or "now". Comments describe the current invariant.
-- Match the file's existing punctuation convention. If the file uses em-dashes and curly quotes, use them; if it uses ASCII-only, stay ASCII.
-
-When writing test comments specifically:
-
-- Avoid "wrong reason" boilerplate. Use concise wording like "Positive control: the unmutated witness is accepted."
-- Keep category labels consistent with the module header. If a new label like `parser-negative` or `positive-control` appears, the header must account for it.
+The `comment-cleanup` skill owns the full rules — what to delete, what is protected, and how to rewrite what you keep. It runs on the final diff before committing, enforced by `comment-diff-gate.sh`.
 
 ## Written Artifacts
 

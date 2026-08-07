@@ -39,15 +39,19 @@ Delete a comment unless it answers one of:
 - A doc-comment that only expands the function name into a sentence.
 - Rationale duplicated across a doc-comment and an adjacent inline comment —
   keep one home (the one closest to the invariant, not the more ceremonious).
-- Names of current call sites / consumers (`used by X`, `cross-checked in Y`) —
-  they go stale on rename; rewrite as the invariant the code maintains.
+- The same rationale repeated across sibling items — move the shared context to
+  the module header or a helper comment, then keep each item's comment local.
+- Names of current call sites / consumers (`used by X`, `cross-checked in Y`),
+  tasks, PRs, or issues (`handles #123`) — they go stale on rename; rewrite as
+  the invariant the code maintains. Enduring context belongs in the PR
+  description or a design note.
 - Archaeology: `previously`, `now`, `added in PR`, `renamed from`.
 - Vague intent: `for readability`, `handle edge cases`, `important check`.
 - Commented-out code.
-- Loud emphasis (`ONLY`, `WRONG`, `FIRST`); state the invariant affirmatively
-  without weakening it — the rewrite keeps exclusivity and requirement force
-  ("only finalized checkpoints may be signed", not "finalized checkpoints are
-  signed").
+- Loud emphasis (`ONLY`, `SAME`, `WRONG`, `FIRST`, `AFTER`, `ACCEPTS`,
+  `DIFFERS`); state the invariant affirmatively without weakening it — the
+  rewrite keeps exclusivity and requirement force ("only finalized checkpoints
+  may be signed", not "finalized checkpoints are signed").
 
 Every deletion or rewrite preserves scope, conditions, uncertainty,
 verification status, and requirement force; if the shorter form claims more
@@ -70,6 +74,32 @@ repaired or escalated, not kept verbatim.
 - Generated-code markers and lint/tool directives (`#[allow(...)]` with a reason).
 - `TODO` / `FIXME` tied to an issue or a removal condition. An untethered one is
   reviewed (add a condition or delete), never blindly kept.
+
+## Rewriting a kept comment
+
+- **Proportional to the code.** One clear sentence over a multi-paragraph
+  rationale. If it genuinely needs a paragraph, move it to a doc-comment on the
+  item or a design doc.
+- **Affirmative, not contrastive.** Describe the rule the code enforces rather
+  than the alternative it didn't take ("checked, not saturating"; "selected by
+  slots, not branch length"). Prefer "the target slot must precede the finalized
+  slot; panic otherwise."
+- This is not a ban on "not". Stating what invalid input does ("other branch
+  lengths panic") is affirmative enforcement, and adversarial rationale in
+  security code ("a prover-supplied X would let an attacker Y") explains the
+  invariant. Both stay.
+- **Names must be current.** Check the code before naming a helper; never carry
+  a stale function name or an old architecture reference into a rewrite.
+- **Match the file's punctuation convention.** If the file uses em-dashes and
+  curly quotes, use them; if it is ASCII-only, stay ASCII.
+
+### Test comments
+
+- Avoid "wrong reason" boilerplate. Prefer concise intent: "Positive control:
+  the unmutated witness is accepted."
+- Keep category labels consistent with the module header. If a new label such as
+  `parser-negative` or `positive-control` appears, the header must account for
+  it.
 
 ## Finish
 
