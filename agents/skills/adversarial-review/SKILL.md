@@ -109,3 +109,10 @@ Confidence never inflates severity; severity never substitutes for evidence.
    taxonomy.md in this skill directory.
 
 **Never post review content to GitHub without explicit user approval.**
+
+## Blockchain and ZK code
+
+When the review touches blockchain or zero-knowledge code, read and apply
+`~/.claude/ZK_SECURITY_CHECKLIST.md` (circuit checklist and fix discipline),
+and consult `~/.claude/BLOCKCHAIN_ATTACK_VECTORS.md` as an attack-vector
+reference.
