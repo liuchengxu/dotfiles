@@ -42,6 +42,18 @@ let difference = total.checked_sub(fee).ok_or(Error::InsufficientFunds)?;
 
 Bare `+`, `-`, `*` are reserved for arithmetic that carries no value semantics.
 
+## Function-Local Statics
+
+A process-lifetime singleton whose only consumer is one function is declared
+inside that function:
+
+```rust
+static FOO: OnceCell<T> = OnceCell::const_new();
+```
+
+Put it inside `get()` rather than at module level when there is exactly one
+caller.
+
 ## Before Committing
 
 ```bash

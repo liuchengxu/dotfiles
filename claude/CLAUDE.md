@@ -17,7 +17,7 @@
 
 Name the pattern when you catch yourself in one, then stop — don't push through:
 
-- **Kitchen Sink** — restructuring half the codebase while doing a small task.
+- **Kitchen Sink** — restructuring half the codebase while doing a small task. Keep the diff as small as the task allows: no reformatting, no drive-by cleanups. The test: can you justify every changed line by the task? If a line changed only because "while I was in there," revert it.
 - **Wrong Abstraction** — abstracting before the second real use. Copy-paste twice before extracting.
 - **Optimistic Path** — handling the happy path and ignoring the error or 500 case.
 - **Runaway Refactor** — a fix that keeps cascading across files. Stop and re-scope rather than chase it.
@@ -55,15 +55,12 @@ Name the pattern when you catch yourself in one, then stop — don't push throug
 ## Code Editing
 
 - **Read before you write.** Before changing a file, read the code you're about to touch and the code around it. Copy the patterns and idioms already there, and check what the project actually depends on (its real imports) rather than reaching for a familiar library. When no existing pattern fits, ask rather than invent one.
-- **Keep the diff surgical.** Make the change as small as the task allows. Don't touch code you weren't asked to touch, don't reformat, and don't fold in opportunistic cleanups — a formatter pass or drive-by refactor buries the few lines that matter inside hundreds that don't. The test: can you justify every changed line by the task? If a line changed only because "while I was in there," revert it.
 - Confirm you are editing the correct file in multi-crate workspaces before making changes.
 - When the user specifies placement, implement exactly there — do not relocate.
 
 ## Code Layout
 
-- **Variable locality**: define variables as close as possible to their first use. Don't pre-declare bindings at the top of a function when the value isn't used until many lines later — introduce the binding at the line above its consumer instead. Group related setup so multiple bindings feeding the same downstream call sit adjacent and just above it.
-- **Inline single-use values** unless naming them earns its keep: (a) the value is used 2+ times, (b) naming it makes a long line fit width, or (c) the expression is complex enough that a name aids comprehension.
-- **Function-local statics** for process-lifetime singletons whose only consumer is one function. Prefer `static FOO: OnceCell<T> = OnceCell::const_new();` *inside* `get()` over a module-level static when there's exactly one caller.
+Function bodies follow the `code-layout` skill — bindings next to their first use, single-use values inlined unless a name earns its keep.
 
 ## Rust Conventions
 
@@ -128,11 +125,7 @@ Rules:
 - Never amend commits on main. Always create separate commits for fixes.
 - Confirm strategy before multi-step git operations (rebase vs merge, cherry-pick vs manual port)
 - Never force push unless explicitly requested; prefer `--force-with-lease`
-- **Git worktrees:** `gh` CLI cannot operate inside worktrees (the `.git` file is a text pointer, not a directory). Use `--repo owner/repo` to bypass local git discovery, e.g. `gh pr create --repo babylonlabs-io/vault-provers --head branch-name ...`
-- **Push in worktrees:** Always use `git push origin <branch-name>` explicitly. Bare `git push` defaults to the main repo's branch, not the worktree's branch.
-- **Worktree location:** Always create worktrees at `<repo>/.claude/worktrees/<branch-name>` using:
-  `git worktree add .claude/worktrees/<branch-name> -b <branch-name>`
-  Never create worktrees in sibling directories (e.g., `../repo-wt/`).
+- Working in a worktree (creation, pushing, `gh --repo`) follows the `git-worktrees` skill.
 
 Commit signing is shared verbatim with Codex — keep it model-agnostic.
 
