@@ -5,8 +5,9 @@ description: >
   the result is concise, plain-spoken, and leads with the bigger picture
   instead of reading like a robotic template.
   USE when: about to open or draft a GitHub issue or PR (via `gh`, the
-  web UI, or any tool), write a PR description, or fill in an issue body
-  — including after finishing a feature and writing it up.
+  web UI, or any tool), write a PR description, fill in an issue body, or
+  reply to a review comment — including after finishing a feature and
+  writing it up.
   DO NOT USE for: slicing a plan into many tickets or triaging existing
   issues (no dedicated skill — handle directly), or reviewing/editing a
   doc that is not an issue/PR (use doc-review).
@@ -201,6 +202,18 @@ that adds a second review unit can turn a prose paragraph into bullets.
 Each bullet protects a different invariant, reads alone, and could be its
 own PR — that is what earns the bullet form. A single-change PR stays
 prose, as above.
+
+## Replying to review comments
+
+A reply belongs in the thread it answers, so the reviewer reads it beside
+their own comment:
+
+```bash
+gh api repos/{owner}/{repo}/pulls/comments/{comment_id}/replies
+```
+
+A top-level PR comment loses that context and makes the reviewer hunt for
+what it refers to.
 
 ## Common mistakes
 

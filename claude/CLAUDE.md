@@ -90,7 +90,6 @@ Agent-created docs go to scratch `notes/`, which dies with the worktree, or dura
 - Never amend commits on main. Always create separate commits for fixes.
 - Confirm strategy before multi-step git operations (rebase vs merge, cherry-pick vs manual port)
 - Never force push unless explicitly requested; prefer `--force-with-lease`
-- Working in a worktree (creation, pushing, `gh --repo`) follows the `git-worktrees` skill.
 
 Commit signing is shared verbatim with Codex — keep it model-agnostic.
 
@@ -98,9 +97,7 @@ Commit signing is shared verbatim with Codex — keep it model-agnostic.
 
 ## GitHub PRs & Issues
 
-- **Before creating or editing a GitHub PR or issue body, invoke the `writing-issues-and-prs` skill and let it shape the body.** Do not hand-write PR/issue bodies from generic templates.
 - **Never post PR review comments without explicit user approval.** Always show the comment content and ask before posting.
-- When responding to PR review comments, **reply in the comment thread** (use `gh api repos/{owner}/{repo}/pulls/comments/{comment_id}/replies`) — never as a top-level PR comment.
 
 ## Security — Adversarial Analysis
 
