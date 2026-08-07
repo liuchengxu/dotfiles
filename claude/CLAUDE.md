@@ -126,11 +126,6 @@ Rules:
 
 - **Never** `git add -A` or `git add .` — stage files explicitly or use `git add -u`
 - Never amend commits on main. Always create separate commits for fixes.
-- **babylonlabs-io repos** (YubiKey signing required):
-  - **macOS (local YubiKey):** `git -c user.signingkey=~/.ssh/yubikey-primary.pub commit -S -m "message"`. Global gitconfig routes signing through the `yubikey-sign` gate (`gpg.format=ssh` + `gpg.ssh.program`), which surfaces the osascript PIN dialog itself — do not set `SSH_ASKPASS` manually or point `gpg.ssh.program` at raw `ssh-keygen`; that bypasses the decline switch. Run the signing command directly via Bash — do NOT tell the user to run it in their terminal.
-  - **Linux (remote YubiKey):** Just use `git commit -S -m "message"`. Signing is auto-configured via `~/.gitconfig` `includeIf` → `~/.gitconfig-babylonlabs` (sets `gpg.ssh.program` to `~/.claude/scripts/remote-ssh-sign`, symlinked from `~/.local/bin/`). The proxy SSHs to the Mac and signs through the same `yubikey-sign` gate there. A PIN dialog appears on the Mac and the user must tap the YubiKey.
-  - **Declined signing (both platforms):** a failure containing `YUBIKEY_SIGNING_DISABLED` means the user cancelled the PIN dialog and signing is sticky-off. Abort the whole operation (`git rebase --abort` if mid-rebase), do not retry any signing attempt, and never fall back to an unsigned commit. Resume only when the user explicitly asks to sign again: run `yubikey-signing enable` (from Linux: run it on the Mac over ssh), then retry. Tap-timeout errors ("incorrect passphrase", "invalid format") remain retryable as before.
-- **All other repos**: always use `git -c commit.gpgsign=false commit -m "message"` — never use `-S` or signing flags outside babylonlabs-io
 - Confirm strategy before multi-step git operations (rebase vs merge, cherry-pick vs manual port)
 - Never force push unless explicitly requested; prefer `--force-with-lease`
 - **Git worktrees:** `gh` CLI cannot operate inside worktrees (the `.git` file is a text pointer, not a directory). Use `--repo owner/repo` to bypass local git discovery, e.g. `gh pr create --repo babylonlabs-io/vault-provers --head branch-name ...`
@@ -138,6 +133,10 @@ Rules:
 - **Worktree location:** Always create worktrees at `<repo>/.claude/worktrees/<branch-name>` using:
   `git worktree add .claude/worktrees/<branch-name> -b <branch-name>`
   Never create worktrees in sibling directories (e.g., `../repo-wt/`).
+
+Commit signing is shared verbatim with Codex — keep it model-agnostic.
+
+@/Users/xuliucheng/.dotfiles/ai-rules/git-signing.md
 
 ## GitHub PRs & Issues
 
