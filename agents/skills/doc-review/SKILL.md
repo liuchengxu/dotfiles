@@ -397,8 +397,9 @@ analysis, audit checklist/report, comprehensive spec, or formal RFC,
 treat the request literally and include the detail the genre requires
 (and draft against the matching Part B genre rules).
 
-For ADRs, follow `../grill-with-docs/ADR-FORMAT.md` instead — it is
-the single source for ADR shape, scope, and length.
+Do not create an ADR unless explicitly asked for a decision record. When
+asked, follow `../grill-with-docs/ADR-FORMAT.md` instead — it is the
+single source for ADR shape, scope, and length.
 
 ## Review output format
 

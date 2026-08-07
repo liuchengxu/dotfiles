@@ -76,10 +76,6 @@ The context-closure gate and HTML-views contract below are shared verbatim with 
 
 @/Users/xuliucheng/.dotfiles/ai-rules/html-views.md
 
-## ADRs
-
-Do not create an ADR unless explicitly asked for a decision record. When asked, follow `~/.claude/skills/grill-with-docs/ADR-FORMAT.md` — the single source for ADR shape, scope, and length.
-
 ## Notes: Scratch vs Durable
 
 Agent-created docs go to scratch `notes/`, which dies with the worktree, or durable `~/notes/<owner>/<repo>/`, which outlives the branch. Write durable work straight to `~/notes/` at creation. Before ending a task or removing a worktree, sweep the worktree `notes/` and move anything durable out — whatever stays is destroyed with the worktree.
