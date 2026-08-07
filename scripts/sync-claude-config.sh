@@ -7,6 +7,9 @@ set -e
 DOTFILES_DIR="$HOME/.dotfiles"
 CLAUDE_DIR="$HOME/.claude"
 CLAUDE_DOTFILES="$DOTFILES_DIR/claude"
+# Skills are shared by Claude Code and Codex, so they live outside claude/.
+AGENTS_DIR="$HOME/.agents"
+AGENTS_DOTFILES="$DOTFILES_DIR/agents"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -17,7 +20,8 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}=== Claude Code Configuration Sync ===${NC}"
 
 # Create dotfiles structure if it doesn't exist
-mkdir -p "$CLAUDE_DOTFILES"/{commands,skills,hooks/scripts}
+mkdir -p "$CLAUDE_DOTFILES"/{commands,hooks/scripts}
+mkdir -p "$AGENTS_DOTFILES/skills"
 
 # Function to sync a file
 sync_file() {
@@ -65,6 +69,23 @@ sync_dir() {
     fi
 }
 
+# Point a consumer directory at a canonical copy already in dotfiles.
+# The canonical copy is the only source; nothing is ever copied back.
+# `-n` keeps a re-link from landing inside an existing symlinked directory.
+link_dir() {
+    local src="$1"
+    local dest="$2"
+
+    if [ -e "$src" ] && [ ! -L "$src" ]; then
+        echo -e "${YELLOW}Moving${NC} $src into $dest..."
+        cp -r "$src"/* "$dest/" 2>/dev/null || true
+        rm -rf "$src"
+    fi
+    mkdir -p "$(dirname "$src")"
+    ln -sfn "$dest" "$src"
+    echo -e "${GREEN}✓${NC} Linked $src"
+}
+
 # Sync individual files
 echo -e "\n${BLUE}Syncing configuration files...${NC}"
 sync_file "$CLAUDE_DIR/CLAUDE.md" "$CLAUDE_DOTFILES/CLAUDE.md"
@@ -73,8 +94,11 @@ sync_file "$CLAUDE_DIR/settings.json" "$CLAUDE_DOTFILES/settings.json"
 # Sync directories
 echo -e "\n${BLUE}Syncing directories...${NC}"
 sync_dir "$CLAUDE_DIR/commands" "$CLAUDE_DOTFILES/commands"
-sync_dir "$CLAUDE_DIR/skills" "$CLAUDE_DOTFILES/skills"
 sync_dir "$CLAUDE_DIR/hooks/scripts" "$CLAUDE_DOTFILES/hooks/scripts"
+
+echo -e "\n${BLUE}Linking shared skills...${NC}"
+link_dir "$CLAUDE_DIR/skills" "$AGENTS_DOTFILES/skills"
+link_dir "$AGENTS_DIR/skills" "$AGENTS_DOTFILES/skills"
 
 # Git operations
 echo -e "\n${BLUE}Checking git status...${NC}"
@@ -82,14 +106,14 @@ cd "$DOTFILES_DIR"
 
 if [ -d .git ]; then
     # Check if there are changes
-    if ! git diff --quiet claude/ 2>/dev/null || ! git diff --cached --quiet claude/ 2>/dev/null; then
+    if ! git diff --quiet claude/ agents/ 2>/dev/null || ! git diff --cached --quiet claude/ agents/ 2>/dev/null; then
         echo -e "${YELLOW}Changes detected in Claude config${NC}"
-        git status --short claude/
+        git status --short claude/ agents/
 
         read -p "Commit and push changes? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            git add claude/
+            git add claude/ agents/
 
             # Generate commit message
             COMMIT_MSG="chore: update Claude Code configuration
@@ -118,5 +142,6 @@ echo -e "\nSymlinks created:"
 echo -e "  ~/.claude/CLAUDE.md -> ~/.dotfiles/claude/CLAUDE.md"
 echo -e "  ~/.claude/settings.json -> ~/.dotfiles/claude/settings.json"
 echo -e "  ~/.claude/commands -> ~/.dotfiles/claude/commands"
-echo -e "  ~/.claude/skills -> ~/.dotfiles/claude/skills"
 echo -e "  ~/.claude/hooks/scripts -> ~/.dotfiles/claude/hooks/scripts"
+echo -e "  ~/.claude/skills -> ~/.dotfiles/agents/skills"
+echo -e "  ~/.agents/skills -> ~/.dotfiles/agents/skills"

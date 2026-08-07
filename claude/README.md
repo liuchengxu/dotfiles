@@ -11,10 +11,21 @@ This directory contains Claude Code settings and customizations that should be s
 ├── CLAUDE.md           # Global instructions for all projects
 ├── statusline.sh       # Custom status line script
 ├── commands/           # Custom slash commands
-├── skills/             # Custom skills
 └── hooks/
     └── scripts/        # Hook scripts (auto-format, error handling, etc.)
 ```
+
+Skills are shared by Claude Code and Codex, so they live outside this
+Claude-specific directory:
+
+```
+~/.dotfiles/agents/
+└── skills/             # Custom skills, read by both agents
+```
+
+Both consumers symlink straight to it — `~/.claude/skills` and
+`~/.agents/skills`. Neither points at the other, so replacing one does not
+silently redirect the second.
 
 ## Setup on a New Machine
 
@@ -31,7 +42,11 @@ ln -sf ~/.dotfiles/claude/statusline.sh ~/.claude/statusline.sh
 
 # Create symlinks for directories
 ln -sf ~/.dotfiles/claude/commands ~/.claude/commands
-ln -sf ~/.dotfiles/claude/skills ~/.claude/skills
+
+# Skills are shared with Codex — link both agents at the same canonical copy
+mkdir -p ~/.agents
+ln -sfn ~/.dotfiles/agents/skills ~/.claude/skills
+ln -sfn ~/.dotfiles/agents/skills ~/.agents/skills
 
 # For hooks, symlink the scripts subdirectory
 mkdir -p ~/.claude/hooks
@@ -41,10 +56,16 @@ ln -sf ~/.dotfiles/claude/hooks/scripts ~/.claude/hooks/scripts
 Or use a one-liner:
 
 ```bash
-mkdir -p ~/.claude ~/.claude/hooks && \
-ln -sf ~/.dotfiles/claude/{settings.json,CLAUDE.md,statusline.sh,commands,skills} ~/.claude/ && \
-ln -sf ~/.dotfiles/claude/hooks/scripts ~/.claude/hooks/scripts
+mkdir -p ~/.claude ~/.claude/hooks ~/.agents && \
+ln -sf ~/.dotfiles/claude/{settings.json,CLAUDE.md,statusline.sh,commands} ~/.claude/ && \
+ln -sf ~/.dotfiles/claude/hooks/scripts ~/.claude/hooks/scripts && \
+ln -sfn ~/.dotfiles/agents/skills ~/.claude/skills && \
+ln -sfn ~/.dotfiles/agents/skills ~/.agents/skills
 ```
+
+`ln -sfn` matters when re-linking: without `-n`, `ln -sf` on an existing
+symlink-to-directory creates the link *inside* the target instead of replacing
+it.
 
 ## What to Sync (in this directory)
 
@@ -54,8 +75,8 @@ ln -sf ~/.dotfiles/claude/hooks/scripts ~/.claude/hooks/scripts
 | `CLAUDE.md` | Global instructions applied to all sessions |
 | `statusline.sh` | Custom status line display |
 | `commands/` | Custom slash commands |
-| `skills/` | Custom skills |
 | `hooks/scripts/` | Hook scripts for automation |
+| `../agents/skills/` | Custom skills, shared with Codex |
 
 ## What NOT to Sync (machine-specific)
 
