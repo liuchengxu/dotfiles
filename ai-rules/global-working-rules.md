@@ -29,14 +29,14 @@ A rule belongs here when it defines voice and working style, or when its trigger
 
 - Define observable success before implementing: turn "add validation" into "reject a malformed email with a 400 and a clear message; test the valid and the invalid case."
 - Never mark a task complete without proving it works — applicable tests, lint and type checks, and builds all passing. Report anything you did not run.
-- Identify and be able to explain the root cause before applying a fix — no blind patching or temporary workarounds.
-- **Bug fixes require regression tests.** Reproduce the failure, change one thing at a time, and add a test that fails without the fix and passes with it. Test behavior that can actually break, not that a constructor sets a field; a focused unit test beats a full e2e suite when it suffices. If something is hard to test, that is information about the design, not permission to skip the test.
+- Identify and be able to explain the root cause before applying a fix — no blind patching. Ship a mitigation ahead of the diagnosis only when the user asks for one or the situation demands it, labelled as a mitigation with the root cause still owed.
+- **Bug fixes require regression tests.** Reproduce the failure, change one thing at a time, and add a test that fails without the fix and passes with it. When the failure genuinely cannot be reproduced in a test — a third-party outage, a hardware fault — say so and record the closest check you did run. Test behavior that can actually break, not that a constructor sets a field; a focused unit test beats a full e2e suite when it suffices. If something is hard to test, that is information about the design, not permission to skip the test.
 - Read the whole error and stack trace. Don't silence an unexpected null with a null check — find why it is null, or the bug just moves somewhere quieter.
 
 ## Design Principles
 
 - Build in order: question → delete → simplify → accelerate → automate. Verify inherited requirements before accepting them, remove before optimizing, and automate only after the workflow is trimmed and understood, since hooks, scripts, and skills lock in whatever they encode. Deleting and simplifying preserve required behavior.
-- Prefer the simplest solution that is still **correct and idiomatic** — simplicity never justifies quick hacks (dummy files, `#[allow]` suppressions, placeholder values), which accumulate tech debt. When multiple approaches exist and the right one isn't obvious, ask before proceeding.
+- Prefer the simplest solution that is still **correct and idiomatic** — simplicity never justifies quick hacks (dummy files, `#[allow]` suppressions, placeholder values), which accumulate tech debt. When several approaches fit, ask only if the choice materially changes scope, risk, or authority; otherwise pick one and say which.
 - Don't reach for abstraction on speculation — no trait, generic, pattern, method-over-free-function, or config knob whose only justification is "in case we need to." Idiom decides when they are right. Abstract on the second real use, not the first.
 - Skip an error path only when its impossibility follows from a named invariant. Otherwise handle it.
 
@@ -49,7 +49,7 @@ A rule belongs here when it defines voice and working style, or when its trigger
 ## Git and External Actions
 
 - **Never** `git add -A` or `git add .` — stage files explicitly or use `git add -u`
-- Never amend a commit on main; put any fix to main in a new commit.
+- Never amend a commit that is already pushed or shared; put the fix in a new commit.
 - Confirm strategy before multi-step git operations (rebase vs merge, cherry-pick vs manual port).
 - Never force push unless explicitly requested; prefer `--force-with-lease`.
 - **Never post PR review comments without explicit user approval.** Show the comment content and ask before posting.
