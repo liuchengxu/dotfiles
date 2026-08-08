@@ -16,8 +16,18 @@ Markdown is canonical; the page is a view of it. Write the HTML for the
 document in front of you — no converter, no shared stylesheet — so the layout
 follows that document's actual shape instead of a template's.
 
-Invariants live in `~/.dotfiles/ai-rules/html-views.md` (imported into
-CLAUDE.md and Codex's AGENTS.md). Follow them; this file covers format only.
+Never author an `.html` as the only record of a decision or finding, and never
+hand-edit a rendered one — edit the `.md` and rebuild.
+
+## When to render
+
+Convert on request ("html view", "make this readable", "render as a page"), or
+offer it in one sentence when a deliverable is long. Never generate an HTML
+view by default.
+
+Only render local, curated docs you have read. Never paste untrusted markdown
+(pasted issues, third-party files) into a page without stripping raw HTML
+first.
 
 ## Read the doc before designing
 
@@ -123,6 +133,11 @@ Revisions and branches:
 
 ## Page requirements
 
+- Single file, no runtime fetches: inline every style and script, embed images
+  as data URIs, no CDN or remote fonts. The ban covers resources the page loads
+  to render — outbound citation links (permalinks, specs, issues) are expected
+  and wanted.
+- No secrets, no unredacted command output.
 - Light and dark both defined explicitly; the page picks up the viewer's theme.
 - Wide content (tables, code, diagrams) scrolls inside its own container. The
   body never scrolls sideways.
@@ -130,8 +145,15 @@ Revisions and branches:
 
 ## Output
 
-Same-slug `.html` beside the `.md`. Scratch renders go to `notes/` or a temp
-path so they never sit beside a durable note. Preview with
+Same-slug `.html` beside the `.md`, opening with the notes header comment
+(`~/notes/CLAUDE.md`, "HTML artifacts"):
+
+```html
+<!-- canonical-md: <slug>.md | kind: snapshot|tool | commit: <sha> -->
+```
+
+Use `kind: snapshot` unless the page is a live tool. Scratch renders go to
+`notes/` or a temp path so they never sit beside a durable note. Preview with
 `~/.claude/scripts/lore-open.py <file.html>`.
 
 Never hand-edit a rendered page — change the `.md` and rebuild.
