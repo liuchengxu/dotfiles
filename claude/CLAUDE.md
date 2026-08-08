@@ -4,7 +4,7 @@ The working rules below are shared with Codex, which reads the same files throug
 
 @/Users/xuliucheng/.dotfiles/ai-rules/global-working-rules.md
 
-@/Users/xuliucheng/.dotfiles/ai-rules/documentation-context-closure.md
+@/Users/xuliucheng/.dotfiles/ai-rules/operational-evidence.md
 
 @/Users/xuliucheng/.dotfiles/ai-rules/git-signing.md
 

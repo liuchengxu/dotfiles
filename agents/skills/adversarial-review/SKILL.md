@@ -116,3 +116,9 @@ When the review touches blockchain or zero-knowledge code, read and apply
 `~/.claude/ZK_SECURITY_CHECKLIST.md` (circuit checklist and fix discipline),
 and consult `~/.claude/BLOCKCHAIN_ATTACK_VECTORS.md` as an attack-vector
 reference.
+
+## Closure
+
+Review findings are read by people who were not in the session. Before handing
+them over, close them with the `doc-closure` skill — pinned code links, defined
+finding IDs, no session-only shorthand.

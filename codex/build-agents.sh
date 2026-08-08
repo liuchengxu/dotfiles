@@ -14,7 +14,7 @@ mkdir -p "$HOME/.codex"
   printf '\n\n'
   cat "$dotfiles/ai-rules/git-signing.md"
   printf '\n\n'
-  cat "$dotfiles/ai-rules/documentation-context-closure.md"
+  cat "$dotfiles/ai-rules/operational-evidence.md"
   printf '\n'
 } > "$out.tmp"
 

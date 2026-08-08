@@ -462,3 +462,8 @@ external-model consult, or a domain owner).
   document's structure, clarity, and alignment with an existing spec.
 - **Single-line edits**: applying this entire framework to "fix this
   typo" is overkill.
+
+## Closure
+
+A doc that references code or may leave the session must also be closed against
+the session that produced it — see the `doc-closure` skill.

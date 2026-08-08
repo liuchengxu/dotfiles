@@ -223,3 +223,9 @@ what it refers to.
   with a Summary/Changes/Testing scaffold around three real sentences.
 - Restating the diff in prose. Summarize intent and altitude; let the
   code show the lines.
+
+## Closure
+
+An issue or PR body leaves the session by definition: every finding ID, code
+reference, and coined term has to resolve for a reader who was not there. Apply
+the `doc-closure` skill.

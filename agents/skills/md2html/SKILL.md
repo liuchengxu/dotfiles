@@ -157,3 +157,6 @@ Use `kind: snapshot` unless the page is a live tool. Scratch renders go to
 `~/.claude/scripts/lore-open.py <file.html>`.
 
 Never hand-edit a rendered page — change the `.md` and rebuild.
+
+A page that will be shared carries the same closure duty as any doc leaving the
+session — see the `doc-closure` skill.
