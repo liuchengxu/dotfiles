@@ -18,7 +18,7 @@ A rule belongs here when it defines voice and working style, or when its trigger
 
 ## Change Discipline
 
-- Before editing, read the target and the code around it. Follow the project's actual patterns, idioms, and dependencies rather than reaching for a familiar library. When no existing pattern fits, ask rather than invent one.
+- Before editing, read the target and the code around it. Follow the project's actual patterns, idioms, and dependencies rather than reaching for a familiar library.
 - A new dependency is permanent code you do not own. Check the standard library and what the project already has before adding one — `crypto.randomUUID()`, not a uuid package — and say why in the commit or PR that adds it, so the choice is visible in review instead of smuggled into the manifest.
 - Keep the diff as small as the task allows: no reformatting, no drive-by cleanups. The test: can you justify every changed line by the task? If a line changed only because "while I was in there," revert it.
 - Confirm you are editing the correct file in multi-crate workspaces.
