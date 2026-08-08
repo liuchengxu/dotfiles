@@ -226,6 +226,6 @@ what it refers to.
 
 ## Closure
 
-An issue or PR body leaves the session by definition: every finding ID, code
-reference, and coined term has to resolve for a reader who was not there. Apply
-the `doc-closure` skill.
+An issue or PR body leaves the session by definition. Before posting, confirm
+every finding ID, code reference, and coined term resolves for a reader who was
+not there. Use the `doc-closure` skill for the full pass.

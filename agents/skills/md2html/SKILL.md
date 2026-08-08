@@ -158,5 +158,5 @@ Use `kind: snapshot` unless the page is a live tool. Scratch renders go to
 
 Never hand-edit a rendered page — change the `.md` and rebuild.
 
-A page that will be shared carries the same closure duty as any doc leaving the
-session — see the `doc-closure` skill.
+A page that will be shared leaves the session, so confirm its links resolve and
+its terms stand alone first. Use the `doc-closure` skill for the full pass.

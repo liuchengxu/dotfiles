@@ -43,18 +43,17 @@ A rule belongs here when it defines voice and working style, or when its trigger
 ## Artifacts and Durable State
 
 - PR descriptions, commit messages, design docs, and prose explanations describe the **final state**, not the path that got there. No dropped iterations, no rejected approaches, no prose defending revisions. Describe the accepted design as an affirmative contract; rejected alternatives belong only in an explicit Alternatives section when the comparison is the artifact's purpose. If the diff already shows the *what*, the prose needs only the one nonobvious *why*.
-- When drafting or reviewing a design doc, proposal, planning doc, or RFC, apply the document-review workflow.
 - Validate factual claims against a primary source rather than training data, and mark anything you could not verify as unverified rather than stating it as fact.
 - Agent-created docs go to scratch `notes/`, which dies with the worktree, or durable `~/notes/<owner>/<repo>/`, which outlives the branch. The test is whether it must still matter after the branch merges; if so, write it straight to `~/notes/` at creation. Before ending a task or removing a worktree, sweep the worktree `notes/` and move anything durable out — whatever stays is destroyed with it.
 
 ## Git and External Actions
 
 - **Never** `git add -A` or `git add .` — stage files explicitly or use `git add -u`
-- Never amend commits on main. Always create separate commits for fixes.
+- Never amend a commit on main; put any fix to main in a new commit.
 - Confirm strategy before multi-step git operations (rebase vs merge, cherry-pick vs manual port).
 - Never force push unless explicitly requested; prefer `--force-with-lease`.
 - **Never post PR review comments without explicit user approval.** Show the comment content and ask before posting.
 
 ## Security
 
-- **Always perform an adversarial trace.** For every security mechanism, ask: "What does the attacker control, and can they fabricate the inputs this check relies on?"
+- **For every security mechanism, trace what the attacker controls** and whether they can fabricate the inputs the check trusts.

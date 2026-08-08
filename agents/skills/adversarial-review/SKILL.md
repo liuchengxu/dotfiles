@@ -119,6 +119,7 @@ reference.
 
 ## Closure
 
-Review findings are read by people who were not in the session. Before handing
-them over, close them with the `doc-closure` skill — pinned code links, defined
-finding IDs, no session-only shorthand.
+Findings delivered in chat need no extra treatment. Once they are saved,
+published, or handed to another reader, confirm code links are pinned to the
+reviewed commit, finding IDs are defined, and no session-only shorthand
+survives. Use the `doc-closure` skill for the full pass.

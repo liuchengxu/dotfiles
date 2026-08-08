@@ -465,5 +465,6 @@ external-model consult, or a domain owner).
 
 ## Closure
 
-A doc that references code or may leave the session must also be closed against
-the session that produced it — see the `doc-closure` skill.
+Before delivering a doc that references code or may leave the session, confirm a
+cold reader can resolve every term, reference, and finding ID from the artifact
+alone. Use the `doc-closure` skill for the full pass.
