@@ -1,11 +1,10 @@
 ## HTML Views of Markdown Docs
 
-Markdown is canonical; HTML is a regenerable view. Never author an `.html` as the only record of a decision or finding, and never hand-edit a generated one — edit the `.md` and re-render.
+Markdown is canonical; HTML is a regenerable view. Never author an `.html` as the only record of a decision or finding, and never hand-edit a rendered one — edit the `.md` and rebuild.
 
 - Convert on request ("html view", "make this readable", "render as a page"), or offer it in one sentence when a deliverable is long — never generate HTML views by default.
-- Render with `~/.claude/scripts/md2html.py <doc.md>` (self-contained script, runs via `uv`). It writes a same-slug `.html` beside the source, stamped with a `canonical-md | kind | commit` header; `--out` overrides the path, `--open` opens it.
-- Doc type comes from `type:` frontmatter (`review | adr | plan | design | ideas | note`) or `--type`. Types add genre layers — review: verdict banner, severity badges, findings index; plan: task progress bar; adr: status pill. Untyped docs render as plain prose.
-- The renderer consumes the markdown conventions the writing rules already produce (`VERDICT:` line, ``### [F-01] `label` `` findings headings, `- [ ]` task lists, minimal frontmatter). Keep emitting those in markdown; do not invent HTML-only formats.
-- Generated views follow the notes convention (`~/notes/CLAUDE.md`, "HTML artifacts"): single-file, no CDN or network calls, no secrets; `kind: snapshot` unless the page is a live tool.
-- Trust assumption: the renderer passes raw HTML in the markdown through to the page (needed for `<details>` evidence blocks). Only render local, curated docs — never markdown you haven't read (pasted issues, third-party files) without stripping raw HTML first.
-- Styling: `~/.claude/artifacts/prose.css` (per-type sections at the bottom) over the shared `~/.claude/artifacts/theme.css` tokens. Change styling there, never in generated output.
+- Write the page for the document at hand: read it, then build markup that fits its shape. No shared renderer or stylesheet carries the design for you.
+- Output is a same-slug `.html` beside the source, opening with the notes header comment (`~/notes/CLAUDE.md`, "HTML artifacts"): `<!-- canonical-md: <slug>.md | kind: snapshot|tool | commit: <sha> -->`. Use `kind: snapshot` unless the page is a live tool.
+- Single file, no runtime fetches: inline every style and script, embed images as data URIs, no CDN or remote fonts. The ban is on resources the page loads to render — outbound citation links (permalinks, specs, issues) are expected and wanted. No secrets, no unredacted command output.
+- Surface the structure the markdown already carries (`type:` frontmatter, `VERDICT:` line, ``### [F-01] `label` `` findings, `- [ ]` task lists) and invent no HTML-only formats — someone reading only the `.md` must not be missing anything.
+- Only render local, curated docs you have read. Never paste untrusted markdown (pasted issues, third-party files) into a page without stripping raw HTML first.

@@ -1,34 +1,137 @@
 ---
 name: md2html
 description: >
-  Render a markdown doc into a themed, self-contained HTML view (same-slug
-  .html beside the source). TRIGGER when the user asks for an "html view",
-  "make this readable", "render as html/page", "open as a page", or wants a
-  shareable page of a markdown deliverable (review report, plan, ADR,
-  research/design note). DO NOT TRIGGER to author new content (write the
-  markdown first), for the todo board (use /todo), or to build interactive
-  dashboards/tools (author those directly on the artifact theme).
+  Render a markdown doc as a self-contained HTML view, written by hand for that
+  document. TRIGGER when the user asks for an "html view", "make this
+  readable", "render as html/page", "open as a page", or wants a shareable page
+  of a markdown deliverable (review report, plan, ADR, research/design note).
+  DO NOT TRIGGER to author new content (write the markdown first), for the todo
+  board (use /todo), or to build interactive dashboards and tools (author those
+  directly).
 ---
 
 # md2html
 
-Markdown stays canonical; this renders a view. The contract and invariants
-live in `~/.dotfiles/ai-rules/html-views.md` (imported into CLAUDE.md and
-Codex's AGENTS.md) — follow them, don't restate them.
+Markdown is canonical; the page is a view of it. Write the HTML for the
+document in front of you — no converter, no shared stylesheet — so the layout
+follows that document's actual shape instead of a template's.
 
-Run:
+Invariants live in `~/.dotfiles/ai-rules/html-views.md` (imported into
+CLAUDE.md and Codex's AGENTS.md). Follow them; this file covers format only.
 
-```sh
-~/.claude/scripts/md2html.py <doc.md> [--type review|adr|plan|design|ideas|note] \
-    [--open] [--out <path>] [--title <t>] [--kind snapshot|tool]
-```
+## Read the doc before designing
 
-- Type comes from `type:` frontmatter when present; pass `--type` otherwise.
-  Review docs get a verdict banner + severity badges + findings index; plans
-  get a task progress bar; ADRs a status pill; untyped docs plain prose.
-- Output lands same-slug beside the `.md`; use `--out` for scratch renders
-  that shouldn't sit beside a durable note.
-- After rendering, `--open` it or send the file to the user (render display).
-- Styling: `~/.claude/artifacts/prose.css` (per-type sections at the bottom)
-  on `theme.css` tokens; converter: `~/.claude/scripts/md2html.py`. Edit
-  those — never a generated `.html`.
+Know its genre, its length, what the reader looks for first, and what structure
+the markdown already carries. A three-paragraph note and a forty-finding audit
+are not the same page.
+
+## Structure the markdown already carries
+
+Surface these; never invent HTML-only formats. The authoring skills own these
+shapes — for review, severity, impact class, action mapping and the finding
+template are defined in `../adversarial-review/taxonomy.md`. Read the ladders
+there rather than inferring them from the words on the page.
+
+| In the markdown | Means |
+|---|---|
+| `type:` frontmatter | genre: review, adr, plan, design, ideas, note |
+| `branch` / `commit` / `session` frontmatter | provenance to stamp on the page |
+| `VERDICT:` line | the headline conclusion |
+| ``### [F-01] `label` `` | one finding |
+| critical / high / medium / low | finding severity |
+| `- [ ]`, `- [x]` | plan tasks, open vs done |
+| `<details>` | evidence; keep it collapsed |
+
+A doc without them renders as prose. Do not fabricate structure it lacks.
+
+## What each genre must surface
+
+Goals, not implementations — pick the form yourself.
+
+- **review** — verdict legible before any scrolling; findings individually
+  linkable and scannable by severity; evidence collapsed by default.
+- **plan** — done versus remaining, visible at a glance.
+- **adr** — status (proposed / accepted / superseded) beside the title.
+- **design, ideas, note** — prose; long docs earn a way to navigate.
+
+## Navigating a long page
+
+Once a page carries more structure than a reader holds in view — roughly 2,000
+words, 7 sections, or 8 findings — its full structure belongs near the top and
+its destinations stay reachable from anywhere in it. Assume no find-in-page:
+Lore is a Tauri webview and macOS `WKWebView` ships no find bar, so the page's
+own navigation is often the only tool the reader has.
+
+Every decision-bearing item stays in the linear flow — searchable, printable,
+and reachable by its own link. Collapse only what the source marked secondary,
+and give each finding and section a stable id that reads as the target once the
+reader lands on it.
+
+Navigation does not get its own column. Prose already sets the measure, and a
+persistent rail spends width on a second copy of an index the page states
+better in flow. Reach for these in order, and stop as soon as the page is
+navigable:
+
+1. An exhaustive table under the verdict — every finding, not a sample. Carry
+   severity and action as separate columns; they are separate ladders. This is
+   the index; anything later only has to make it reachable again.
+2. An overlay that opens on demand for reach from deep in the page — a fixed
+   `<details>` costs nothing until the reader asks for it.
+3. A pinned header on a card that runs past a screen.
+
+Tracking the reader's position needs script and only earns it around 30
+destinations. Splitting into sibling pages waits for roughly 15,000 words, and
+never replaces a single-file edition for search and print.
+
+No tabs. Inactive panels are `display:none`, which the HTML standard excludes
+from find-in-page in every engine, and a document has one `:target`, so tab
+fragments and `#F-01` links cannot both drive it. CSS alone also cannot supply
+the selected state and arrow-key focus a tab widget owes a screen reader.
+
+## Links out
+
+Code locations, issue and PR numbers, revisions and branches are the reader's
+exits from the page. Resolve them all, which the context-closure rule already
+requires of any doc that leaves the session.
+
+Code references:
+
+- Pin each ref to the commit its finding was reviewed against, not to a single
+  repo HEAD. A stacked-PR review pins a different SHA per PR; read them off the
+  doc's own source pins.
+- Verify the target exists at that SHA (`git cat-file -e <sha>:<path>`) before
+  emitting a link. An unverified permalink is worse than plain text.
+- Leave ambiguous bare filenames and third-party paths as plain code. Guessing
+  which `main.rs` was meant produces a confidently wrong link.
+
+Issue and PR references:
+
+- `#NNN` resolves to the repo's `/pull/` or `/issues/` path. Confirm which it is
+  (`gh pr view` / `gh issue view`) — the two are not interchangeable.
+- Rewrite only bare refs in prose. Attribute syntax (`#[ignore]`), anchor
+  fragments, and colour literals also start with `#` and must survive untouched.
+
+Revisions and branches:
+
+- A commit SHA links to `/commit/<sha>` and is the durable anchor — it survives
+  deletion of every branch that once contained it.
+- A branch links to `/tree/<branch>` only once `git ls-remote --heads` resolves
+  it. Merged feature branches are routinely deleted, so the link dies while the
+  commit it pointed at still loads.
+- A metadata field that defers elsewhere ("heads pinned below") links to that
+  section, never to a fabricated commit.
+
+## Page requirements
+
+- Light and dark both defined explicitly; the page picks up the viewer's theme.
+- Wide content (tables, code, diagrams) scrolls inside its own container. The
+  body never scrolls sideways.
+- Readable line length for prose; the content sets the measure, not the window.
+
+## Output
+
+Same-slug `.html` beside the `.md`. Scratch renders go to `notes/` or a temp
+path so they never sit beside a durable note. Preview with
+`~/.claude/scripts/lore-open.py <file.html>`.
+
+Never hand-edit a rendered page — change the `.md` and rebuild.
