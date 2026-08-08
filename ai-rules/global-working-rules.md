@@ -19,6 +19,7 @@ A rule belongs here when it defines voice and working style, or when its trigger
 ## Change Discipline
 
 - Before editing, read the target and the code around it. Follow the project's actual patterns, idioms, and dependencies rather than reaching for a familiar library. When no existing pattern fits, ask rather than invent one.
+- A new dependency is permanent code you do not own. Check the standard library and what the project already has before adding one — `crypto.randomUUID()`, not a uuid package — and say why in the commit or PR that adds it, so the choice is visible in review instead of smuggled into the manifest.
 - Keep the diff as small as the task allows: no reformatting, no drive-by cleanups. The test: can you justify every changed line by the task? If a line changed only because "while I was in there," revert it.
 - Confirm you are editing the correct file in multi-crate workspaces.
 - When the user specifies placement, implement exactly there — do not relocate.
@@ -38,10 +39,6 @@ A rule belongs here when it defines voice and working style, or when its trigger
 - Prefer the simplest solution that is still **correct and idiomatic** — simplicity never justifies quick hacks (dummy files, `#[allow]` suppressions, placeholder values), which accumulate tech debt. When multiple approaches exist and the right one isn't obvious, ask before proceeding.
 - Don't reach for abstraction on speculation — no trait, generic, pattern, method-over-free-function, or config knob whose only justification is "in case we need to." Idiom decides when they are right. Abstract on the second real use, not the first.
 - Skip an error path only when its impossibility follows from a named invariant. Otherwise handle it.
-
-## Dependencies
-
-- Every dependency is permanent code you do not own. Before adding one, check whether the standard library or something already in the project does the job — reach for the built-in (`crypto.randomUUID()`, not a uuid package) first. Say why in the commit or PR that adds it, so the choice is visible in review instead of smuggled into the manifest.
 
 ## Artifacts and Durable State
 
