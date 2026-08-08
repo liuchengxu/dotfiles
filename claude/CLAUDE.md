@@ -12,7 +12,6 @@ The working rules below are shared with Codex, which reads the same files throug
 
 ## Claude Code Specifics
 
-- Use Plan Mode for the planning step on non-trivial tasks — 3+ steps or an architectural decision.
 - The document-review workflow is the `doc-review` skill; invoke it through the Skill tool.
 - Use subagents to keep the main context window clean — offload research, exploration, and parallel analysis. One focused task per subagent.
 - When I say "ask codex", "let codex review", "consult codex" (or similar), always run it in the background via a subagent that invokes the codex tool — never block the foreground on it. Keep working while it runs.
