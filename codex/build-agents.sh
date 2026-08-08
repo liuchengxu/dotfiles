@@ -11,7 +11,10 @@ trap 'rm -f "$out.tmp"' EXIT
 
 # The list comes from CLAUDE.md's @imports rather than a second copy here, so the
 # agents cannot drift onto different sets. Only ai-rules/ imports are shared.
-mapfile -t sources < <(sed -n 's|^@\(.*/ai-rules/[^[:space:]]*\)$|\1|p' "$claude_md")
+sources=()
+while IFS= read -r src; do
+  sources+=("$src")
+done < <(sed -n 's|^@\(.*/ai-rules/[^[:space:]]*\)$|\1|p' "$claude_md")
 [ ${#sources[@]} -gt 0 ] || { echo "no ai-rules imports found in $claude_md" >&2; exit 1; }
 
 {
