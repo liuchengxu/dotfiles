@@ -29,3 +29,7 @@
 	insteadOf = https://github.com/
 [gpg "ssh"]
 	program = /Users/xuliucheng/.local/bin/yubikey-sign
+# Signs by default here, so an unsigned commit fails instead of landing quietly;
+# --no-gpg-sign skips one. Machine-local target, silently ignored if absent.
+[includeIf "gitdir:~/src/github.com/babylonlabs-io/"]
+	path = ~/.gitconfig-babylonlabs
