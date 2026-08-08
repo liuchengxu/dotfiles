@@ -9,6 +9,7 @@ This directory contains Claude Code settings and customizations that should be s
 ├── README.md           # This file
 ├── settings.json       # Permissions, hooks config, env vars, plugins
 ├── CLAUDE.md           # Global instructions for all projects
+├── show-rules.sh       # Print CLAUDE.md with its @imports expanded
 ├── statusline.sh       # Custom status line script
 ├── commands/           # Custom slash commands
 └── hooks/
@@ -26,6 +27,24 @@ Claude-specific directory:
 Both consumers symlink straight to it — `~/.claude/skills` and
 `~/.agents/skills`. Neither points at the other, so replacing one does not
 silently redirect the second.
+
+## Reading the rules
+
+The model-agnostic rules also live outside this directory, in
+`~/.dotfiles/ai-rules/`. `CLAUDE.md` pulls them in with `@` imports;
+`codex/build-agents.sh` concatenates the same files into `~/.codex/AGENTS.md`.
+One copy, two readers.
+
+That makes `CLAUDE.md` short to maintain but unreadable end to end, so
+`show-rules.sh` prints the assembled document:
+
+```bash
+claude/show-rules.sh | less -R    # everything Claude loads, in order
+```
+
+Each import is announced by an HTML comment naming its source file, so anything
+worth changing can be traced back to the file that owns it. Edit the sources —
+`show-rules.sh` writes nothing.
 
 ## Setup on a New Machine
 
@@ -73,6 +92,7 @@ it.
 |----------------|---------|
 | `settings.json` | Permissions, hooks, env vars, plugins |
 | `CLAUDE.md` | Global instructions applied to all sessions |
+| `show-rules.sh` | Prints `CLAUDE.md` with `@imports` expanded |
 | `statusline.sh` | Custom status line display |
 | `commands/` | Custom slash commands |
 | `hooks/scripts/` | Hook scripts for automation |
