@@ -74,14 +74,14 @@ if [ $? -ne 0 ]; then
 fi
 
 # Sign through the Mac-side yubikey-sign gate: it owns the askpass dialog,
-# the sticky decline switch, and dialog serialization.
+# per-attempt cancellation, and dialog serialization.
 ssh "$REMOTE_HOST" "\$HOME/.local/bin/yubikey-sign -Y sign -f $REMOTE_KEY -n $namespace $remote_tmp"
 sign_result=$?
 
 if [ $sign_result -eq 97 ]; then
-    # Reserved decline exit code from yubikey-sign. Re-emit the canonical
+    # Reserved cancellation exit code from yubikey-sign. Re-emit the canonical
     # token locally so git surfaces it even if remote stderr was lost.
-    echo "YUBIKEY_SIGNING_DISABLED: user declined signing; run 'yubikey-signing enable' on the Mac only after an explicit user request" >&2
+    echo "YUBIKEY_SIGNING_CANCELLED: user cancelled signing; stop this operation and wait for an explicit retry request" >&2
     ssh "$REMOTE_HOST" "rm -f '$remote_tmp' '${remote_tmp}.sig'" 2>/dev/null
     exit 1
 fi

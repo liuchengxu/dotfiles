@@ -38,7 +38,7 @@ Use `gh pr view $PR --repo <owner/repo> --json headRefName,title,body,commits` t
 
 ## Rules
 
-- If any step fails with `YUBIKEY_SIGNING_DISABLED`, the user declined signing: run `git rebase --abort`, stop the task, and resume only when the user explicitly asks (after `yubikey-signing enable`).
+- If any step fails with `YUBIKEY_SIGNING_CANCELLED`, run `git rebase --abort` and stop. Resume only after an explicit user request; no enable command is required.
 - Always use `--force-with-lease`, never `--force`.
 - Inside worktrees, `gh` needs `--repo <owner/repo>` since `.git` is a file, not a directory.
 - Never modify commit messages during re-signing (use `--no-edit`).

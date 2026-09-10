@@ -12,7 +12,7 @@
 #   SSH_ASKPASS_ORIGIN_BRANCH       branch checked out on the origin
 #   SSH_ASKPASS_ORIGIN_TERM         $TERM_PROGRAM on the origin
 #   SSH_ASKPASS_ORIGIN_CLAUDE       "1" if Claude Code drove the sign
-#   YUBIKEY_SIGN_DECLINE_MARKER     set by yubikey-sign: marker path to write
+#   YUBIKEY_SIGN_CANCEL_MARKER      per-attempt marker set by yubikey-sign
 #                                   when the user cancels the PIN dialog
 # When invoked locally (no SSH_ASKPASS_ORIGIN), path/repo/branch are
 # resolved from $PWD, and $TERM_PROGRAM / $CLAUDECODE are read from the
@@ -20,7 +20,7 @@
 #
 # A PIN stored in the login Keychain under KEYCHAIN_SERVICE turns the entry
 # dialog into a consent click: the dialog still gates each signature and still
-# records a decline, but nothing is typed. Absent that item, entry falls back to
+# reports cancellation, but nothing is typed. Absent that item, entry falls back to
 # hidden text. The PIN alone cannot sign; the key still requires a tap.
 
 KEYCHAIN_SERVICE="yubikey-fido-pin"
@@ -107,17 +107,13 @@ case "$SSH_ASKPASS_PROMPT" in
       | tr '[:upper:]' '[:lower:]'
     ;;
   *)
-    # In the signing context the cancel-designated button is the sticky
-    # decline, so label it accordingly; clicking it (or pressing Esc)
-    # raises AppleScript -128.
     cancel_label="Cancel"
-    [ -n "$YUBIKEY_SIGN_DECLINE_MARKER" ] && cancel_label="Decline"
     err_file=$(mktemp)
     cached_pin=$(security find-generic-password \
         -a "$KEYCHAIN_ACCOUNT" -s "$KEYCHAIN_SERVICE" -w 2>/dev/null)
     if [ -n "$cached_pin" ]; then
         # Buttons only. Esc and the cancel-designated button still raise -128,
-        # so the decline path below is reached identically to typed entry.
+        # so cancellation is reported identically to typed entry.
         /usr/bin/osascript \
           -e "display dialog \"$prompt_text\" with title \"$title\" buttons {\"$cancel_label\", \"Sign\"} default button \"Sign\" cancel button \"$cancel_label\"" \
           >/dev/null 2>"$err_file"
@@ -130,13 +126,10 @@ case "$SSH_ASKPASS_PROMPT" in
         rc=$?
     fi
     if [ "$rc" -ne 0 ]; then
-        # Only AppleScript -128 (the Cancel button) becomes a sticky decline,
-        # and only when a signing gate exported the marker path; every other
-        # osascript failure is transient and leaves decline state untouched.
-        if [ -n "$YUBIKEY_SIGN_DECLINE_MARKER" ] && grep -q -- '(-128)' "$err_file"; then
-            if ! (umask 077; mkdir -p "$(dirname "$YUBIKEY_SIGN_DECLINE_MARKER")" \
-                    && date -u +%Y-%m-%dT%H:%M:%SZ > "$YUBIKEY_SIGN_DECLINE_MARKER"); then
-                echo "YUBIKEY_SIGNING_STATE_ERROR: could not record decline" >&2
+        # Only explicit dialog cancellation marks this signing attempt.
+        if [ -n "$YUBIKEY_SIGN_CANCEL_MARKER" ] && grep -q -- '(-128)' "$err_file"; then
+            if ! (umask 077; date -u +%Y-%m-%dT%H:%M:%SZ > "$YUBIKEY_SIGN_CANCEL_MARKER"); then
+                echo "YUBIKEY_SIGNING_STATE_ERROR: could not record cancellation" >&2
             fi
         fi
         rm -f "$err_file"
