@@ -2,8 +2,8 @@
 """Open a Markdown file or folder in Shed's Preview, or a repository's changes
 in Shed's Changes.
 
-Shed cannot hand a request to a window that is already open, so each call
-starts a new Shed, detached from the caller.
+A running Shed takes the request over its control socket and comes to the
+front. When no Shed runs, this starts one, detached from the caller.
 """
 
 import argparse
@@ -17,6 +17,10 @@ CHECKOUT_BINARY = os.path.expanduser(
     "~/src/github.com/liuchengxu/shed/target/release/shed"
 )
 SCOPES = ("committed", "with-uncommitted", "uncommitted")
+# `shed state --json` exits with this code when no Shed runs.
+NO_SHED_EXIT_CODE = 10
+# The client waits up to 10 s for a starting Shed and 10 s for its answer.
+HANDOFF_TIMEOUT_SECONDS = 30
 # Shed refuses a bad command line at once; a window that opened keeps running.
 STARTUP_WAIT_SECONDS = 1.5
 LOG_PATH = os.path.join(tempfile.gettempdir(), "shed-open.log")
@@ -95,16 +99,43 @@ def command_line(arguments, binary):
     path = os.path.abspath(os.path.expanduser(arguments.path or "."))
     if not os.path.exists(path):
         sys.exit("No such file or folder: " + path)
+    # The user asked to see the result, so the window comes to the front.
     if not arguments.diff:
-        return [binary, "--", path], "Preview: " + path
+        return [binary, "--focus", "--", path], "Preview: " + path
     directory = path if os.path.isdir(path) else os.path.dirname(path)
     root = git(directory, "rev-parse", "--show-toplevel")
     if root is None:
         sys.exit("Not in a Git repository: " + directory)
     base = arguments.base or default_base(root)
     scope = arguments.scope or "with-uncommitted"
-    command = [binary, "diff", "--repo", root, "--base", base, "--scope", scope]
+    command = [
+        binary, "diff", "--repo", root, "--base", base, "--scope", scope, "--focus",
+    ]
     return command, "Changes: " + root + ", " + base + " to HEAD, " + scope
+
+
+def shed_is_running(binary):
+    result = subprocess.run(
+        [binary, "state", "--json"],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        timeout=HANDOFF_TIMEOUT_SECONDS,
+    )
+    return result.returncode != NO_SHED_EXIT_CODE
+
+
+def hand_off(command):
+    """The client exits once the running Shed has answered."""
+    result = subprocess.run(
+        command,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=HANDOFF_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0:
+        output = (result.stderr or result.stdout).strip()
+        sys.exit("Shed exited with " + str(result.returncode) + ":\n" + output)
 
 
 def launch(command):
@@ -131,12 +162,17 @@ def launch(command):
 
 def main():
     arguments = parse_arguments()
-    command, description = command_line(arguments, shed_binary())
+    binary = shed_binary()
+    command, description = command_line(arguments, binary)
     if arguments.dry_run:
         print(" ".join(command))
         return
+    if shed_is_running(binary):
+        hand_off(command)
+        print("Opened in the running Shed. " + description)
+        return
     pid = launch(command)
-    print("Opened in Shed (pid " + str(pid) + "). " + description)
+    print("Opened in a new Shed (pid " + str(pid) + "). " + description)
 
 
 if __name__ == "__main__":

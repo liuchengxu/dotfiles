@@ -1,4 +1,4 @@
-Open a Markdown file or a folder in Shed's Preview, or a worktree's changes in Shed's Changes. Each call starts a new Shed window, which comes to the front.
+Open a Markdown file or a folder in Shed's Preview, or a worktree's changes in Shed's Changes. A running Shed takes the request and comes to the front; when none runs, the call starts one.
 
 - **Preview**: `$ARGUMENTS` is a Markdown file or a folder.
 - **Changes**: `$ARGUMENTS` starts with `--diff`, then a worktree or repository folder (the current folder when none is given). The base is the remote's default branch (`origin/HEAD`), else `origin/main`, `origin/master`, `main` or `master`. Add `--base <ref>` to choose another. The review includes uncommitted work; add `--scope committed` or `--scope uncommitted` to change that.
