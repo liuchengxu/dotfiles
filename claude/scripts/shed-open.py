@@ -17,8 +17,10 @@ CHECKOUT_BINARY = os.path.expanduser(
     "~/src/github.com/liuchengxu/shed/target/release/shed"
 )
 SCOPES = ("committed", "with-uncommitted", "uncommitted")
-# `shed state --json` exits with this code when no Shed runs.
+# `shed --state --json` exits with this code when no Shed runs.
 NO_SHED_EXIT_CODE = 10
+# A binary that does not know `--state` refuses it with this code.
+USAGE_EXIT_CODE = 2
 # The client waits up to 10 s for a starting Shed and 10 s for its answer.
 HANDOFF_TIMEOUT_SECONDS = 30
 # Shed refuses a bad command line at once; a window that opened keeps running.
@@ -116,11 +118,13 @@ def command_line(arguments, binary):
 
 def shed_is_running(binary):
     result = subprocess.run(
-        [binary, "state", "--json"],
+        [binary, "--state", "--json"],
         stdin=subprocess.DEVNULL,
         capture_output=True,
         timeout=HANDOFF_TIMEOUT_SECONDS,
     )
+    if result.returncode == USAGE_EXIT_CODE:
+        sys.exit("This Shed does not know `--state`; rebuild it: " + binary)
     return result.returncode != NO_SHED_EXIT_CODE
 
 
