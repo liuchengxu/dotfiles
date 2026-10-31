@@ -157,5 +157,5 @@ new diff settles. Show the reply to the user and get approval before posting.
 - Every material claim has evidence, or is worded as narrowly as the evidence.
 - A temporary change names its gap, its retirement trigger, and its removal.
 - Every ID, code reference, and coined term resolves for a reader outside the
-  session. The `standalone-docs` skill does the full pass.
+  session. The `Stand alone` section of `writing-docs` covers reference closure.
 - Nothing is posted, created, or labeled without the user's approval.

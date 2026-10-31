@@ -92,7 +92,9 @@ Skills in use:
 |---|---|
 | `grafana-logs` | The Grafana MCP server in each agent (below). |
 | `writing-issues-and-prs` | `gh`. |
-| `standalone-docs` | — |
+| `writing-docs` | — |
+| `eli5` | Firefox, to open the page. |
+| `ask-models` | `pi` with the requested models' providers signed in. |
 | `adversarial-review` | `gh` for PR reviews. |
 
 Grafana MCP server, added once per agent. The first query opens a browser
