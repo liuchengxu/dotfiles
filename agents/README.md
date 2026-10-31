@@ -88,6 +88,7 @@ Skills in use:
 | `grafana-logs` | The Grafana MCP server in each agent (below). |
 | `writing-issues-and-prs` | `gh`. |
 | `standalone-docs` | — |
+| `adversarial-review` | `gh` for PR reviews. |
 
 Grafana MCP server, added once per agent. The first query opens a browser
 login; the token stays in `~/.mcp-auth`.
@@ -177,6 +178,7 @@ Steps, each with the user's approval:
    skills, and plugins.
 
 After both machines work, remove `ai-rules/`, `claude/CLAUDE.md`,
-`claude/settings.json` (a stale copy), `codex/build-agents.sh`, `pi/AGENTS.md`,
+`claude/settings.json` (a stale copy), `claude/ZK_SECURITY_CHECKLIST.md` (now
+in `adversarial-review`), `codex/build-agents.sh`, `pi/AGENTS.md`,
 and the extension from the repository, and `~/.config/agent-rules/` from
 Studio.
