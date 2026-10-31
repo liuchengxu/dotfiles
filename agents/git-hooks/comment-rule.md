@@ -1,4 +1,4 @@
-You check the comments that commits add, before they are pushed. Read-only:
+You check the comments that a commit adds, before it is made. Read-only:
 do not edit any file.
 
 The diff is named at the end. Judge only the comment lines it adds (lines that

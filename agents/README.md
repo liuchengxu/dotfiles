@@ -16,7 +16,7 @@ these sources. Nothing syncs automatically: preview, apply, then check.
 | `rules/tests/` | Renderer tests. |
 | `skills/<skill>/` | One skill. Only skills in use live here. |
 | `claude-hud.json` | Claude status line layout (claude-hud plugin). |
-| `git-hooks/` | Global git hooks: the pre-push comment check. |
+| `git-hooks/` | Global git hooks: the pre-commit comment check. |
 
 ## Where a rule belongs
 
@@ -146,13 +146,15 @@ git config --global core.hooksPath ~/.dotfiles/agents/git-hooks
 - Each hook name links to `hook`, which runs this directory's checks, then the
   repository's own hook of the same name. A global hooks path would otherwise
   hide the repository's hooks.
-- **pre-push** runs `check-comments` when the pushed commits add comment lines
-  (`//`, `/*`, or `#`) outside Markdown, text, lock, and JSON files. A model
-  judges them against `comment-rule.md` and blocks the push on `FAIL`. With no
-  verdict (timeout, provider error), the push goes ahead with a warning.
+- **pre-commit** runs `check-comments` when the staged change adds comment
+  lines (`//`, `/*`, or `#`) outside Markdown, text, lock, and JSON files. A
+  model judges them against `comment-rule.md` and blocks the commit on `FAIL`.
+  With no verdict (timeout after 90 s, provider error), the commit goes ahead
+  with a warning. It runs before commit, not push: during a push over SSH,
+  GitHub closes the connection while the model is still answering.
 - The model is `zai/glm-5.3-flash`; set `COMMENT_CHECK_MODEL` to change it.
-- Skip one push with `SKIP_COMMENT_CHECK=1 git push`. `git push --no-verify`
-  also skips the repository's own hook.
+- Skip one commit with `SKIP_COMMENT_CHECK=1 git commit`. `git commit
+  --no-verify` also skips the repository's own hook.
 - A repository that sets its own `core.hooksPath` does not run these hooks.
   The `pre-commit` framework refuses to install while a global hooks path is
   set: unset it, run `pre-commit install`, then set it again.

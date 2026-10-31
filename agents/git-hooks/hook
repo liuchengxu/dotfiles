@@ -7,23 +7,12 @@ set -u
 name=$(basename "$0")
 dir=$(cd "$(dirname "$0")" && pwd -P)
 
-# These hooks read their input from stdin; keep it for both consumers.
-input=""
-case $name in
-  pre-push|post-rewrite) input=$(cat) ;;
-esac
-
-if [ "$name" = pre-push ]; then
-  printf '%s\n' "$input" | "$dir/check-comments" "$@" || exit $?
+if [ "$name" = pre-commit ]; then
+  "$dir/check-comments" || exit $?
 fi
 
 common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
 repo_hook="$common/hooks/$name"
 [ -x "$repo_hook" ] || exit 0
 [ "$(cd "$(dirname "$repo_hook")" && pwd -P)" = "$dir" ] && exit 0
-
-if [ -n "$input" ]; then
-  printf '%s\n' "$input" | "$repo_hook" "$@"
-else
-  exec "$repo_hook" "$@"
-fi
+exec "$repo_hook" "$@"
