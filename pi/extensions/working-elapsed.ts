@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getLiveRate, onLiveRate } from "./lib/working-line.ts";
 
 export default function workingElapsed(pi: ExtensionAPI): void {
@@ -6,8 +7,12 @@ export default function workingElapsed(pi: ExtensionAPI): void {
   let startedAt = 0;
   let activity = "";
   let currentCtx: ExtensionContext | undefined;
+  let turnSummary = "";
+  let redrawSummary = () => {};
 
-  const stop = (ctx: ExtensionContext): void => {
+  const stop = (ctx: ExtensionContext, keepSummary = false): void => {
+    if (!keepSummary) turnSummary = "";
+    redrawSummary();
     if (timer !== undefined) clearInterval(timer);
     timer = undefined;
     activity = "";
@@ -51,9 +56,10 @@ export default function workingElapsed(pi: ExtensionAPI): void {
 
   pi.on("tool_execution_start", (event, ctx) => {
     const args = event.args as { description?: unknown } | undefined;
+    const phase: Record<string, string> = { read: "Reading", write: "Writing", edit: "Editing", grep: "Searching", find: "Finding", bash: "Running" };
     const label = event.toolName === "bash" && typeof args?.description === "string" && args.description.trim()
       ? args.description.trim()
-      : event.toolName.replace(/^mcp__.+?__/, "").replace(/[_-]+/g, " ");
+      : phase[event.toolName] ?? event.toolName.replace(/^mcp__.+?__/, "").replace(/[_-]+/g, " ");
     active.set(event.toolCallId, label);
     activity = label;
     render(ctx);
@@ -67,10 +73,28 @@ export default function workingElapsed(pi: ExtensionAPI): void {
     render(ctx);
   });
 
-  pi.on("agent_end", (_event, ctx) => stop(ctx));
-  pi.on("session_start", (_event, ctx) => stop(ctx));
+  pi.on("agent_end", (_event, ctx) => {
+    const seconds = Math.round((performance.now() - startedAt) / 1000);
+    const duration = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    const done = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    turnSummary = `Worked for ${duration} · done ${done}`;
+    stop(ctx, true);
+    redrawSummary();
+  });
+  pi.on("session_start", (_event, ctx) => {
+    stop(ctx);
+    if (ctx.mode !== "tui") return;
+    ctx.ui.setWidget("turn-summary", (tui, theme) => {
+      redrawSummary = () => tui.requestRender();
+      return {
+        invalidate() {},
+        render: (width: number) => turnSummary ? [truncateToWidth(theme.fg("dim", turnSummary), width)] : [],
+      };
+    });
+  });
   pi.on("session_shutdown", (_event, ctx) => {
     stopRateListener();
     stop(ctx);
+    redrawSummary = () => {};
   });
 }

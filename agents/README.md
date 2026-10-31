@@ -159,6 +159,32 @@ git config --global core.hooksPath ~/.dotfiles/agents/git-hooks
   The `pre-commit` framework refuses to install while a global hooks path is
   set: unset it, run `pre-commit install`, then set it again.
 
+## Pi extensions
+
+`~/.dotfiles/pi/extensions/` holds the Pi extensions in use. Link each file and
+the `lib` folder into `~/.pi/agent/extensions`. Skip `shared-working-rules.ts`:
+it loads the old rules.
+
+```bash
+cd ~/.pi/agent/extensions
+for f in ~/.dotfiles/pi/extensions/*.ts; do
+  [ "$(basename "$f")" = shared-working-rules.ts ] || ln -sf "$f" .
+done
+ln -sfn ~/.dotfiles/pi/extensions/lib lib
+```
+
+Pi packages install per machine with `pi install npm:<package>`:
+
+| Package | Note |
+|---|---|
+| `pi-subagents` | Subagents and the async agents panel. |
+| `pi-web-access` | |
+| `remote-pi` | |
+| `@narumitw/pi-usage` | Quota footer; `footer-model-prefix` styles it. |
+| `@guwidoe/pi-prompt-suggester` | |
+| `pi-away` | |
+| `@juicesharp/rpiv-todo@2.13.8` | The todo tool; `todo-gate` and `rename-todos` need it. |
+
 ## Local files
 
 These stay on each machine and out of the repository:
@@ -210,8 +236,11 @@ Steps, each with the user's approval:
 8. Replace the old global hooks: `core.hooksPath` points to
    `~/.claude/git-hooks` (comment-cleanup and diff-audit gates). Set it to
    `~/.dotfiles/agents/git-hooks` (see Git hooks).
-9. Start a new session of each agent and confirm that it loads the new rules,
-   skills, plugins, and hooks.
+9. Replace the Pi extension links (see Pi extensions); move unlinked old
+   files aside. MacBook also has the `pi-gmail` and `pi-webserver` packages
+   and lacks `pi-away`; ask the user before changing them.
+10. Start a new session of each agent and confirm that it loads the new rules,
+    skills, plugins, hooks, and extensions.
 
 After both machines work, remove `ai-rules/`, `claude/CLAUDE.md`,
 `claude/settings.json` (a stale copy), `claude/ZK_SECURITY_CHECKLIST.md` (now
