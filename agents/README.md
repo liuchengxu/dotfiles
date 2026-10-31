@@ -16,6 +16,7 @@ these sources. Nothing syncs automatically: preview, apply, then check.
 | `rules/tests/` | Renderer tests. |
 | `skills/<skill>/` | One skill. Only skills in use live here. |
 | `claude-hud.json` | Claude status line layout (claude-hud plugin). |
+| `git-hooks/` | Global git hooks: the pre-push comment check. |
 
 ## Where a rule belongs
 
@@ -133,6 +134,29 @@ Then, in Claude, run `/claude-hud:setup` once to set the status line. Slack
 asks for a login on first use. When you change the HUD layout, copy
 `~/.claude/plugins/claude-hud/config.json` back to `agents/claude-hud.json`.
 
+## Git hooks
+
+`git-hooks/` is the global git hooks directory for every repository on the
+machine:
+
+```bash
+git config --global core.hooksPath ~/.dotfiles/agents/git-hooks
+```
+
+- Each hook name links to `hook`, which runs this directory's checks, then the
+  repository's own hook of the same name. A global hooks path would otherwise
+  hide the repository's hooks.
+- **pre-push** runs `check-comments` when the pushed commits add comment lines
+  (`//`, `/*`, or `#`) outside Markdown, text, lock, and JSON files. A model
+  judges them against `comment-rule.md` and blocks the push on `FAIL`. With no
+  verdict (timeout, provider error), the push goes ahead with a warning.
+- The model is `zai/glm-5.3-flash`; set `COMMENT_CHECK_MODEL` to change it.
+- Skip one push with `SKIP_COMMENT_CHECK=1 git push`. `git push --no-verify`
+  also skips the repository's own hook.
+- A repository that sets its own `core.hooksPath` does not run these hooks.
+  The `pre-commit` framework refuses to install while a global hooks path is
+  set: unset it, run `pre-commit install`, then set it again.
+
 ## Local files
 
 These stay on each machine and out of the repository:
@@ -181,11 +205,15 @@ Steps, each with the user's approval:
    `code-review`, `frontend-design`, `superpowers`, `warp`, and disabled
    `rust-analyzer-lsp`, `andrej-karpathy-skills`, `baby-skills`; ask the user
    before uninstalling any of them.
-8. Start a new session of each agent and confirm that it loads the new rules,
-   skills, and plugins.
+8. Replace the old global hooks: `core.hooksPath` points to
+   `~/.claude/git-hooks` (comment-cleanup and diff-audit gates). Set it to
+   `~/.dotfiles/agents/git-hooks` (see Git hooks).
+9. Start a new session of each agent and confirm that it loads the new rules,
+   skills, plugins, and hooks.
 
 After both machines work, remove `ai-rules/`, `claude/CLAUDE.md`,
 `claude/settings.json` (a stale copy), `claude/ZK_SECURITY_CHECKLIST.md` (now
-in `adversarial-review`), `codex/build-agents.sh`, `pi/AGENTS.md`,
+in `adversarial-review`), `claude/scripts/` gates, `codex/build-agents.sh`,
+`pi/AGENTS.md`,
 and the extension from the repository, and `~/.config/agent-rules/` from
 Studio.

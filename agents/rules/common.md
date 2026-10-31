@@ -12,7 +12,7 @@
 - State your assumptions. When the intent is unclear and the answer changes the work, ask.
 - Make the simplest change that does the job. Add no abstraction, option, or state that the task does not need.
 - Touch only what the task needs. Report other problems; do not fix them unasked.
-- Mark a workaround as temporary in the code, with what retires it.
+- Comments state only an invariant, an external contract, a surprise, a safety argument, or a workaround with what retires it, never what the code already says.
 - Before you start, define what success means, then check the result against it. A bug fix gets a regression test that fails without the fix.
 
 ## Operational evidence

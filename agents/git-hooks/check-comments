@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Before a push, ask a model whether the comments the pushed commits add earn
+# their place (comment-rule.md). Runs only when the push adds comment lines.
+# If the model gives no verdict, the push goes ahead with a warning.
+# Skip once with SKIP_COMMENT_CHECK=1 git push.
+set -u
+
+[ "${SKIP_COMMENT_CHECK:-}" = 1 ] && exit 0
+remote=${1:-origin}
+dir=$(cd "$(dirname "$0")" && pwd -P)
+model=${COMMENT_CHECK_MODEL:-zai/glm-5.3-flash}
+top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+is_zero() { case $1 in *[!0]*) return 1 ;; *) return 0 ;; esac; }
+
+# Added comment lines: //, /*, or # (not a Rust attribute or a shebang).
+# Prose and data files are not code.
+comment_files() {
+  git diff -U0 --no-color "$1" "$2" -- . ':!*.md' ':!*.txt' ':!*.lock' ':!*.json' |
+    awk '/^\+\+\+ b\// { f = substr($0, 7); next }
+         /^\+[[:space:]]*(\/\/|\/\*|#([^[!]|$))/ { print f }' | sort -u
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${local_sha:-}" ] || continue
+  is_zero "$local_sha" && continue # branch deletion
+  base=""
+  if ! is_zero "$remote_sha" && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+    base=$remote_sha
+  elif head=$(git rev-parse -q --verify "refs/remotes/$remote/HEAD"); then
+    base=$(git merge-base "$head" "$local_sha")
+  fi
+  if [ -z "$base" ]; then
+    echo "comment check: no base for $local_ref; skipped" >&2
+    continue
+  fi
+  comment_files "$base" "$local_sha" | while read -r file; do
+    git diff -U3 --no-color "$base" "$local_sha" -- "$file"
+  done >> "$tmp/diff"
+done
+
+[ -s "$tmp/diff" ] || exit 0
+
+echo "comment check: asking $model about the added comments..." >&2
+out=$(cd "$top" && perl -e 'alarm shift; exec @ARGV' "${COMMENT_CHECK_TIMEOUT:-180}" \
+  pi -p --no-session --model "$model" --tools read,grep,find,ls \
+  "$(cat "$dir/comment-rule.md")
+
+The diff to check is in $tmp/diff." < /dev/null 2> "$tmp/err")
+status=$?
+
+verdict=$(printf '%s\n' "$out" | awk 'NF { print $1; exit }')
+case $verdict in
+  PASS) exit 0 ;;
+  FAIL)
+    {
+      echo "comment check ($model) blocked the push:"
+      printf '%s\n' "$out" | awk 'NF' | sed 1d
+      echo
+      echo "Fix these comments in a new commit and push again."
+      echo "If the check is wrong: SKIP_COMMENT_CHECK=1 git push"
+    } >&2
+    exit 1
+    ;;
+  *)
+    echo "comment check: no verdict from $model (exit $status); push allowed." >&2
+    exit 0
+    ;;
+esac
