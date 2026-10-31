@@ -81,6 +81,11 @@ ln -s ~/.dotfiles/agents/skills/<skill> ~/.agents/skills/<skill>
 ln -s ~/.dotfiles/agents/skills/<skill> ~/.claude/skills/<skill>
 ```
 
+Pi silently skips a skill whose frontmatter is not strict YAML; Claude loads
+it anyway. Quote a `description` that contains `: `. After adding a skill,
+confirm that Pi lists it:
+`pi -p --no-session "List your skills by name." < /dev/null`.
+
 Skills in use:
 
 | Skill | Needs |

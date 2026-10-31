@@ -1,6 +1,6 @@
 ---
 name: adversarial-review
-description: Use when asked to review code or a design: a pull request, a design or ADR, a module, or a whole repository — "review this PR", "audit this module", "challenge this design", "re-review", "verify this fix", "adjudicate these findings". Especially for trust boundaries, signing or key flows, consensus, upgrade logic, protocol APIs, and boundaries being locked in. Prefer a repository's own review skill when one applies. Not for quick diff hygiene or prose editing.
+description: Use when asked to review code or a design, such as a pull request, a design or ADR, a module, or a whole repository — "review this PR", "audit this module", "challenge this design", "re-review", "verify this fix", "adjudicate these findings". Especially for trust boundaries, signing or key flows, consensus, upgrade logic, protocol APIs, and boundaries being locked in. Prefer a repository's own review skill when one applies. Not for quick diff hygiene or prose editing.
 ---
 
 # Adversarial Review
