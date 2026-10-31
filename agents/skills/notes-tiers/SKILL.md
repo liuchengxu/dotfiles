@@ -1,14 +1,6 @@
 ---
 name: notes-tiers
-description: >
-  Where an agent-created document belongs: scratch `notes/` that dies with the
-  worktree, or durable `~/notes/<owner>/<repo>/` that outlives the branch.
-  Covers naming, frontmatter, collisions, repo hygiene, and HTML artifacts.
-  TRIGGER when creating, naming, or moving any agent-authored document —
-  research notes, findings, design docs, postmortems, scratchpads, rendered
-  HTML views.
-  DO NOT TRIGGER for source files, or for documents the repo itself owns
-  (README, CLAUDE.md, committed `docs/`).
+description: Choose storage for agent-authored documents when saving, naming, or moving them. Covers scratch notes, durable notes, and HTML artifacts; excludes source files and repository-owned docs.
 ---
 
 # Notes: Scratch vs Durable
@@ -25,6 +17,10 @@ investigation findings, postmortems — anything that still matters after the
 branch merges.
 
 ## Choosing a tier
+
+Exception: [handoff](../handoff/SKILL.md) uses a temporary file for transient
+session transfer by default. A handoff requested for archival preservation
+follows this skill's durable tier.
 
 Litmus test at write time: "will this matter after the branch merges?" If
 clearly yes, write it to `~/notes/...` directly at creation rather than parking
@@ -56,3 +52,12 @@ worktree `notes/*.html` and dies with it, so export findings to md before
 cleanup. Durable HTML follows `~/notes/CLAUDE.md`: same-slug canonical md note,
 `snapshot|tool` kind, self-contained with no secrets, data in sidecars.
 Repo-committed docs stay markdown.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before saving, confirmed the artifact's owner, lifespan, canonical format, and need for the selected storage tier were clear.
+- [ ] Put transient work in scratch or temporary storage and put lasting agent-authored notes under the owner and repository durable path.
+- [ ] Preserved canonical Markdown, required provenance, collision safety, and repository hygiene for every saved artifact.
+- [ ] Reported the saved path and any retention, source-pin, or HTML-sidecar gap.

@@ -30,9 +30,27 @@ exit 0
         askpass = askpass.replace("security find-generic-password", f"{self.keychain} find-generic-password")
         self.askpass = self.script("askpass", askpass)
         self.keygen = self.script("keygen", '''
+if [ "$1" = "-lf" ]; then
+  case "$2" in
+    software-key) echo '256 SHA256:test test (ED25519)' ;;
+    ecdsa-hardware-key) echo '256 SHA256:test test (ECDSA-SK)' ;;
+    unknown-key) exit 1 ;;
+    multiple-keys) printf '256 SHA256:test test (ED25519-SK)\\n256 SHA256:test test (ED25519)\\n' ;;
+    *) echo '256 SHA256:test test (ED25519-SK)' ;;
+  esac
+  exit 0
+fi
 if [ "$1" != "-Y" ] || [ "$2" != "sign" ]; then
   echo passthrough; exit 0
 fi
+if [ "$4" = "software-key" ]; then
+  [ "$SSH_AUTH_SOCK" = test-agent ] || exit 5
+  [ "$SSH_ASKPASS" = original-askpass ] || exit 6
+  [ "$SSH_ASKPASS_REQUIRE" = prefer ] || exit 7
+  echo agent-signing
+  exit 0
+fi
+[ -z "$SSH_AUTH_SOCK" ] || exit 8
 echo start >> "$SIGN_TEST_LOG"
 pin=$("$SSH_ASKPASS" 'Enter PIN')
 rc=$?
@@ -53,9 +71,9 @@ exit 0
         path.chmod(0o700)
         return path
 
-    def sign(self, mode):
+    def sign(self, mode, key="test-key"):
         return subprocess.run(
-            [str(self.wrapper), "-Y", "sign", "-f", "test-key", "-n", "git", "test-buffer"],
+            [str(self.wrapper), "-Y", "sign", "-f", key, "-n", "git", "test-buffer"],
             env=dict(self.env, SIGN_TEST_MODE=mode), capture_output=True, text=True, timeout=10,
         )
 
@@ -91,6 +109,30 @@ exit 0
         result = subprocess.run([str(self.wrapper), "-l"], env=self.env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "passthrough")
+
+    def test_software_key_preserves_agent_and_askpass(self):
+        self.env.update(SSH_AUTH_SOCK="test-agent", SSH_ASKPASS="original-askpass",
+                        SSH_ASKPASS_REQUIRE="prefer")
+        result = self.sign("cancel", "software-key")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "agent-signing")
+        self.assertFalse((self.root / "state/yubikey-signing").exists())
+
+    def test_hardware_keys_clear_agent_and_keep_cancellation(self):
+        self.env["SSH_AUTH_SOCK"] = "test-agent"
+        for key in ["test-key", "ecdsa-hardware-key"]:
+            with self.subTest(key=key):
+                result = self.sign("cancel", key)
+                self.assertEqual(result.returncode, 97, result.stderr)
+                self.assertIn("YUBIKEY_SIGNING_CANCELLED", result.stderr)
+
+    def test_unknown_and_multiple_keys_keep_approval_gate(self):
+        self.env["SSH_AUTH_SOCK"] = "test-agent"
+        for key in ["unknown-key", "multiple-keys"]:
+            with self.subTest(key=key):
+                result = self.sign("cancel", key)
+                self.assertEqual(result.returncode, 97, result.stderr)
+                self.assertIn("YUBIKEY_SIGNING_CANCELLED", result.stderr)
 
 
 if __name__ == "__main__":

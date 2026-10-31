@@ -1,0 +1,293 @@
+#!/usr/bin/env python3
+"""Forward Babylon Git SSH signing to the fixed MacBook signing service."""
+
+import base64
+import json
+import os
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+SSH = "/usr/bin/ssh"
+SSH_KEYGEN = "/usr/bin/ssh-keygen"
+SSH_ALIAS = "macbook-yubikey-sign"
+REMOTE_COMMAND = "babylon-git-sign-v1"
+EXPECTED_KEY = "/Users/xlc/.ssh/yubikey-primary.pub"
+SCOPE_ROOT = "/Users/xlc/src/github.com/babylonlabs-io"
+MAX_PAYLOAD = 1024 * 1024
+MAX_SIGNATURE = 64 * 1024
+MAX_RESPONSE = 128 * 1024
+CLIENT_TIMEOUT = 110
+GIT_TIMEOUT = 5
+EXIT_CANCELLED = 97
+CANCEL_TOKEN = (
+    "YUBIKEY_SIGNING_CANCELLED: user cancelled signing; stop this operation "
+    "and wait for an explicit retry request"
+)
+CONTEXT_LIMITS = {"origin": 128, "path": 1024, "repo": 256, "branch": 256}
+
+
+class SigningError(Exception):
+    """A safe error that can be shown on stderr."""
+
+
+def is_sign_operation(args):
+    return any(args[index : index + 2] == ["-Y", "sign"] for index in range(len(args) - 1))
+
+
+def parse_sign_args(args):
+    values = {}
+    files = []
+    index = 0
+    while index < len(args):
+        argument = args[index]
+        if argument not in {"-Y", "-f", "-n"}:
+            if argument.startswith("-"):
+                raise SigningError(f"unsupported signing option: {argument}")
+            files.append(argument)
+            index += 1
+            continue
+        if argument in values:
+            raise SigningError(f"duplicate signing option: {argument}")
+        if index + 1 >= len(args):
+            raise SigningError(f"missing value for signing option: {argument}")
+        values[argument] = args[index + 1]
+        index += 2
+
+    if set(values) != {"-Y", "-f", "-n"}:
+        raise SigningError("signing requires exactly -Y, -f, and -n")
+    if values["-Y"] != "sign":
+        raise SigningError("only ssh-keygen -Y sign is supported remotely")
+    if values["-n"] != "git":
+        raise SigningError("only the git signing namespace is allowed")
+    if os.path.abspath(values["-f"]) != EXPECTED_KEY:
+        raise SigningError("Git must use the expected YubiKey public key")
+    if len(files) > 1:
+        raise SigningError("signing accepts at most one input file")
+    return files[0] if files else None
+
+
+def read_bounded(stream, limit, description):
+    data = stream.read(limit + 1)
+    if len(data) > limit:
+        raise SigningError(f"{description} exceeds {limit} bytes")
+    return data
+
+
+def git_output(*args):
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    try:
+        return subprocess.check_output(
+            ["/usr/bin/git", "-C", os.getcwd(), *args],
+            env=environment,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=GIT_TIMEOUT,
+        ).strip()
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SigningError("current directory is not an allowed Git worktree") from error
+
+
+def repository_context():
+    common_dir = os.path.realpath(
+        git_output("rev-parse", "--path-format=absolute", "--git-common-dir")
+    )
+    scope_root = os.path.realpath(SCOPE_ROOT)
+    try:
+        in_scope = os.path.commonpath([common_dir, scope_root]) == scope_root
+    except ValueError:
+        in_scope = False
+    if not in_scope or common_dir == scope_root:
+        raise SigningError("repository is outside the babylonlabs-io signing scope")
+
+    top_level = os.path.realpath(git_output("rev-parse", "--show-toplevel"))
+    branch = git_output("rev-parse", "--abbrev-ref", "HEAD")
+    return {
+        "origin": sanitize_context(
+            f"Mac Studio (reported): {socket.gethostname()}", CONTEXT_LIMITS["origin"]
+        ),
+        "path": sanitize_context(top_level, CONTEXT_LIMITS["path"]),
+        "repo": sanitize_context(os.path.basename(top_level), CONTEXT_LIMITS["repo"]),
+        "branch": sanitize_context(branch, CONTEXT_LIMITS["branch"]),
+    }
+
+
+def sanitize_context(value, limit):
+    safe = "".join(
+        character
+        for character in value
+        if character not in {'"', "'", "\\"} and character.isprintable()
+    )
+    return safe[:limit]
+
+
+def terminate_process_group(process):
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=2)
+    except (ProcessLookupError, subprocess.TimeoutExpired):
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+
+
+def run_remote(request):
+    process = subprocess.Popen(
+        [SSH, SSH_ALIAS, REMOTE_COMMAND],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(request, timeout=CLIENT_TIMEOUT)
+    except subprocess.TimeoutExpired as error:
+        terminate_process_group(process)
+        raise SigningError("remote signing timed out") from error
+
+    if process.returncode == EXIT_CANCELLED:
+        raise SigningError(CANCEL_TOKEN)
+    if process.returncode != 0:
+        detail = stderr[:4096].decode("utf-8", "replace").strip()
+        raise SigningError(detail or "remote signing failed")
+    if len(stdout) > MAX_RESPONSE:
+        raise SigningError("remote signing response is too large")
+    return stdout
+
+
+def parse_response(response):
+    try:
+        document = json.loads(response)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise SigningError("remote signer returned invalid JSON") from error
+    if not isinstance(document, dict) or set(document) != {"signature"}:
+        raise SigningError("remote signer returned an invalid schema")
+    if not isinstance(document["signature"], str):
+        raise SigningError("remote signer returned an invalid signature")
+    try:
+        signature = base64.b64decode(document["signature"], validate=True)
+    except (ValueError, base64.binascii.Error) as error:
+        raise SigningError("remote signer returned invalid base64") from error
+    if not signature or len(signature) > MAX_SIGNATURE:
+        raise SigningError("remote signer returned an invalid signature size")
+    return signature
+
+
+def expected_public_key():
+    try:
+        key = Path(EXPECTED_KEY).read_bytes()
+    except OSError as error:
+        raise SigningError("cannot read the expected YubiKey public key") from error
+    if len(key) > 16 * 1024 or len(key.splitlines()) != 1:
+        raise SigningError("expected YubiKey public key has an invalid format")
+    fields = key.strip().split()
+    if len(fields) < 2 or not fields[0].startswith(b"sk-"):
+        raise SigningError("expected YubiKey public key is not a security-key identity")
+    return b"remote-yubikey-sign " + b" ".join(fields[:2]) + b"\n"
+
+
+def verify_signature(payload, signature):
+    with tempfile.TemporaryDirectory(prefix="remote-yubikey-verify-") as directory:
+        allowed_signers = Path(directory, "allowed_signers")
+        allowed_signers.write_bytes(expected_public_key())
+        os.chmod(allowed_signers, 0o600)
+        signature_file = Path(directory, "signature")
+        signature_file.write_bytes(signature)
+        os.chmod(signature_file, 0o600)
+        try:
+            result = subprocess.run(
+                [
+                    SSH_KEYGEN,
+                    "-Y",
+                    "verify",
+                    "-f",
+                    str(allowed_signers),
+                    "-I",
+                    "remote-yubikey-sign",
+                    "-n",
+                    "git",
+                    "-s",
+                    str(signature_file),
+                ],
+                input=payload,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise SigningError("local signature verification failed") from error
+    if result.returncode != 0:
+        raise SigningError("remote signature does not match the expected YubiKey")
+
+
+def write_signature(path, signature):
+    destination = path + ".sig"
+    directory = os.path.dirname(os.path.abspath(destination))
+    descriptor, temporary = tempfile.mkstemp(prefix=".remote-signature-", dir=directory)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            output.write(signature)
+            output.flush()
+            os.fsync(output.fileno())
+        os.link(temporary, destination)
+    except FileExistsError as error:
+        raise SigningError("signature destination already exists") from error
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+
+
+def sign(args):
+    input_path = parse_sign_args(args)
+    repository = repository_context()
+    if input_path is None:
+        payload = read_bounded(sys.stdin.buffer, MAX_PAYLOAD, "signing payload")
+    else:
+        try:
+            with open(input_path, "rb") as source:
+                payload = read_bounded(source, MAX_PAYLOAD, "signing payload")
+        except OSError as error:
+            raise SigningError("cannot read the signing input file") from error
+
+    request = json.dumps(
+        {
+            "version": 1,
+            "payload": base64.b64encode(payload).decode("ascii"),
+            "context": repository,
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    signature = parse_response(run_remote(request))
+    verify_signature(payload, signature)
+    if input_path is None:
+        sys.stdout.buffer.write(signature)
+        sys.stdout.buffer.flush()
+    else:
+        write_signature(input_path, signature)
+
+
+def main():
+    args = sys.argv[1:]
+    if not is_sign_operation(args):
+        os.execv(SSH_KEYGEN, [SSH_KEYGEN, *args])
+    try:
+        sign(args)
+    except SigningError as error:
+        print(f"remote-yubikey-sign: {error}", file=sys.stderr)
+        return EXIT_CANCELLED if str(error) == CANCEL_TOKEN else 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

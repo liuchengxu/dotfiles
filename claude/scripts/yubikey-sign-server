@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Forced-command service for one bounded Babylon Git signing request."""
+
+import base64
+import json
+import os
+import select
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+
+EXPECTED_COMMAND = "babylon-git-sign-v1"
+SIGNING_GATE = "/Users/xuliucheng/.local/bin/yubikey-sign"
+EXPECTED_KEY = "/Users/xuliucheng/.ssh/yubikey-primary.pub"
+MAX_PAYLOAD = 1024 * 1024
+MAX_REQUEST = 1536 * 1024
+MAX_SIGNATURE = 64 * 1024
+READ_TIMEOUT = 10
+SIGN_TIMEOUT = 90
+EXIT_CANCELLED = 97
+CANCEL_TOKEN = (
+    "YUBIKEY_SIGNING_CANCELLED: user cancelled signing; stop this operation "
+    "and wait for an explicit retry request"
+)
+CONTEXT_LIMITS = {"origin": 128, "path": 1024, "repo": 256, "branch": 256}
+
+
+class RequestError(Exception):
+    """A request or signing failure safe for stderr."""
+
+
+def read_request():
+    deadline = time.monotonic() + READ_TIMEOUT
+    chunks = []
+    size = 0
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RequestError("request read timed out")
+        readable, _, _ = select.select([sys.stdin.buffer], [], [], remaining)
+        if not readable:
+            raise RequestError("request read timed out")
+        chunk = os.read(sys.stdin.buffer.fileno(), min(65536, MAX_REQUEST + 1 - size))
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+        size += len(chunk)
+        if size > MAX_REQUEST:
+            raise RequestError("request is too large")
+
+
+def validate_context(context):
+    if not isinstance(context, dict) or set(context) != set(CONTEXT_LIMITS):
+        raise RequestError("invalid context schema")
+    validated = {}
+    for name, limit in CONTEXT_LIMITS.items():
+        value = context[name]
+        if not isinstance(value, str) or len(value) > limit:
+            raise RequestError(f"invalid context field: {name}")
+        if any(
+            character in {'"', "'", "\\"} or not character.isprintable()
+            for character in value
+        ):
+            raise RequestError(f"unsafe context field: {name}")
+        validated[name] = value
+    return validated
+
+
+def parse_request(request):
+    try:
+        document = json.loads(request)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RequestError("invalid request JSON") from error
+    if not isinstance(document, dict) or set(document) != {"version", "payload", "context"}:
+        raise RequestError("invalid request schema")
+    if type(document["version"]) is not int or document["version"] != 1:
+        raise RequestError("unsupported request version or payload")
+    if not isinstance(document["payload"], str):
+        raise RequestError("unsupported request version or payload")
+    try:
+        payload = base64.b64decode(document["payload"], validate=True)
+    except (ValueError, base64.binascii.Error) as error:
+        raise RequestError("invalid payload base64") from error
+    if len(payload) > MAX_PAYLOAD:
+        raise RequestError("payload is too large")
+    return payload, validate_context(document["context"])
+
+
+def terminate_process_group(process):
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=2)
+    except (ProcessLookupError, subprocess.TimeoutExpired):
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+
+
+def sign_payload(payload, context):
+    with tempfile.TemporaryDirectory(prefix="yubikey-sign-server-") as directory:
+        payload_file = Path(directory, "payload")
+        payload_file.write_bytes(payload)
+        os.chmod(payload_file, 0o600)
+        environment = {
+            "HOME": "/Users/xuliucheng",
+            "LOGNAME": "xuliucheng",
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
+            "USER": "xuliucheng",
+            "SSH_ASKPASS_ORIGIN": context["origin"],
+            "SSH_ASKPASS_ORIGIN_PATH": context["path"],
+            "SSH_ASKPASS_ORIGIN_REPO": context["repo"],
+            "SSH_ASKPASS_ORIGIN_BRANCH": context["branch"],
+        }
+        process = subprocess.Popen(
+            [
+                SIGNING_GATE,
+                "-Y",
+                "sign",
+                "-f",
+                EXPECTED_KEY,
+                "-n",
+                "git",
+                str(payload_file),
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            env=environment,
+            start_new_session=True,
+        )
+        try:
+            _, stderr = process.communicate(timeout=SIGN_TIMEOUT)
+        except subprocess.TimeoutExpired as error:
+            terminate_process_group(process)
+            raise RequestError("YubiKey signing timed out") from error
+
+        if process.returncode == EXIT_CANCELLED:
+            raise RequestError(CANCEL_TOKEN)
+        if process.returncode != 0:
+            detail = stderr[:4096].decode("utf-8", "replace").strip()
+            raise RequestError(detail or "YubiKey signing failed")
+        signature_file = Path(f"{payload_file}.sig")
+        try:
+            signature = signature_file.read_bytes()
+        except OSError as error:
+            raise RequestError("signing gate did not produce a signature") from error
+        if not signature or len(signature) > MAX_SIGNATURE:
+            raise RequestError("signing gate produced an invalid signature size")
+        return signature
+
+
+def main():
+    if os.environ.get("SSH_ORIGINAL_COMMAND") != EXPECTED_COMMAND:
+        print("yubikey-sign-server: rejected SSH command", file=sys.stderr)
+        return 1
+    try:
+        payload, context = parse_request(read_request())
+        signature = sign_payload(payload, context)
+    except RequestError as error:
+        print(f"yubikey-sign-server: {error}", file=sys.stderr)
+        return EXIT_CANCELLED if str(error) == CANCEL_TOKEN else 1
+    response = json.dumps(
+        {"signature": base64.b64encode(signature).decode("ascii")},
+        separators=(",", ":"),
+    )
+    sys.stdout.write(response)
+    sys.stdout.flush()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -86,3 +86,13 @@ Only offer to create an ADR when all three are true:
 If any of the three is missing, skip the ADR. Use the format in [ADR-FORMAT.md](./ADR-FORMAT.md).
 
 </supporting-info>
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before the session, confirmed the plan boundary, document authority, and need for the interview; recorded domain questions still to investigate.
+- [ ] Checked code and existing domain documents before asking questions that source evidence could answer.
+- [ ] Resolved one design branch at a time and used precise, established domain terms for each agreed decision.
+- [ ] Updated `CONTEXT.md` only for resolved glossary terms and offered ADRs only for hard-to-reverse, surprising trade-offs.
+- [ ] Recorded remaining contradictions, undecided branches, and document gaps without presenting them as agreement.

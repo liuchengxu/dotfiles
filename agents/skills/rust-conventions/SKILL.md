@@ -1,13 +1,7 @@
 ---
 name: rust-conventions
 description: >
-  Rust conventions: inline interpolation in format strings, one consolidated
-  import group per file, checked arithmetic for value operations, and the
-  fmt/clippy gate before committing.
-  TRIGGER when writing, editing, or reviewing Rust — any `.rs` file, a Cargo
-  workspace, or a diff containing Rust.
-  DO NOT TRIGGER for other languages, or for illustrative Rust in prose that is
-  never compiled.
+  Apply Rust style and validation when writing or reviewing Rust files, Cargo workspaces, or Rust diffs. Excludes uncompiled examples in prose and other languages.
 ---
 
 # Rust Conventions
@@ -56,6 +50,14 @@ caller.
 
 ## Before Committing
 
-```bash
-cargo +nightly fmt --all && cargo clippy
-```
+Use the repository's required format and lint commands for each affected workspace.
+A repository with separate Cargo workspaces needs explicit manifest paths; do not
+assume a root Cargo.toml exists.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before changing or reviewing Rust, confirmed the requested outcome, affected workspace, and why the change or review was needed.
+- [ ] Used inline format interpolation, one top-level import group, checked value arithmetic, and function-local single-consumer statics where applicable.
+- [ ] Before an authorized commit, ran the repository's required format and lint checks with explicit workspace manifests; otherwise recorded applicable validation limits.

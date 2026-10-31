@@ -1,12 +1,7 @@
 ---
 name: grafana-logs
 description: >
-  Query Grafana Loki logs and Prometheus metrics for BTC Vault infrastructure.
-  TRIGGER when: user mentions Grafana, logs, Loki, monitoring, observability,
-  alerts, metrics, error investigation, or asks to check/debug/investigate
-  daemon behavior in any environment (testnet, mainnet, devnet, etc.).
-  DO NOT TRIGGER when: user is writing code that uses the word "log" in a
-  programming context (e.g., log::info, tracing).
+  Investigate BTC Vault runtime incidents, daemon behavior, logs, or metrics with Grafana Loki and Prometheus. Does not apply to source-code logging edits or unrelated uses of the word log.
 allowed-tools: >
   mcp__grafana__query_loki_logs,
   mcp__grafana__list_loki_label_names,
@@ -49,18 +44,23 @@ recreated.
 - Base selector: `{namespace="...", container="..."}`
 - Triggered when user mentions: ubernets, kubernetes, k8s, pods, namespace
 - Same Loki datasources, different label set
-## Noise Filter (Testnet/Devnet Default)
+## Conditional noise filters
 ```logql
 != `eth_event_poller` != `getblockcount` != `getblockhash` != `getblock` != `rustls` != `reqwest` != `request for pegin` != `(will retry) `
 ```
-- Always apply unless user explicitly asks for unfiltered logs
-- If investigating a subsystem that would be excluded (e.g., reqwest issues), remove that specific exclusion
+- Start an unknown-failure investigation without these exclusions. Retry, RPC,
+  and network/TLS messages can contain the cause.
+- Apply an exclusion only when the question or inspected evidence establishes
+  that its class is irrelevant. Record which classes the query omits.
+- If a filtered query is empty or the cause remains unexplained, widen the query
+  and remove exclusions before concluding that no relevant events occurred.
+- An explicit request for unfiltered logs keeps all these classes.
 ## Query Workflow
 1. **Identify environment** from context -> resolve datasource UID
 2. **Identify infra type** (Hetzner vs Kubernetes) -> choose label set
 3. **Discover hosts** via `list_loki_label_values` if host not specified
 4. **Default time range**: 1 hour. Convert user-specified times to RFC3339.
-5. **Build LogQL**: base selector + user filters (`|= "txid"`) + noise exclusions
+5. **Build LogQL**: base selector + relevant user filters (`|= "txid"`). Add only justified noise exclusions.
 6. **Execute** via `query_loki_logs` with limit 50, direction backward
 7. **Present results** highlighting errors, extracting pegin_txid/claim_txid for drill-down
 ## Common Query Templates
@@ -70,3 +70,13 @@ recreated.
 - Pattern detection: use `query_loki_patterns` with base selector only (no noise filters)
 ## Prometheus Metrics
 All vaultd metrics are prefixed `vaultd_*` (defined in `crates/vaultd/src/metrics.rs`). Discover dynamically via `list_prometheus_metric_names` with filter `vaultd_`.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before querying, confirmed the incident question, environment, infrastructure, time range, and need for each filter were clear and within scope.
+- [ ] Resolved the live datasource and labels instead of treating stale UIDs or assumed hosts as evidence.
+- [ ] Started with the relevant signal, recorded every omitted noise class, and widened the query before concluding that no cause or event existed.
+- [ ] Correlated logs and metrics with stable identifiers and separated observed evidence from inference.
+- [ ] Reported the query boundary, relevant events, cause confidence, and any missing data or unresolved incident question.

@@ -1,13 +1,7 @@
 ---
 name: vpn
 description: >
-  Inspect and switch the local Clash Verge/mihomo VPN via the bundled `vpnctl`
-  CLI. TRIGGER when: user asks to check VPN status, see/switch proxy nodes, find
-  the fastest node, fix slow/blocked connectivity, or control how
-  Claude/Anthropic traffic is routed (e.g. "route Claude away from HK", "my VPN
-  is slow", "switch to the fastest non-HK node", "what node am I on").
-  DO NOT TRIGGER when: user is configuring a VPN in code/infra (Terraform,
-  WireGuard configs, cloud networking) unrelated to their local Clash Verge.
+  Inspect or operate the local Clash Verge/mihomo VPN with vpnctl: status, nodes, latency, connectivity, or Claude routing. Does not apply to VPN infrastructure or code configuration.
 allowed-tools: Bash
 ---
 
@@ -77,3 +71,12 @@ total Claude outage.
 
 Run `vpnctl <cmd> --help` if you need exact flags; the CLI documents each
 subcommand with examples.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before running vpnctl, confirmed the routing problem, read-only or mutating intent, region constraints, and need for the selected command were clear.
+- [ ] Used the command that matches the request and diagnosed vague failures before any configuration change.
+- [ ] After a mutation, reported the selected node, latency, and any backup path from command output, and distinguished connectivity-tested results from untested ones.
+- [ ] Reported command errors, blocked regions, or unverified connectivity without treating latency alone as successful Claude access.

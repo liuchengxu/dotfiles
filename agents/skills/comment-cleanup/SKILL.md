@@ -9,6 +9,9 @@ A delete-biased pass over the comments a change added or edited. Comment quality
 is a whole-file property that only resolves after the code settles, so this runs
 on the final diff — not mid-implementation.
 
+This pass grants no edit, commit, or push authority beyond the user's existing
+authorization. In review-only mode, report proposed changes without applying them.
+
 ## Scope
 
 Review every comment on an added or edited line in the diff:
@@ -32,6 +35,10 @@ Delete a comment unless it answers one of:
 - **Safety** — what makes this `unsafe` / panic / `unwrap` / lock-ordering /
   retry / cancellation valid?
 - **Workaround** — what temporary exception exists, and when can it be removed?
+
+If project rules require public-item documentation, retain that documentation.
+Replace a low-value restatement with the caller's contract; do not delete it just
+to shorten the diff or satisfy a line-count target.
 
 ## Auto-remove (noise)
 
@@ -103,9 +110,15 @@ repaired or escalated, not kept verbatim.
 
 ## Finish
 
-1. Apply the deletions/rewrites.
-2. Re-run the pre-commit gate with the pass marker set, then commit:
-   `COMMENT_CLEANUP_DONE=1 ~/.claude/scripts/comment-diff-gate.sh`
+1. Apply the deletions/rewrites only when edits are authorized; otherwise report them.
+2. For an authorized commit, finish cleanup and stage the final content only
+   when staging is authorized. If the deployed gate supports content records,
+   run `~/.claude/scripts/comment-diff-gate.sh --record`, then re-run the gate.
+   The record binds the repository, HEAD, and complete staged content. Any
+   staged change requires a new record. It does not prove cleanup quality.
+   `COMMENT_CLEANUP_DONE=1` remains an explicit bypass, not content evidence.
+   Do not create unauthorized staging or commits to satisfy the gate. Direct
+   invocation of this skill does not itself authorize a commit.
 3. If you deliberately kept a comment that looks like noise, say so in the
    commit/PR rather than annotating the code.
 
@@ -115,3 +128,13 @@ For diffs touching `unsafe`, public API docs, or crypto/consensus/security/
 serialization code — where deleting the wrong comment loses load-bearing
 rationale — get a second-agent review of the kept/cut set rather than deciding
 solo.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before cleanup, confirmed the changed-comment boundary, edit authority, and why the cleanup pass was needed.
+- [ ] Reviewed every added or edited comment and kept only contract, invariant, safety, surprise, or temporary-workaround value.
+- [ ] Preserved protected comments and repaired or escalated any protected rationale that no longer matched the code.
+- [ ] Matched retained comments to current names and code behavior, then ran any required high-risk second review.
+- [ ] Reported deliberate keeps, affected checks, and any cleanup or staging gap without claiming gate evidence proves quality.

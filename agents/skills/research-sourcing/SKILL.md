@@ -1,13 +1,7 @@
 ---
 name: research-sourcing
 description: >
-  Sourcing discipline for research and analysis: validate each claim against a
-  primary source, link it, and verify on-chain identifiers before citing them.
-  TRIGGER when producing research, analysis, comparisons, or any write-up that
-  asserts external facts about protocols, libraries, incidents, or on-chain
-  state.
-  DO NOT TRIGGER for reasoning about code in the current repo, which is settled
-  by reading it.
+  Source external factual claims in research and comparisons from primary evidence; verify on-chain identifiers and preserve uncertainty. Excludes claims settled by current repository source.
 ---
 
 # Research Sourcing
@@ -24,3 +18,12 @@ data, GitHub repos, post-mortems. Training data alone is not a source.
   fact.
 
 Where the finished document goes follows the `notes-tiers` skill.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before research, confirmed the research question, required evidence types, and search boundary; left source selection and claim verification to investigation.
+- [ ] Supported each non-trivial claim with primary evidence, or marked it unverified.
+- [ ] When citing on-chain identifiers, verified them first; marked this item N/A only when no such identifiers were cited.
+- [ ] Linked the evidence, preserved uncertainty, and stored any finished document in the correct notes tier.

@@ -11,12 +11,23 @@ LOCK_DIR="$STATE_DIR/lock.d"
 TOKEN="YUBIKEY_SIGNING_CANCELLED: user cancelled signing; stop this operation and wait for an explicit retry request"
 EXIT_CANCELLED=97
 
-is_sign=0 prev=""
+is_sign=0 prev="" key_file=""
 for arg in "$@"; do
     [ "$prev" = "-Y" ] && [ "$arg" = "sign" ] && is_sign=1
+    [ "$prev" = "-f" ] && key_file=$arg
     prev=$arg
 done
 [ "$is_sign" = 1 ] || exec "$SSH_KEYGEN" "$@"
+
+# Software keys use the caller's agent. Unknown or multiple keys keep the gate.
+if [ -n "$key_file" ] && fingerprint=$("$SSH_KEYGEN" -lf "$key_file" 2>/dev/null); then
+    case "$fingerprint" in
+        *$'\n'*) ;;
+        *" (ED25519)"|*" (ECDSA)"|*" (RSA)"|*" (DSA)")
+            exec "$SSH_KEYGEN" "$@"
+            ;;
+    esac
+fi
 
 (umask 077; mkdir -p "$STATE_DIR")
 
@@ -39,7 +50,7 @@ trap 'rm -rf "$LOCK_DIR"' EXIT
 
 MARKER="$LOCK_DIR/cancelled"
 
-SSH_AUTH_SOCK= \
+SSH_AUTH_SOCK='' \
 SSH_ASKPASS="$HOME/.local/bin/ssh-askpass" \
 SSH_ASKPASS_REQUIRE=force \
 YUBIKEY_SIGN_CANCEL_MARKER="$MARKER" \

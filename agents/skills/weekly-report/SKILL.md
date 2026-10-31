@@ -1,6 +1,7 @@
 ---
 name: weekly-report
-description: Use when the user asks for a weekly report, activity summary, or wants to review what was done in a GitHub org over a time period — searches issues and PRs, filters by author, groups by repo, and formats for Slack
+description: >
+  Summarize GitHub organization activity over a requested interval, with author filtering, repository grouping, and Slack-ready output.
 ---
 
 # Weekly Report
@@ -9,11 +10,15 @@ Generate a weekly activity summary from a GitHub org, formatted for Slack.
 
 ## Flow
 
-1. **Query org activity** — use `gh search issues` and `gh search prs` with `--owner <org>` and `--created ">=$(date -v-7d +%Y-%m-%d)"` (adjust range as needed). Use `--limit 200` to catch high-volume orgs. Default org: `babylonlabs-io`.
-2. **Filter by author** — default to `@liuchengxu` unless the user specifies otherwise.
-3. **Exclude closed PRs** — only include open and merged PRs. Closed (unmerged) PRs are abandoned work and should not appear in the report.
+1. **Set the interval** — use the requested dates, or the last seven calendar days including today. Use an inclusive `START..END` date range, not an unbounded lower limit.
+2. **Query by org and author** — pass `--owner <org> --author <author> --limit 200` on every query. Defaults: `babylonlabs-io` and `liuchengxu`.
+   - Issues: `gh search issues --created "START..END"`.
+   - PRs created in the interval: `gh search prs --created "START..END"`, once with `--state open` and once with `--merged`.
+   - PRs merged in the interval, regardless of creation date: `gh search prs --merged-at "START..END" --merged`.
+   - Include `--updated "START..END"` queries only when the requested report includes other ongoing activity; an update alone does not prove substantive work.
+3. **Deduplicate and filter** — union results by canonical URL. Keep only open or merged PRs; omit closed-unmerged PRs. Keep URLs internally even though the Slack output omits them.
 4. **Group by repo** — organize items by repository, not chronologically.
-4. **Format for Slack** — output as flat bullet points, one line per work item:
+5. **Format for Slack** — output as flat bullet points, one line per work item:
 
 ```
 - <repo>: <description of work item>
@@ -40,6 +45,16 @@ Generate a weekly activity summary from a GitHub org, formatted for Slack.
 
 ## Notes
 
-- If `gh search` hits the 100-result cap, paginate by splitting the date range
+- If a query reaches the selected result limit or reports incomplete results, split its date range (or partition by repo), then deduplicate again. Do not present truncated results as complete.
 - Generate repo-level stats (issue/PR counts by repo, by author) first if the user wants an overview before drilling into individual contributions
 - Let the user iterate on format — they may want to adjust grouping, wording, or add/remove items before posting
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before querying, confirmed the organization, author, inclusive interval, activity types, and need for each query were clear.
+- [ ] Queried created and merged work with bounded dates, split any truncated result set, and deduplicated by canonical URL.
+- [ ] Kept only supported issue and open or merged PR activity, and did not infer substantive work from an update alone.
+- [ ] Grouped Slack-ready items by repository with the requested short names and omitted links, numbers, states, and dates.
+- [ ] Reported any incomplete query, author ambiguity, or wording uncertainty that limits the report.

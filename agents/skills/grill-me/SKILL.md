@@ -8,3 +8,11 @@ Interview me relentlessly about every aspect of this plan until we reach a share
 Ask the questions one at a time.
 
 If a question can be answered by exploring the codebase, explore the codebase instead.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before the interview, confirmed the plan to examine, the decision boundary, and why an interview was needed; left questions and branches to discovery.
+- [ ] Resolved codebase facts through source exploration and asked each necessary decision question separately with a recommended answer.
+- [ ] Reached shared understanding on every applicable branch or recorded the exact unresolved decision and evidence needed.

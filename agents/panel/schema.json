@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["files_examined", "findings", "dismissed"],
+  "properties": {
+    "files_examined": {
+      "type": "array",
+      "description": "Every file whose contents you actually read, including files outside the diff.",
+      "items": { "type": "string" }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "file", "line", "severity", "blocking", "failure_scenario", "evidence", "fix"],
+        "properties": {
+          "title": { "type": "string" },
+          "file": { "type": "string" },
+          "line": { "type": "integer" },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+          "blocking": { "type": "boolean" },
+          "failure_scenario": {
+            "type": "string",
+            "description": "Concrete inputs or state that produce the wrong result."
+          },
+          "evidence": {
+            "type": "string",
+            "description": "The specific code, in which files, that establishes this. Cite what you read."
+          },
+          "fix": { "type": "string" }
+        }
+      }
+    },
+    "dismissed": {
+      "type": "array",
+      "description": "Things that looked like defects but are not. Report these explicitly.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "file", "why_not_a_defect"],
+        "properties": {
+          "title": { "type": "string" },
+          "file": { "type": "string" },
+          "why_not_a_defect": { "type": "string" }
+        }
+      }
+    }
+  }
+}

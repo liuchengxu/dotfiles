@@ -26,3 +26,11 @@ Inline a single-use value unless naming it earns its keep:
 - the value is used twice or more,
 - naming it makes a long line fit the width, or
 - the expression is complex enough that a name aids comprehension.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before writing or restructuring a function body, confirmed the required behavior, edit boundary, and why the work was needed.
+- [ ] Placed each retained binding next to its first use and grouped setup by its consumer.
+- [ ] Inlined single-use values unless a name improves reuse, line length, or comprehension.

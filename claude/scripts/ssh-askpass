@@ -111,6 +111,11 @@ case "$SSH_ASKPASS_PROMPT" in
     err_file=$(mktemp)
     cached_pin=$(security find-generic-password \
         -a "$KEYCHAIN_ACCOUNT" -s "$KEYCHAIN_SERVICE" -w 2>/dev/null)
+    if [ -z "$cached_pin" ]; then
+        # SSH sessions cannot always access login Keychain secrets. Keep the
+        # lookup in the logged-in GUI session; the PIN travels only in pipes.
+        cached_pin=$("$HOME/.local/bin/yubikey-keychain-gui" 2>/dev/null)
+    fi
     if [ -n "$cached_pin" ]; then
         # Buttons only. Esc and the cancel-designated button still raise -128,
         # so cancellation is reported identically to typed entry.

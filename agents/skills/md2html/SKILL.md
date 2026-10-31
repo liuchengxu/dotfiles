@@ -1,29 +1,31 @@
 ---
 name: md2html
 description: >
-  Render a markdown doc as a self-contained HTML view, written by hand for that
-  document. TRIGGER when the user asks for an "html view", "make this
-  readable", "render as html/page", "open as a page", or wants a shareable page
-  of a markdown deliverable (review report, plan, ADR, research/design note).
-  DO NOT TRIGGER to author new content (write the markdown first), for the todo
-  board (use /todo), or to build interactive dashboards and tools (author those
-  directly).
+  Render an existing Markdown document as a self-contained HTML page when requested. Does not author new content, build dashboards, or handle the todo board.
 ---
 
 # md2html
 
 Markdown is canonical; the page is a view of it. Write the HTML for the
-document in front of you — no converter, no shared stylesheet — so the layout
-follows that document's actual shape instead of a template's.
+document in front of you so its layout follows that document's shape. Apply
+the destination's theme policy without forcing a shared page layout. For notes
+artifacts, follow `~/notes/CLAUDE.md`: inline the shared theme at generation
+time through the required renderer. Do not load an external stylesheet at
+runtime. The result stays a self-contained view of canonical Markdown.
+
+Use the shared theme's palette and variants. Document-specific styling may
+change layout, not redefine shared color tokens. If a required theme variant
+is unavailable, report the limitation instead of inventing another palette.
 
 Never author an `.html` as the only record of a decision or finding, and never
 hand-edit a rendered one — edit the `.md` and rebuild.
 
 ## When to render
 
-Convert on request ("html view", "make this readable", "render as a page"), or
-offer it in one sentence when a deliverable is long. Never generate an HTML
-view by default.
+Convert on an explicit page request ("html view", "render as a page"), or
+when the requesting workflow explicitly requires HTML. `adversarial-review`
+requires it by default alongside canonical Markdown. Otherwise offer it in
+one sentence when a deliverable is long; do not generate it unasked.
 
 Only render local, curated docs you have read. Never paste untrusted markdown
 (pasted issues, third-party files) into a page without stripping raw HTML
@@ -160,3 +162,13 @@ Never hand-edit a rendered page — change the `.md` and rebuild.
 
 A page that will be shared leaves the session, so confirm its links resolve and
 its terms stand alone first. Use the `doc-closure` skill for the full pass.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before rendering, confirmed an explicit render request or workflow requirement, the canonical Markdown, document genre, and required page scope and theme.
+- [ ] Preserved the Markdown's structure and decision content without inventing HTML-only findings, status, or navigation semantics.
+- [ ] Produced one self-contained page with explicit light and dark styles, safe overflow, no runtime assets, and no secret content.
+- [ ] Verified outbound references and cold-reader context for shared output, then previewed the generated page from the canonical source.
+- [ ] Reported the HTML path, canonical Markdown path, render kind, and any unresolved link or rendering gap.

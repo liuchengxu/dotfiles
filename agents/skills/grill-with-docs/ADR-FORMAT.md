@@ -16,6 +16,19 @@ That's it. An ADR can be a single paragraph. The value is in recording *that* a 
 
 Short does not mean session-dependent. Define non-obvious terms on first use and include the constraint/state that makes the decision understandable without chat.
 
+## Reader test
+
+Before delivery, check whether a reader outside the discussion can answer from
+the ADR alone:
+
+- What concrete problem exists, and why does it matter?
+- Why choose this solution?
+- What does the choice cost or leave unresolved?
+
+Revise answers that depend on chat context, unexplained terms, or vague benefits.
+These are review questions, not required headings. This check does not establish
+that a human reviewer understands or accepts the decision.
+
 ## Scope and length
 
 - An ADR captures **a decision and its rationale**, not a full design. Include only the topology, state transitions, alternatives, and trade-offs needed to justify the decision. Field-level schemas, SQL DDL, pseudocode, API contracts, and per-component I/O or failure-mode breakdowns belong in a follow-up RFC or implementation doc.

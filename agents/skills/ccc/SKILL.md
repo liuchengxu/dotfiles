@@ -1,18 +1,24 @@
 ---
 name: ccc
-description: "This skill should be used when code search is needed (whether explicitly requested or as part of completing a task), when indexing the codebase after changes, or when the user asks about ccc, cocoindex-code, or the codebase index. Trigger phrases include 'search the codebase', 'find code related to', 'update the index', 'ccc', 'cocoindex-code'."
+description: >
+  Find code by behavior or concept, or manage the ccc/cocoindex-code index. Exact identifiers, known paths, and literal searches use direct tools without indexing.
 ---
 
 # ccc - Semantic Code Search & Indexing
 
 `ccc` is the CLI for CocoIndex Code, providing semantic search over the current codebase and index management.
 
+Use direct read/search tools for known files, exact identifiers, and literal
+text. Those lookups do not require ccc initialization or indexing.
+
 ## Ownership
 
-The agent owns the `ccc` lifecycle for the current project — initialization, indexing, and searching. Do not ask the user to perform these steps; handle them automatically.
+When ccc is needed, the agent owns its lifecycle for the current project —
+initialization, indexing, and searching. Do not ask the user to perform these
+steps; handle them automatically within the existing access permissions.
 
 - **Initialization**: If `ccc search` or `ccc index` fails with an initialization error (e.g., "Not in an initialized project directory"), run `ccc init` from the project root directory, then `ccc index` to build the index, then retry the original command.
-- **Index freshness**: Keep the index up to date by running `ccc index` (or `ccc search --refresh`) when the index may be stale — e.g., at the start of a session, or after making significant code changes (new files, refactors, renamed modules). There is no need to re-index between consecutive searches if no code was changed in between.
+- **Index freshness**: Keep the index up to date by running `ccc index` (or `ccc search --refresh`) when the index may be stale — e.g., before the first semantic search in a session, or after making significant code changes relevant to the next semantic search (new files, refactors, renamed modules). There is no need to re-index between consecutive searches if no code was changed in between.
 - **Installation**: If `ccc` itself is not found (command not found), refer to [management.md](references/management.md) for installation instructions and inform the user.
 
 ## Searching the Codebase
@@ -69,3 +75,12 @@ To view or edit embedding model configuration, include/exclude patterns, or lang
 ## Management & Troubleshooting
 
 For installation, initialization, daemon management, troubleshooting, and cleanup commands, see [management.md](references/management.md).
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before searching or managing the index, confirmed the requested concept, search boundary, and index action were clear, necessary, and within scope.
+- [ ] Used direct search for known paths or exact text, and used ccc only for behavior or concept discovery.
+- [ ] Refreshed or initialized the index when needed and inspected enough source around each useful result to confirm relevance.
+- [ ] Reported the useful locations and any installation, indexing, freshness, or coverage limit.

@@ -1,0 +1,297 @@
+#!/usr/bin/env bash
+# panel-review — run one code review across several vendors' models in parallel.
+#
+# Each lane is an independent agentic reviewer with real read access to the repo,
+# so it can follow a changed function to callers that did not change. Lanes never
+# see each other's output: agreement between them only means something if it is
+# independent.
+#
+# A lane that times out, exits non-zero, or returns nothing is reported as a
+# FAILED lane. It is never merged into the findings as though it had reviewed
+# anything.
+
+set -uo pipefail
+
+# Resolve through symlinks: this is invoked as ~/.local/bin/panel-review, and the
+# prompt, schema, and merger sit next to the real file, not next to the link.
+_src="${BASH_SOURCE[0]}"
+while [ -L "$_src" ]; do
+  _dir="$(cd -P "$(dirname "$_src")" && pwd)"
+  _src="$(readlink "$_src")"
+  case "$_src" in /*) ;; *) _src="$_dir/$_src" ;; esac
+done
+readonly SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
+unset _src _dir
+readonly SCHEMA="${PANEL_SCHEMA:-$SELF_DIR/schema.json}"
+readonly PROMPT_FILE="${PANEL_PROMPT:-$SELF_DIR/reviewer.md}"
+readonly MERGER="${PANEL_MERGER:-$SELF_DIR/merge.py}"
+
+# Lanes that send code to a third party who is not already in the daily
+# toolchain. `gpt` is deliberately absent: Codex is already the default reviewer
+# here, so routing to OpenAI is pre-existing consent, not a new disclosure.
+#
+# These reach their vendor directly over the OpenAI Responses API. There is no
+# local proxy in the path any more, so nothing else has to be running first.
+readonly FOREIGN_LANES="deepseek kimi"
+
+# Reviewers only read, so stale index locks are pure downside.
+export GIT_OPTIONAL_LOCKS=0
+
+scope=--uncommitted
+scope_arg=""
+lanes="gpt deepseek"
+allow_egress=0
+lane_timeout=420
+outdir=""
+repo=""
+
+die() { printf 'panel-review: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  cat >&2 <<'EOF'
+usage: panel-review [options] [repo-dir]
+
+  --uncommitted        review staged + unstaged + untracked  (default)
+  --base <branch>      review this branch against <branch>
+  --commit <sha>       review the changes in one commit
+  --lanes <a,b,c>      which models review    (default: gpt,deepseek)
+                       available: gpt, deepseek, kimi
+  --allow-egress       consent to sending this code to third-party providers.
+                       Required for the deepseek and kimi lanes.
+  --timeout <secs>     per-lane wall-clock limit  (default: 420)
+  --out <dir>          where to write results  (default: a mktemp dir)
+
+Exit 0 if at least one lane succeeded, 1 if all failed, 3 if egress was refused.
+EOF
+  exit 2
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --uncommitted) scope=--uncommitted; scope_arg=""; shift ;;
+    --base)        scope=--base;   scope_arg="${2:?--base needs a branch}"; shift 2 ;;
+    --commit)      scope=--commit; scope_arg="${2:?--commit needs a sha}";  shift 2 ;;
+    --lanes)       lanes="$(printf '%s' "${2:?--lanes needs a list}" | tr ',' ' ')"; shift 2 ;;
+    --allow-egress) allow_egress=1; shift ;;
+    --timeout)     lane_timeout="${2:?--timeout needs seconds}"; shift 2 ;;
+    --out)         outdir="${2:?--out needs a dir}"; shift 2 ;;
+    -h|--help)     usage ;;
+    -*)            die "unknown option: $1" ;;
+    *)             repo="$1"; shift ;;
+  esac
+done
+
+repo="${repo:-$PWD}"
+[ -d "$repo" ] || die "not a directory: $repo"
+repo="$(cd "$repo" && pwd)"
+git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository: $repo"
+for f in "$SCHEMA" "$PROMPT_FILE" "$MERGER"; do
+  [ -f "$f" ] || die "missing required file: $f"
+done
+for lane in $lanes; do
+  case "$lane" in
+    gpt|deepseek|kimi) ;;
+    *) die "unknown lane: $lane (want gpt, deepseek, or kimi)" ;;
+  esac
+done
+
+# ── scope ────────────────────────────────────────────────────────────────────
+# One definition, used for three things: the egress manifest, the drift hash,
+# and the instruction the lane receives. They cannot disagree because there is
+# only one of them. (An earlier version computed the manifest from the flag but
+# left the lane to guess, so --base silently reviewed uncommitted work.)
+case "$scope" in
+  --uncommitted)
+    scope_desc="the uncommitted changes (staged, unstaged, and untracked)"
+    diff_cmd="git diff HEAD"
+    names_cmd="git status --porcelain" ;;
+  --base)
+    scope_desc="the changes on this branch relative to '$scope_arg'"
+    diff_cmd="git diff $scope_arg...HEAD"
+    names_cmd="git diff --name-only $scope_arg...HEAD" ;;
+  --commit)
+    scope_desc="the changes introduced by commit $scope_arg"
+    diff_cmd="git show $scope_arg"
+    names_cmd="git show --name-only --format= $scope_arg" ;;
+esac
+
+changed="$(cd "$repo" && eval "$names_cmd" 2>/dev/null | sed 's/^...//;/^$/d')"
+[ -n "$changed" ] || die "no changes in scope ($scope $scope_arg) — nothing to review"
+file_count=$(printf '%s\n' "$changed" | wc -l | tr -d ' ')
+
+# One definition, called twice. Hashing the same bytes through two different
+# pipelines is how the first version reported drift on every single run:
+# command substitution strips the trailing newline and a direct pipe does not.
+diff_hash() { ( cd "$repo" && eval "$diff_cmd" 2>/dev/null ) | shasum -a 256 | cut -d' ' -f1; }
+
+diff_bytes=$( ( cd "$repo" && eval "$diff_cmd" 2>/dev/null ) | wc -c | tr -d ' ')
+diff_hash_before=$(diff_hash)
+
+remote="$(git -C "$repo" remote get-url origin 2>/dev/null || echo '<no remote>')"
+all_remotes="$(git -C "$repo" remote -v 2>/dev/null | awk '{print $2}' | sort -u | tr '\n' ' ')"
+head_sha="$(git -C "$repo" rev-parse HEAD 2>/dev/null || echo '<no commit>')"
+
+foreign_selected=""
+for lane in $lanes; do
+  case " $FOREIGN_LANES " in *" $lane "*) foreign_selected="$foreign_selected $lane" ;; esac
+done
+foreign_selected="${foreign_selected# }"
+
+# ── egress gate ──────────────────────────────────────────────────────────────
+# This is an accidental-disclosure guard, not a security boundary, and it says
+# so. A read-only sandbox restricts writes, not reads: the reviewer decides
+# which files to open, so the diff size below is what the review is ABOUT, not a
+# bound on what gets transmitted. Anything the agent can read, it can send.
+if [ -n "$foreign_selected" ]; then
+  if [ "$allow_egress" -ne 1 ]; then
+    cat >&2 <<EOF
+panel-review: refusing to send code to third-party providers without consent.
+
+  repo       $repo
+  remotes    ${all_remotes:-<none>}
+  HEAD       $head_sha
+  scope      $scope $scope_arg — $scope_desc
+  to         $foreign_selected
+  providers  DeepSeek (api.deepseek.com) / Moonshot (api.moonshot.ai)
+
+  the diff under review is $file_count file(s), ~$diff_bytes bytes
+
+  This is NOT a bound on what gets sent. Each reviewer is an agent that chooses
+  which files to open. read-only sandboxing prevents writes, not reads, so it
+  can transmit anything readable from this checkout -- and, absent an OS-level
+  boundary, other host-readable paths. Only run this on a repo whose entire
+  contents you would hand to these providers.
+
+Re-run with --allow-egress to consent, or --lanes gpt to stay off them.
+EOF
+    exit 3
+  fi
+fi
+
+outdir="${outdir:-$(mktemp -d "${TMPDIR:-/tmp}/panel-review.XXXXXX")}"
+mkdir -p "$outdir" || die "cannot create $outdir"
+
+# Each foreign lane authenticates with an environment key. An absent key fails
+# the lane minutes later with an opaque error, so refuse now instead.
+lane_env_key() { case "$1" in deepseek) printf 'DEEPSEEK_API_KEY' ;; kimi) printf 'KIMI_API_KEY' ;; esac; }
+
+for lane in $foreign_selected; do
+  key="$(lane_env_key "$lane")"
+  eval "key_value=\${$key:-}"
+  [ -n "$key_value" ] || die "\$$key is unset, and the '$lane' lane needs it to
+    reach its provider. Export it, or drop the lane."
+done
+
+# ── the prompt each lane receives ────────────────────────────────────────────
+run_prompt="$outdir/prompt.md"
+{
+  cat "$PROMPT_FILE"
+  cat <<EOF
+
+## This review's scope
+
+You are reviewing $scope_desc in this repository.
+
+Run exactly this to see the subject of the review:
+
+    $diff_cmd
+
+Do not review unrelated changes. Files outside that diff are still yours to
+read -- following a changed function to an unchanged caller is the point -- but
+they are context, not the subject.
+EOF
+} > "$run_prompt"
+
+# ── lanes ────────────────────────────────────────────────────────────────────
+profile_for() {
+  case "$1" in gpt) printf '' ;; deepseek) printf 'deepseek' ;; kimi) printf 'kimi' ;; esac
+}
+
+run_lane() {
+  local lane="$1"
+  local json="$outdir/$lane.json" log="$outdir/$lane.log"
+  local profile start rc elapsed status
+  profile="$(profile_for "$lane")"
+  start=$SECONDS
+
+  # stdin must be closed: `codex exec` otherwise blocks on "Reading additional
+  # input from stdin..." and the lane hangs until the watchdog kills it.
+  # `exec` makes this subshell BE the codex process, so the watchdog's signal
+  # cannot land on a shell that has already forked away from its child.
+  if [ -n "$profile" ]; then
+    ( cd "$repo" && exec codex exec -p "$profile" -c sandbox_mode=read-only --ephemeral \
+        --output-schema "$SCHEMA" -o "$json" "$(cat "$run_prompt")" ) \
+      </dev/null >"$log" 2>&1 &
+  else
+    ( cd "$repo" && exec codex exec -c sandbox_mode=read-only --ephemeral \
+        --output-schema "$SCHEMA" -o "$json" "$(cat "$run_prompt")" ) \
+      </dev/null >"$log" 2>&1 &
+  fi
+  local pid=$!
+  ( sleep "$lane_timeout"; kill -9 "$pid" 2>/dev/null ) & local watchdog=$!
+
+  wait "$pid"; rc=$?
+  kill -9 "$watchdog" 2>/dev/null; wait "$watchdog" 2>/dev/null
+  elapsed=$((SECONDS - start))
+
+  # Parseability is decided in one place only -- the merger. A second, stricter
+  # check here once marked a good fence-wrapped lane as failed.
+  status=ok
+  if [ "$rc" -eq 137 ]; then status="timeout:${lane_timeout}s"
+  elif [ "$rc" -ne 0 ]; then status="exit:$rc"
+  elif [ ! -s "$json" ]; then status="empty-output"
+  fi
+  printf '%s\t%s\t%s\n' "$lane" "$status" "$elapsed" >"$outdir/$lane.status"
+}
+
+printf 'panel-review  %s %s  %s@%s\n' "$scope" "$scope_arg" \
+  "$(basename "$repo")" "${head_sha:0:8}" >&2
+printf '  lanes: %s   timeout: %ss   out: %s\n\n' "$lanes" "$lane_timeout" "$outdir" >&2
+
+for lane in $lanes; do run_lane "$lane" & done
+wait
+
+# ── did the source move under us? ────────────────────────────────────────────
+diff_hash_after=$(diff_hash)
+drift=""
+if [ "$diff_hash_before" != "$diff_hash_after" ]; then
+  drift="yes"
+  printf 'panel-review: WARNING — the diff changed while the review was running.\n' >&2
+  printf '  Findings may cite lines that have since moved. Re-run to be sure.\n\n' >&2
+fi
+
+ok_lanes=0
+printf '%-10s %-18s %s\n' LANE STATUS SECS >&2
+for lane in $lanes; do
+  if [ -f "$outdir/$lane.status" ]; then
+    st="$(cut -f2 "$outdir/$lane.status")"; secs="$(cut -f3 "$outdir/$lane.status")"
+  else st="no-status"; secs="-"; fi
+  printf '%-10s %-18s %s\n' "$lane" "$st" "$secs" >&2
+  [ "$st" = ok ] && ok_lanes=$((ok_lanes + 1))
+done
+printf '\n' >&2
+
+cat > "$outdir/run.json" <<EOF
+{
+  "repo": "$repo",
+  "remotes": "${all_remotes}",
+  "head": "$head_sha",
+  "scope": "$scope $scope_arg",
+  "diff_cmd": "$diff_cmd",
+  "diff_files": $file_count,
+  "diff_bytes": $diff_bytes,
+  "diff_sha256_before": "$diff_hash_before",
+  "diff_sha256_after": "$diff_hash_after",
+  "source_drifted": ${drift:+true}${drift:-false},
+  "lanes_requested": "$lanes",
+  "lane_timeout_s": $lane_timeout
+}
+EOF
+
+if [ "$ok_lanes" -eq 0 ]; then
+  printf 'panel-review: every lane failed — no review was produced.\nLogs: %s\n' "$outdir" >&2
+  exit 1
+fi
+
+PANEL_DRIFT="${drift:-}" python3 "$MERGER" "$outdir" $lanes
+printf '\nArtifacts: %s\n' "$outdir" >&2

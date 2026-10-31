@@ -1,14 +1,7 @@
 ---
 name: doc-closure
 description: >
-  Close a document against the session that produced it — no dangling finding
-  IDs, no session-only shorthand, and code references a cold reader can actually
-  resolve.
-  TRIGGER when writing or updating any document that references code or may
-  leave the session: review notes, GitHub issues and PRs, runbooks, shared HTML,
-  colleague hand-offs, design docs quoting code.
-  DO NOT TRIGGER for private scratch notes that stay private, or for source code
-  itself.
+  Make saved or shareable documents stand alone: resolve code references, finding IDs, and session shorthand. Apply while drafting or updating; excludes private scratch notes and source code.
 ---
 
 # Documentation Context Closure
@@ -65,3 +58,13 @@ A doc recording a run, release, migration, ceremony, benchmark, deployment, or
 on-chain step must also let the reader verify what happened, not only resolve
 references. Those rules stay in the working rules rather than here, because the
 evidence has to be planned before the operation runs.
+
+## Completion checklist
+
+Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
+
+- [ ] Before editing, confirmed the document audience, changed section, required anchors, and need for each closure change were clear and within scope.
+- [ ] Defined or resolved every touched term, finding ID, issue reference, revision, and code location that a cold reader needs.
+- [ ] Pinned shareable code evidence to valid source state and labeled dirty, unpushed, proposed, or renamed material accurately.
+- [ ] Kept session links as provenance only and preserved every qualification that changes the reader's conclusion.
+- [ ] Recorded any operation evidence that the document cannot recover as an explicit gap.
