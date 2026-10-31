@@ -109,8 +109,13 @@ document built from other sources.
 
 ## Reviewing a document
 
-Cite the passage, the effect on the reader, and the smallest fix. Number the
-findings, keep the numbers stable across rounds, and mark which ones block
-delivery. An editorial review does not certify technical correctness;
-technical soundness belongs to `adversarial-review` or the repository's review
-skill.
+Lead with one verdict: Ready, Fix first, or Rework. Then one entry per finding,
+with an ID (`D-01`) that stays stable across rounds:
+
+- **Passage:** the quoted text and where it is.
+- **Reader effect:** what goes wrong for the reader.
+- **Suggestion:** the smallest change.
+- **Action:** Blocking or Optional.
+
+An editorial review does not certify technical correctness; technical
+soundness belongs to `adversarial-review` or the repository's review skill.

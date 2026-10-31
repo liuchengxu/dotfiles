@@ -1,7 +1,7 @@
 ---
 name: ask-models
 description: >
-  Ask one or more named models (for example Astra, Kimi, GLM) for an opinion or a review through Pi, then adjudicate their answers. Use for "ask astra", "consult kimi and glm", "let the models review this", or a blind review of a pinned commit. Not for a review you do yourself (use adversarial-review).
+  Ask one or more named models (for example Astra, Kimi, GLM, Opus) for an opinion or a review through Pi or the Claude Code CLI, then adjudicate their answers. Use for "ask astra", "consult kimi and glm", "let the models review this", or a blind review of a pinned commit. Not for a review you do yourself (use adversarial-review).
 ---
 
 # Ask models
@@ -12,16 +12,18 @@ your own verdict.
 
 ## Models
 
-| Name | Pi model id |
-|---|---|
-| astra | `openai-codex/gpt-6-astra` |
-| kimi | `kimi-coding/k3.1-pro` |
-| glm | `zai/glm-5.3` |
+| Name | Runner | Model |
+|---|---|---|
+| astra | Pi | `openai-codex/gpt-6-astra` |
+| kimi | Pi | `kimi-coding/k3.1-pro` |
+| glm | Pi | `zai/glm-5.3` |
+| opus, sonnet, fable, haiku | Claude Code CLI | the same alias, for example `opus` |
 
-Use the table. For a name it does not list, find the id with
-`pi --list-models | grep -i <name>`. Add `:<thinking>` only when the user names
-a level. If a name does not resolve, or a run's log says the id was not
-recognized, say so; never substitute another model.
+Run Claude models through the Claude Code CLI, not Pi. For a name the table
+does not list, find the Pi id with `pi --list-models | grep -i <name>`. When the
+user names a thinking level, add `:<thinking>` to a Pi id, or pass
+`--effort <level>` to Claude. If a name does not resolve, or a run's log says
+the id was not recognized, say so; never substitute another model.
 
 ## Prepare
 
@@ -46,8 +48,20 @@ cd <copy> && pi -p --no-session --model <provider>/<id> \
   "$(cat <prompt.md>)" < /dev/null > <name>.md 2> <name>.log
 ```
 
+For a Claude model:
+
+```bash
+cd <copy> && claude -p --no-session-persistence --model <alias> \
+  --allowedTools "Read Grep Glob Bash WebFetch WebSearch" \
+  < <prompt.md> > <name>.md 2> <name>.log
+```
+
+`--allowedTools` takes a list, so the prompt goes on stdin; as an argument
+after it, the prompt is read as a tool name.
+
 - `< /dev/null` is required: without it, Pi waits on stdin and never answers.
-- No `--tools` flag: the model gets all of Pi's tools, including the shell.
+- Reviewers get full tools: Pi has no `--tools` flag, and Claude's allowed
+  tools include the shell.
 - An empty output file means the model failed. Check its log, and rerun it or
   report it as failed.
 
@@ -62,7 +76,16 @@ cd <copy> && pi -p --no-session --model <provider>/<id> \
 
 ## Report
 
-Lead with your verdict. Then, for each model, its exact id, a one-line
-summary, and the points that matter, attributed to it. Say which points you
-adopt, which you reject and why, and which remain open. Give the folder path so
-the user can read the full answers.
+Use this shape, so answers from several models line up:
+
+```
+Verdict: <your conclusion and its main reason>
+
+<name> (<exact id>): <one-line summary>
+  - <point>: adopted | rejected (<why>) | open
+<next model, the same way>
+
+Full answers: <folder>
+```
+
+A failed model gets one line: `<name> (<exact id>): failed, <reason>`.
