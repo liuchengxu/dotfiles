@@ -1,0 +1,69 @@
+---
+name: standalone-docs
+description: >
+  Make saved or shareable documents stand alone: resolve code references, finding IDs, and session shorthand. Apply while drafting or updating; excludes private scratch notes and source code.
+---
+
+# Standalone docs
+
+A live session hides state — prior findings, local files, renames, tentative
+terms — that a published doc does not carry. Move that state into the doc, so
+it stands alone for a cold reader who has the document and its links but was
+never in the session.
+
+Apply this on every create or update, not only before publishing.
+
+## Every non-scratch doc, as you write
+
+Keep the changed text self-contained: no undefined finding IDs, no bare
+code references, no session-coined shorthand or codenames left undefined at
+first use, no unexplained renamed terms, no "link later" placeholders.
+Compression never deletes an anchor or definition a cold reader needs.
+
+On an update, fix the touched section and any directly dependent
+references — don't turn a narrow edit into a whole-document pass unless asked.
+
+## Docs that reference code or may leave the session
+
+Shared HTML, GitHub issues and PRs, review notes, runbooks, colleague
+hand-offs. A cold reader must resolve every identifier, term, finding, and code
+reference from the artifact plus immutable links or declared source pins.
+
+- Reviews, audits, runbooks, and evidence docs carry the reviewed commit SHA or
+  source version near the top.
+- Grep-close finding IDs, issue-like refs, and bare commit SHAs (`AR-\d+`,
+  `#\d+`, hex SHAs): each one defined, linked, or removed.
+- Replace bare `path:line` refs with immutable permalinks
+  (`/blob/<sha>/path#Ln`). A long or multi-repo doc may resolve them through a
+  `Source pins` section instead (repo remote, branch, pushed commit SHA, dirty
+  status, named default pin) — but keep inline permalinks for line-sensitive
+  findings and for excerpts likely to be copied without that section.
+- Never treat an unpushed or dirty SHA as immutable evidence: record the pushed
+  SHA and whether local state was dirty.
+- Tag introduced or renamed terminology — `existing`, `renamed from <old>`,
+  `proposed`, `review terminology` — wherever a reader could mistake it for the
+  codebase's current vocabulary.
+- Chat and session links are provenance only; never make them required context.
+- When forking a shareable doc from a canonical one, re-audience it: translate
+  internal shorthand and regenerate derived siblings from the source rather than
+  hand-editing the copy.
+
+Private scratch notes are exempt only while they stay private — keep them in a
+scratch or local location, or label them `Private scratch`. Upgrade before
+sharing, publishing, or copying the material into a doc that references code.
+
+## Records of a real operation
+
+A doc recording a run, release, migration, ceremony, benchmark, deployment, or
+on-chain step must also let the reader verify what happened, not only resolve
+references. The "Operational evidence" working rule covers this, because the
+evidence has to be planned before the operation runs. Name any evidence the
+doc cannot recover as a gap.
+
+## Before delivery
+
+- Every finding ID, `#N` reference, and bare SHA is defined, linked, or removed.
+- No bare `path:line` remains; each is a permalink or resolves through
+  `Source pins`.
+- No unpushed or dirty SHA is presented as immutable evidence.
+- Session and chat links are provenance only, not required context.
