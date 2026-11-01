@@ -138,12 +138,19 @@ export default function activitySummary(pi: ExtensionAPI): void {
 		timer = undefined;
 	};
 	const updateStatus = (): void => {
-		if (!context || context.mode !== "tui" || state.frozen) {
-			context?.ui.setStatus("activity-summary", undefined);
-			return;
+		try {
+			if (!context || context.mode !== "tui" || state.frozen) {
+				context?.ui.setStatus("activity-summary", undefined);
+				return;
+			}
+			const status = activityParts(state).join(" · ");
+			context.ui.setStatus("activity-summary", status ? context.ui.theme.fg("muted", status) : undefined);
+		} catch {
+			// Pi can invalidate the captured ctx before session_shutdown stops
+			// this timer; an uncaught throw from a tick kills the process.
+			stopTimer();
+			context = undefined;
 		}
-		const status = activityParts(state).join(" · ");
-		context.ui.setStatus("activity-summary", status ? context.ui.theme.fg("muted", status) : undefined);
 	};
 	const begin = (ctx: ExtensionContext): void => {
 		context = ctx;
