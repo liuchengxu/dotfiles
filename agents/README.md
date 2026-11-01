@@ -97,6 +97,7 @@ Skills in use:
 | `eli5` | Firefox, to open the page. |
 | `ask-models` | `pi` with the requested models' providers signed in. |
 | `adversarial-review` | `gh` for PR reviews. |
+| `vpn` | Clash Verge running. Also link `scripts/vpnctl` to `~/.local/bin/vpnctl`, so it works when Claude is down. |
 
 Grafana MCP server, added once per agent. The first query opens a browser
 login; the token stays in `~/.mcp-auth`.
