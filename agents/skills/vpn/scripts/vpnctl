@@ -169,7 +169,8 @@ def primary_selector(proxies, rules):
         seen.add(target)
         if proxies[target].get("type") not in GROUP_TYPES:
             break
-        last_group = target
+        if proxies[target].get("type") == "Selector":
+            last_group = target
         target = proxies[target].get("now")
     return last_group
 
@@ -252,7 +253,10 @@ def command_fastest(args):
 def command_status(args):
     client = Mihomo(args.socket)
     proxies = client.proxies()
-    selectors = args.selectors or [resolve_selector(client, proxies, None)]
+    main = primary_selector(proxies, client.rules())
+    selectors = args.selectors or ([main] if main else [])
+    if not selectors:
+        print("main selector: not detected; pass --selectors")
     for selector in selectors:
         if selector in proxies:
             print(f"{selector}: {proxies[selector].get('now', '')}")
@@ -338,6 +342,8 @@ def anthropic_probe(mixed_port, timeout_s=PROBE_TIMEOUT_S):
         data = json.loads(body)
     except Exception:
         return False, f"HTTP {status} non-JSON {body[:60]!r}"
+    if status == 403:
+        return False, f"HTTP 403 {body[:60]!r}"
     if isinstance(data, dict) and data.get("type") == "error":
         return True, f"HTTP {status} anthropic error envelope"
     return False, f"HTTP {status} unexpected JSON"
@@ -346,9 +352,11 @@ def anthropic_probe(mixed_port, timeout_s=PROBE_TIMEOUT_S):
 def command_ensure_claude(args):
     if re.search(args.blocked, args.target):
         die(f"target matches blocked country pattern: {args.target}")
+    client = Mihomo(args.socket)
+    if args.target not in client.proxies():
+        die(f"target not found in the running profile: {args.target}")
     update_claude_rules(args.config, args.target)
 
-    client = Mihomo(args.socket)
     client.reload_config(args.config)
     client.delete("/connections")
     print("reloaded config and closed existing connections")
@@ -408,30 +416,30 @@ def command_claude_best(args):
     if not candidates:
         die("no reachable non-blocked candidate to verify")
 
-    original = current_claude_node(client)
     backup = backup_config(args.config)
     print(f"\nbackup: {backup}")
     print(f"verifying top {len(candidates)} fastest against Anthropic:")
 
     winner = None
-    for delay, name in candidates:
-        lines = rewrite_claude_rules_lines(read_config_lines(args.config), name)
-        write_config_lines(args.config, lines)
-        client.reload_config(args.config)
-        ok, detail = anthropic_probe(port, args.probe_timeout)
-        status = "USABLE" if ok else "BLOCKED"
-        print(f"  {delay:>5} ms  {status:<7}  {name}  ({detail})")
-        if ok:
-            winner = (name, delay)
-            break
+    try:
+        for delay, name in candidates:
+            lines = rewrite_claude_rules_lines(read_config_lines(args.config), name)
+            write_config_lines(args.config, lines)
+            client.reload_config(args.config)
+            ok, detail = anthropic_probe(port, args.probe_timeout)
+            status = "USABLE" if ok else "BLOCKED"
+            print(f"  {delay:>5} ms  {status:<7}  {name}  ({detail})")
+            if ok:
+                winner = (name, delay)
+                break
+    finally:
+        if not winner:
+            shutil.copy2(backup, args.config)
+            client.reload_config(args.config)
+            client.delete("/connections")
 
     if not winner:
-        if original is not None:
-            restored = rewrite_claude_rules_lines(read_config_lines(args.config), original)
-            write_config_lines(args.config, restored)
-            client.reload_config(args.config)
-        client.delete("/connections")
-        die(f"no usable node among the top {len(candidates)}; restored previous routing (backup: {backup})")
+        die(f"no usable node among the top {len(candidates)}; restored the config from {backup}")
 
     client.delete("/connections")
     name, delay = winner

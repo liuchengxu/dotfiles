@@ -154,16 +154,16 @@ writes to it, so set the keys rather than linking the file):
 | `env.CLAUDE_CODE_AUTO_COMPACT_WINDOW` | `500000` |
 | `env.CLAUDE_CODE_MAX_CONTEXT_TOKENS` | `872000` |
 
-Then, in Claude, run `/claude-hud:setup` once to set the status line.
+Then, in Claude, run `/claude-hud:setup` once to set the status line. Slack
+asks for a login on first use. When you change the HUD layout, copy
+`~/.claude/plugins/claude-hud/config.json` back to `agents/claude-hud.json`.
 
 Codex settings to match (top level of `~/.codex/config.toml`):
 
 ```toml
 sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
-``` Slack
-asks for a login on first use. When you change the HUD layout, copy
-`~/.claude/plugins/claude-hud/config.json` back to `agents/claude-hud.json`.
+```
 
 ## Git hooks
 
@@ -250,7 +250,14 @@ links; steps 3 and 4 replace them.
 Steps, each with the user's approval:
 
 1. Bring `~/.dotfiles` up to date with `origin/master`. Check first for local
-   changes; preserve any that are not in `origin/master`.
+   changes; preserve any that are not in `origin/master`. The pull moves or
+   deletes `claude/`, `codex/`, `pi/`, and `ai-rules/`, which about 30 links
+   point into, including signing: `gpg.ssh.program` is
+   `~/.local/bin/yubikey-sign`, and `yubikey-sign-server` serves Studio's
+   remote signing. Before the pull, list them:
+   `find ~ -maxdepth 4 -type l -lname '*/.dotfiles/*'`. Right after it, point
+   each signing link at `agents/claude/scripts/`, confirm a signed commit on
+   MacBook and on Studio, then handle the other links in the steps below.
 2. Write `macbook` to `~/.local/state/agent-rules/machine`.
 3. Move the three rule files aside to
    `~/.local/state/agent-rules/backups/pre-migration-<UTC time>/`, then apply
