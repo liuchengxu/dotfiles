@@ -109,6 +109,15 @@ codex mcp add grafana -- npx -y mcp-remote "$URL"
 #   "grafana": {"command": "npx", "args": ["-y", "mcp-remote", "<URL>"]}
 ```
 
+Atlassian MCP server, for private Confluence pages, in Claude and Pi. Each
+asks for an Atlassian login on first use.
+
+```bash
+claude mcp add --scope user --transport http atlassian https://mcp.atlassian.com/v1/mcp
+# Pi: add to "mcpServers" in ~/.pi/agent/mcp.json:
+#   "atlassian": {"url": "https://mcp.atlassian.com/v2/mcp"}
+```
+
 ## Claude plugins
 
 Plugins install per machine. This table is the list to keep in sync; do not
@@ -129,6 +138,19 @@ claude plugin install --scope user slack@claude-plugins-official
 claude plugin install --scope user codex@openai-codex
 cp ~/.dotfiles/agents/claude-hud.json ~/.claude/plugins/claude-hud/config.json
 ```
+
+Claude settings to match on each machine (`~/.claude/settings.json`; Claude
+writes to it, so set the keys rather than linking the file):
+
+| Key | Value |
+|---|---|
+| `model` | `claude-opus-5-5` |
+| `effortLevel` | `xhigh` |
+| `tui` | `fullscreen` |
+| `env.CLAUDE_CODE_MAX_OUTPUT_TOKENS` | `64000` |
+| `env.MAX_THINKING_TOKENS` | `31999` |
+| `env.CLAUDE_CODE_AUTO_COMPACT_WINDOW` | `500000` |
+| `env.CLAUDE_CODE_MAX_CONTEXT_TOKENS` | `872000` |
 
 Then, in Claude, run `/claude-hud:setup` once to set the status line. Slack
 asks for a login on first use. When you change the HUD layout, copy
