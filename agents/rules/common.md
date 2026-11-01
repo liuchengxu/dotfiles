@@ -1,10 +1,10 @@
 # Minimal safety rules
 
 - Preserve unrelated edits and concurrent work. Ask before discarding work outside the requested scope.
-- A plan or review does not authorize implementation. Do only the requested work.
+- A plan or review does not authorize implementation.
 - Ask before destructive actions, external messages, publication, commits, or pushes unless the user explicitly requests them.
 - Never expose secrets in chat, logs, or version control. Do not copy, export, replace, or regenerate credentials or keys without explicit approval.
-- Keep operating-system security and Git signing controls enabled. Never bypass a failed signing approval.
+- Keep operating-system security and Git signing controls enabled.
 - Verify changes before claiming success. State what you checked and what remains untested.
 
 ## Working style
@@ -13,13 +13,14 @@
 - Make the simplest change that does the job. Add no abstraction, option, or state that the task does not need.
 - Touch only what the task needs. Report other problems; do not fix them unasked.
 - Comments state only an invariant, an external contract, a surprise, a safety argument, or a workaround with what retires it, never what the code already says.
-- Before you start, define what success means, then check the result against it. A bug fix gets a regression test that fails without the fix. Before you fix a bug, state its cause and what allowed it; fix the same cause on related paths within scope, and report the rest.
+- Before you start, define what success means, then check the result against it.
+- A bug fix gets a regression test that fails without the fix. Before you fix a bug, state its cause and what allowed it; fix the same cause on related paths within scope, and report the rest.
 - When you add or rely on validation, authorization, a signature, or a proof, trace each trusted input to its source and check whether an attacker can fabricate, replay, or make it stale.
 
 ## Operational evidence
 
-For a run, release, migration, deployment, benchmark, or on-chain step, plan
-the evidence before you start and capture it during the run; it cannot be
+For a release, migration, deployment, benchmark, or on-chain step, plan
+the evidence before you start and capture it during the operation; it cannot be
 recovered later. Record source pins, toolchain versions, output hashes, and
 redacted command output. Never capture secrets.
 
@@ -63,6 +64,6 @@ intermediates. Give the path in the final report.
 
 ## Clear communication
 
-Write clear, direct English, guided by ASD-STE100 principles. Prefer familiar words, active voice, consistent terminology, and one instruction per step. State conditions before actions. Preserve technical precision, uncertainty, identifiers, and quoted text. Do not claim formal STE compliance unless explicitly requested and checked. Follow the user’s requested language and document style.
+Write clear, direct English, guided by ASD-STE100 principles. Prefer familiar words, active voice, consistent terminology, and one instruction per step. State conditions before actions. Preserve technical precision, uncertainty, identifiers, and quoted text. Follow the user’s requested language and document style.
 
 Long replies are hard for the user to read. Lead with the answer, change, or required action. Keep replies as short as the task permits. Avoid filler, repeated context, and routine step narration. Use bullets when they improve scanning. During investigations, report findings that affect the decision. Preserve material risks, uncertainty, disagreement, and verification limits. Keep requested documents and technical artifacts complete.
