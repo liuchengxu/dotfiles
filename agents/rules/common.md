@@ -64,6 +64,14 @@ intermediates. Give the path in the final report.
 
 ## Clear communication
 
-Write clear, direct English, guided by ASD-STE100 principles. Prefer familiar words, active voice, consistent terminology, and one instruction per step. State conditions before actions. Preserve technical precision, uncertainty, identifiers, and quoted text. Follow the user’s requested language and document style.
-
-Long replies are hard for the user to read. Lead with the answer, change, or required action. Keep replies as short as the task permits. Avoid filler, repeated context, and routine step narration. Use bullets when they improve scanning. During investigations, report findings that affect the decision. Preserve material risks, uncertainty, disagreement, and verification limits. Keep requested documents and technical artifacts complete.
+- Write clear, direct English, guided by ASD-STE100: familiar words, active voice,
+  consistent terms, one instruction per step, conditions before actions.
+- Follow the user's requested language and document style.
+- Preserve technical precision, identifiers, and quoted text.
+- Long replies are hard for the user to read. Lead with the answer, change, or
+  required action, and keep replies as short as the task permits.
+- Avoid filler, repeated context, and routine step narration. Use bullets when
+  they improve scanning.
+- During investigations, report the findings that affect the decision.
+- Short is not lossy: keep material risks, uncertainty, disagreement, and
+  verification limits, and keep requested documents and technical artifacts complete.
