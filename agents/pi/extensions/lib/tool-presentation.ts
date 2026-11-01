@@ -41,8 +41,10 @@ export function colorChangeSummary(
 ): string {
 	// Style only count tokens, not paths or surrounding punctuation.
 	// Keep stored summaries plain so theme changes can recolor them.
+	// Raw SGR 2/22 (faint): Pi's theme exposes bold and inverse but no faint
+	// style, and the full diff colors are too loud for a header count.
 	return summary.replace(/(^| )([+~-]\d+)(?= |$)/g, (_match, space: string, count: string) =>
-		space + theme.fg(count[0] === "+" ? "toolDiffAdded" : count[0] === "-" ? "toolDiffRemoved" : "warning", count));
+		space + "\x1b[2m" + theme.fg(count[0] === "+" ? "toolDiffAdded" : count[0] === "-" ? "toolDiffRemoved" : "warning", count) + "\x1b[22m");
 }
 
 /** Highlight the changed span without a second line-diff implementation. */
