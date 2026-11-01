@@ -144,6 +144,7 @@ writes to it, so set the keys rather than linking the file):
 
 | Key | Value |
 |---|---|
+| `permissions.allow` | includes `Bash(*)` |
 | `model` | `claude-opus-5-5` |
 | `effortLevel` | `xhigh` |
 | `tui` | `fullscreen` |
@@ -152,7 +153,14 @@ writes to it, so set the keys rather than linking the file):
 | `env.CLAUDE_CODE_AUTO_COMPACT_WINDOW` | `500000` |
 | `env.CLAUDE_CODE_MAX_CONTEXT_TOKENS` | `872000` |
 
-Then, in Claude, run `/claude-hud:setup` once to set the status line. Slack
+Then, in Claude, run `/claude-hud:setup` once to set the status line.
+
+Codex settings to match (top level of `~/.codex/config.toml`):
+
+```toml
+sandbox_mode = "danger-full-access"
+approval_policy = "on-request"
+``` Slack
 asks for a login on first use. When you change the HUD layout, copy
 `~/.claude/plugins/claude-hud/config.json` back to `agents/claude-hud.json`.
 
