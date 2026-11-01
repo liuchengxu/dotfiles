@@ -68,8 +68,10 @@ intermediates. Give the path in the final report.
   consistent terms, one instruction per step, conditions before actions.
 - Follow the user's requested language and document style.
 - Preserve technical precision, identifiers, and quoted text.
-- Long replies are hard for the user to read. Lead with the answer, change, or
-  required action, and keep replies as short as the task permits.
+- Long replies are hard for the user to read. When a reply runs past about five
+  lines, start it with `result:` and one sentence: the outcome, or the decision
+  the user must make. A skill's own verdict line serves instead. Keep the rest
+  as short as the task permits.
 - Avoid filler, repeated context, and routine step narration. Use bullets when
   they improve scanning.
 - During investigations, report the findings that affect the decision.
