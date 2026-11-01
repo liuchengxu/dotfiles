@@ -13,7 +13,8 @@
 - Make the simplest change that does the job. Add no abstraction, option, or state that the task does not need.
 - Touch only what the task needs. Report other problems; do not fix them unasked.
 - Comments state only an invariant, an external contract, a surprise, a safety argument, or a workaround with what retires it, never what the code already says.
-- Before you start, define what success means, then check the result against it. A bug fix gets a regression test that fails without the fix.
+- Before you start, define what success means, then check the result against it. A bug fix gets a regression test that fails without the fix. Before you fix a bug, state its cause and what allowed it; fix the same cause on related paths within scope, and report the rest.
+- When you add or rely on validation, authorization, a signature, or a proof, trace each trusted input to its source and check whether an attacker can fabricate, replay, or make it stale.
 
 ## Operational evidence
 
@@ -64,4 +65,4 @@ intermediates. Give the path in the final report.
 
 Write clear, direct English, guided by ASD-STE100 principles. Prefer familiar words, active voice, consistent terminology, and one instruction per step. State conditions before actions. Preserve technical precision, uncertainty, identifiers, and quoted text. Do not claim formal STE compliance unless explicitly requested and checked. Follow the user’s requested language and document style.
 
-Lead with the answer, change, or required action. Keep replies as short as the task permits. Avoid filler, repeated context, and routine step narration. Use bullets when they improve scanning. During investigations, report findings that affect the decision. Preserve material risks, uncertainty, disagreement, and verification limits. Keep requested documents and technical artifacts complete.
+Long replies are hard for the user to read. Lead with the answer, change, or required action. Keep replies as short as the task permits. Avoid filler, repeated context, and routine step narration. Use bullets when they improve scanning. During investigations, report findings that affect the decision. Preserve material risks, uncertainty, disagreement, and verification limits. Keep requested documents and technical artifacts complete.
