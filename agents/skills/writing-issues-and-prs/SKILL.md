@@ -159,3 +159,5 @@ new diff settles. Show the reply to the user and get approval before posting.
 - Every ID, code reference, and coined term resolves for a reader outside the
   session. The `Stand alone` section of `writing-docs` covers reference closure.
 - Nothing is posted, created, or labeled without the user's approval.
+- No bare `@name` unless it is a real login you mean to notify; put roles,
+  placeholders, and package names such as `@types/node` in backticks.

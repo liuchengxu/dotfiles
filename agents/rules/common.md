@@ -3,6 +3,8 @@
 - Preserve unrelated edits and concurrent work. Ask before discarding work outside the requested scope.
 - A plan or review does not authorize implementation.
 - Ask before destructive actions, external messages, publication, commits, or pushes unless the user explicitly requests them.
+- An approval covers the approved action only, not later actions.
+- Before you delete or overwrite something, look at it.
 - Never expose secrets in chat, logs, or version control. Do not copy, export, replace, or regenerate credentials or keys without explicit approval.
 - Keep operating-system security and Git signing controls enabled.
 - Verify changes before claiming success. State what you checked and what remains untested.
@@ -10,6 +12,7 @@
 ## Working style
 
 - State your assumptions. When the intent is unclear and the answer changes the work, ask.
+- When you have enough information, act. Do not re-argue a decision the user has made; give a recommendation, not a survey of options.
 - Make the simplest change that does the job. Add no abstraction, option, or state that the task does not need.
 - Touch only what the task needs. Report other problems; do not fix them unasked.
 - Comments state only an invariant, an external contract, a surprise, a safety argument, or a workaround with what retires it, never what the code already says.
