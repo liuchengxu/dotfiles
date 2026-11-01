@@ -31,3 +31,6 @@ obj
 
 .claude/settings.local.json
 .cocoindex_code
+
+# Agent task worktrees; .agents/skills stays visible.
+.agents/worktrees/
