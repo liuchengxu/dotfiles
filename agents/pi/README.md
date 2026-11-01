@@ -1,6 +1,6 @@
 # Personal Pi workflow
 
-Pi reuses `../agents/skills/` and the three policy files in `../ai-rules/`.
+Pi reuses `../skills/` and the three policy files in `../ai-rules/`.
 `extensions/shared-working-rules.ts` loads policy for each run. `AGENTS.md` owns
 Pi-specific defaults and resolves historical review-provider conflicts for Pi
 only. It does not change Claude's review route.
@@ -21,7 +21,7 @@ the existing `mcp-remote` endpoint, keeps Slack and Atlassian, sets GPT-6.1 Sol
 as the startup model, and preserves the user-requested 544k context override.
 That override is not proof of backend acceptance above 272k.
 
-Run `node --test ~/.dotfiles/pi/tests/migration.test.mjs` for local resource and
+Run `node --test ~/.dotfiles/agents/pi/tests/migration.test.mjs` for local resource and
 renderer checks against the installed Pi SDK. `PI_PACKAGE_ROOT` can select a
 different installation. Tests do not call an LLM or mutate external services.
 The actual bundled CLI also passed an RPC startup/discovery check. Interactive

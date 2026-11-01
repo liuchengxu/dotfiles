@@ -6,7 +6,7 @@ set -e
 
 DOTFILES_DIR="$HOME/.dotfiles"
 CLAUDE_DIR="$HOME/.claude"
-CLAUDE_DOTFILES="$DOTFILES_DIR/claude"
+CLAUDE_DOTFILES="$DOTFILES_DIR/agents/claude"
 # Skills are shared by Claude Code and Codex, so they live outside claude/.
 AGENTS_DIR="$HOME/.agents"
 AGENTS_DOTFILES="$DOTFILES_DIR/agents"
@@ -106,14 +106,14 @@ cd "$DOTFILES_DIR"
 
 if [ -d .git ]; then
     # Check if there are changes
-    if ! git diff --quiet claude/ agents/ 2>/dev/null || ! git diff --cached --quiet claude/ agents/ 2>/dev/null; then
+    if ! git diff --quiet agents/ 2>/dev/null || ! git diff --cached --quiet agents/ 2>/dev/null; then
         echo -e "${YELLOW}Changes detected in Claude config${NC}"
-        git status --short claude/ agents/
+        git status --short agents/
 
         read -p "Commit and push changes? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            git add claude/ agents/
+            git add agents/
 
             # Generate commit message
             COMMIT_MSG="chore: update Claude Code configuration
@@ -139,9 +139,9 @@ fi
 
 echo -e "\n${GREEN}=== Sync complete! ===${NC}"
 echo -e "\nSymlinks created:"
-echo -e "  ~/.claude/CLAUDE.md -> ~/.dotfiles/claude/CLAUDE.md"
-echo -e "  ~/.claude/settings.json -> ~/.dotfiles/claude/settings.json"
-echo -e "  ~/.claude/commands -> ~/.dotfiles/claude/commands"
-echo -e "  ~/.claude/hooks/scripts -> ~/.dotfiles/claude/hooks/scripts"
+echo -e "  ~/.claude/CLAUDE.md -> ~/.dotfiles/agents/claude/CLAUDE.md"
+echo -e "  ~/.claude/settings.json -> ~/.dotfiles/agents/claude/settings.json"
+echo -e "  ~/.claude/commands -> ~/.dotfiles/agents/claude/commands"
+echo -e "  ~/.claude/hooks/scripts -> ~/.dotfiles/agents/claude/hooks/scripts"
 echo -e "  ~/.claude/skills -> ~/.dotfiles/agents/skills"
 echo -e "  ~/.agents/skills -> ~/.dotfiles/agents/skills"

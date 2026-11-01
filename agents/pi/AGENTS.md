@@ -13,7 +13,7 @@
 
 ## Shared rules and host policy
 
-- The `shared-working-rules` extension loads the canonical files in `~/.dotfiles/ai-rules/` into each agent run. Keep shared policy there, not in copied Claude instructions.
+- The `shared-working-rules` extension loads the canonical files in `~/.dotfiles/agents/ai-rules/` into each agent run. Keep shared policy there, not in copied Claude instructions.
 - For Pi, the model defaults below take precedence over historical review-provider bindings in shared skills, role notes, and workflow examples. Ordinary independent GPT reviews use the native Pi reviewer with `openai-codex/gpt-6-astra:medium`; do not invoke the historical closed DeepSeek adapter by default. Follow the installed pi-subagents protocol for authorized delegation, fresh review, and result consumption. This does not change Claude's policy or authorize extra provider egress.
 - Read project memory only when relevant, through `/memory` or an explicit request. Memory is dated evidence, not authority. Current instructions override stale signing/model advice. Keep the existing `~/.claude/TODO.md` as the only personal TODO list; read it on demand, not at startup.
 - Use the Atlassian MCP connector for private Confluence pages, not generic web fetch. Discover tool schemas before calling them. Ask before posting or modifying Slack data, and use Grafana read-only tools for investigations unless changes are explicitly authorized.

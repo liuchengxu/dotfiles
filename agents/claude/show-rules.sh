@@ -3,8 +3,8 @@
 # document. Review-only: writes nothing, and the sources stay the single copy
 # that Codex's AGENTS.md is also built from.
 #
-#   claude/show-rules.sh | less -R
-#   claude/show-rules.sh > /tmp/rules.md
+#   agents/claude/show-rules.sh | less -R
+#   agents/claude/show-rules.sh > /tmp/rules.md
 set -euo pipefail
 
 expand() {
@@ -19,7 +19,7 @@ expand() {
   done
 }
 
-src="${1:-${DOTFILES_HOME:-$HOME/.dotfiles}/claude/CLAUDE.md}"
+src="${1:-${DOTFILES_HOME:-$HOME/.dotfiles}/agents/claude/CLAUDE.md}"
 
 # Imports are printed where the @ line sits, which is how the rules were
 # authored. At runtime they arrive differently: the whole parent file first,

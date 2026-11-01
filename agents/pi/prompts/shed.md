@@ -8,7 +8,7 @@ Open the requested Markdown file or folder in Shed Preview, or repository change
 Use the existing shared helper with the Bash tool:
 
 ```bash
-python3 ~/.dotfiles/claude/scripts/shed-open.py <arguments>
+python3 ~/.dotfiles/agents/claude/scripts/shed-open.py <arguments>
 ```
 
 Pass the user's arguments as literal command-line arguments, quoting paths safely. Do not interpret argument text as shell code. For Preview, a Markdown file or folder is required. For Changes, use `--diff`; the repository defaults to the current directory. Optional `--base <ref>` selects the comparison base. Optional `--scope committed|with-uncommitted|uncommitted` selects the changes; the default includes uncommitted work. The helper resolves the default base from `origin/HEAD`, then `origin/main`, `origin/master`, `main`, or `master`.

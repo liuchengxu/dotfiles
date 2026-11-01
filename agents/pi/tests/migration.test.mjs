@@ -50,7 +50,7 @@ test("canonical shared rules enter real prompt sections once without loading mem
   assert.deepEqual(event.systemPromptOptions.skills.map((skill) => skill.name), ["code-layout"]);
   const text = system.buildSystemPrompt(event.systemPromptOptions);
   for (const name of ["global-working-rules.md", "operational-evidence.md", "git-signing.md"]) {
-    const path = join(homedir(), ".dotfiles/ai-rules", name);
+    const path = join(homedir(), ".dotfiles/agents/ai-rules", name);
     assert(text.includes(readFileSync(path, "utf8")));
   }
   assert(text.includes("Project constraints"));

@@ -5,7 +5,7 @@ This directory contains Claude Code settings and customizations that should be s
 ## Directory Structure
 
 ```
-~/.dotfiles/claude/
+~/.dotfiles/agents/claude/
 ├── README.md           # This file
 ├── settings.json       # Permissions, hooks config, env vars, plugins
 ├── CLAUDE.md           # Global instructions for all projects
@@ -31,7 +31,7 @@ silently redirect the second.
 ## Reading the rules
 
 The model-agnostic rules also live outside this directory, in
-`~/.dotfiles/ai-rules/`. `CLAUDE.md` pulls them in with `@` imports;
+`~/.dotfiles/agents/ai-rules/`. `CLAUDE.md` pulls them in with `@` imports;
 `codex/build-agents.sh` concatenates the same files into `~/.codex/AGENTS.md`.
 One copy, two readers.
 
@@ -39,7 +39,7 @@ That makes `CLAUDE.md` short to maintain but unreadable end to end, so
 `show-rules.sh` prints the assembled document:
 
 ```bash
-claude/show-rules.sh | less -R    # everything Claude loads, in order
+agents/claude/show-rules.sh | less -R    # everything Claude loads, in order
 ```
 
 Each import is announced by an HTML comment naming its source file, so anything
@@ -55,12 +55,12 @@ After cloning your dotfiles repository, create symlinks from `~/.claude/` to thi
 mkdir -p ~/.claude
 
 # Create symlinks for config files
-ln -sf ~/.dotfiles/claude/settings.json ~/.claude/settings.json
-ln -sf ~/.dotfiles/claude/CLAUDE.md ~/.claude/CLAUDE.md
-ln -sf ~/.dotfiles/claude/statusline.sh ~/.claude/statusline.sh
+ln -sf ~/.dotfiles/agents/claude/settings.json ~/.claude/settings.json
+ln -sf ~/.dotfiles/agents/claude/CLAUDE.md ~/.claude/CLAUDE.md
+ln -sf ~/.dotfiles/agents/claude/statusline.sh ~/.claude/statusline.sh
 
 # Create symlinks for directories
-ln -sf ~/.dotfiles/claude/commands ~/.claude/commands
+ln -sf ~/.dotfiles/agents/claude/commands ~/.claude/commands
 
 # Skills are shared with Codex — link both agents at the same canonical copy
 mkdir -p ~/.agents
@@ -69,15 +69,15 @@ ln -sfn ~/.dotfiles/agents/skills ~/.agents/skills
 
 # For hooks, symlink the scripts subdirectory
 mkdir -p ~/.claude/hooks
-ln -sf ~/.dotfiles/claude/hooks/scripts ~/.claude/hooks/scripts
+ln -sf ~/.dotfiles/agents/claude/hooks/scripts ~/.claude/hooks/scripts
 ```
 
 Or use a one-liner:
 
 ```bash
 mkdir -p ~/.claude ~/.claude/hooks ~/.agents && \
-ln -sf ~/.dotfiles/claude/{settings.json,CLAUDE.md,statusline.sh,commands} ~/.claude/ && \
-ln -sf ~/.dotfiles/claude/hooks/scripts ~/.claude/hooks/scripts && \
+ln -sf ~/.dotfiles/agents/claude/{settings.json,CLAUDE.md,statusline.sh,commands} ~/.claude/ && \
+ln -sf ~/.dotfiles/agents/claude/hooks/scripts ~/.claude/hooks/scripts && \
 ln -sfn ~/.dotfiles/agents/skills ~/.claude/skills && \
 ln -sfn ~/.dotfiles/agents/skills ~/.agents/skills
 ```
@@ -96,7 +96,7 @@ it.
 | `statusline.sh` | Custom status line display |
 | `commands/` | Custom slash commands |
 | `hooks/scripts/` | Hook scripts for automation |
-| `../agents/skills/` | Custom skills, shared with Codex |
+| `../skills/` | Custom skills, shared with Codex |
 
 ## What NOT to Sync (machine-specific)
 
@@ -129,4 +129,4 @@ Check that symlinks are correctly configured:
 ls -la ~/.claude/ | grep -E '^l'
 ```
 
-Expected output should show symlinks pointing to `~/.dotfiles/claude/`.
+Expected output should show symlinks pointing to `~/.dotfiles/agents/claude/`.
