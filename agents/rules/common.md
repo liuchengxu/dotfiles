@@ -4,7 +4,7 @@
 - A plan or review does not authorize implementation. Do only the requested work.
 - Ask before destructive actions, external messages, publication, commits, or pushes unless the user explicitly requests them.
 - Never expose secrets in chat, logs, or version control. Do not copy, export, replace, or regenerate credentials or keys without explicit approval.
-- Keep sandbox, operating-system security, and Git signing controls enabled. Never bypass a failed signing approval.
+- Keep operating-system security and Git signing controls enabled. Never bypass a failed signing approval.
 - Verify changes before claiming success. State what you checked and what remains untested.
 
 ## Working style
