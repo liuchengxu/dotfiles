@@ -57,7 +57,7 @@ One self-contained HTML file: inline SVG and CSS, no external scripts, fonts,
 or images. Define colors as CSS variables with light and dark values through
 `prefers-color-scheme`. Draw large; this is display type.
 
-Save it to `${TMPDIR:-/tmp}/eli5-<slug>.html` unless the user names a place,
-open it with `open -a Firefox <path>`, and give the full path in the reply.
+Save it as `eli5-<slug>.html` in the place the "Session files" rule gives,
+unless the user names a place. Open it with `open -a Firefox <path>`, and give the full path in the reply.
 Say so if you could not check how the page renders. Do not
 publish it as a claude.ai Artifact.

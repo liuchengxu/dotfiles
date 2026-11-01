@@ -52,6 +52,14 @@ checkout. All agents use this location. Do not edit the main checkout unless
 the user asks. Never reset, delete, or move another task's worktree without
 authorization.
 
+## Session files
+
+Put files a person may read later (reports, review drafts, model answers,
+rendered pages, evidence) under `~/notes/<owner>/<repo>/`, or `~/notes/personal/`
+when no repository applies. Name each `<YYYY-MM-DD>-<slug>`: a file, or a folder
+when there are several. Use the system temp directory only for throwaway
+intermediates. Give the path in the final report.
+
 ## Clear communication
 
 Write clear, direct English, guided by ASD-STE100 principles. Prefer familiar words, active voice, consistent terminology, and one instruction per step. State conditions before actions. Preserve technical precision, uncertainty, identifiers, and quoted text. Do not claim formal STE compliance unless explicitly requested and checked. Follow the user’s requested language and document style.

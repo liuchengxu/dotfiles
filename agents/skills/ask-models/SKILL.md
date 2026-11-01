@@ -27,6 +27,9 @@ the id was not recognized, say so; never substitute another model.
 
 ## Prepare
 
+- Make one session folder by the "Session files" rule for the prompt, the
+  answers, and the logs. The copies of the material are throwaway; they may go
+  in the temp directory.
 - Give each model its own disposable copy of the material: a fresh clone or a
   copied folder, never the working checkout. Reviewers get full tools, so they
   can build, run tests, and read dependencies; a copy keeps their edits and
@@ -45,7 +48,7 @@ up the others:
 
 ```bash
 cd <copy> && pi -p --no-session --model <provider>/<id> \
-  "$(cat <prompt.md>)" < /dev/null > <name>.md 2> <name>.log
+  "$(cat <folder>/prompt.md)" < /dev/null > <folder>/<name>.md 2> <folder>/<name>.log
 ```
 
 For a Claude model:
@@ -53,7 +56,7 @@ For a Claude model:
 ```bash
 cd <copy> && claude -p --no-session-persistence --model <alias> \
   --allowedTools "Read Grep Glob Bash WebFetch WebSearch" \
-  < <prompt.md> > <name>.md 2> <name>.log
+  < <folder>/prompt.md > <folder>/<name>.md 2> <folder>/<name>.log
 ```
 
 `--allowedTools` takes a list, so the prompt goes on stdin; as an argument
