@@ -602,7 +602,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 				// Collapsed: label line, then the first command line on its own row
 				// so long commands stay readable instead of truncating into the label.
 				return [
-					theme.fg("toolTitle", theme.bold(description.replace(/\s+/g, " ").trim())),
+					theme.fg("toolTitle", description.replace(/\s+/g, " ").trim()),
 					...(!detailsCollapsed ? [theme.fg("accent", `  ⎿ $ ${command.split(/\r?\n/).find(line => line.trim())?.trim() ?? ""}`)] : []),
 				...(manualHint ? [theme.fg("dim", "  Ctrl+B to run in background")] : []),
 				].map(line => truncateToWidth(line, width));
@@ -1009,14 +1009,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 					if (width <= 0) return [];
 					// Collapsed: label line, then detail on its own row — long tool
 				// names and arguments must not truncate into the label.
-					const header = headerLabel();
-					const hasStats = ((toolName === "edit" || toolName === "write") && typeof context.state?.editLineSummary === "string")
-						|| (toolName === "codemode" && context.toolCallId && nestedEdits.has(context.toolCallId));
-					const statsStart = hasStats ? header.lastIndexOf(" (") : -1;
-					const title = statsStart >= 0
-						? theme.bold(header.slice(0, statsStart)) + header.slice(statsStart)
-						: theme.bold(header);
-					const lines = [theme.fg("toolTitle", title)];
+					const lines = [theme.fg("toolTitle", headerLabel())];
 					if (detail) lines.push(theme.fg("accent", "  ⎿ " + (detail.split(/\r?\n/).find(line => line.trim()) ?? "").trim()));
 					return lines.map(line => truncateToWidth(line, width));
 				},
