@@ -20,11 +20,13 @@ function session() {
   const handlers = new Map();
   const tools = new Map();
   const sent = [];
+  const renderers = [];
   extension({
     on(event, handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]); },
     registerTool(tool) { tools.set(tool.name, tool); },
     sendMessage(message, options) { sent.push({ message, options }); },
-    registerCommand() {}, registerMessageRenderer() {}, registerShortcut() {}, registerToolRenderer() {},
+    registerCommand() {}, registerMessageRenderer() {}, registerShortcut() {},
+    registerToolRenderer(factory) { renderers.push(factory); },
   });
   const emit = (event, payload) => {
     let result;
@@ -37,6 +39,7 @@ function session() {
   };
   return {
     sent,
+    renderer(toolName) { return renderers[0](toolName, () => undefined); },
     start() { emit("agent_start", { type: "agent_start" }); },
     async background(command) {
       const text = await call("bash", { command, description: `Run ${command}`, run_in_background: true });
@@ -147,5 +150,24 @@ test("notices left for agent_settled wake the agent once for the whole batch", a
     s.settled();
     assert.deepEqual(s.sent.map((sent) => sent.message.details.state), ["failed", "failed"]);
     assert.deepEqual(s.sent.map((sent) => sent.options.triggerTurn), [false, true]);
+  } finally { s.shutdown(); }
+});
+
+test("expanding a collapsed tool row does not hand our component to the built-in renderer", () => {
+  const s = session();
+  try {
+    const renderer = s.renderer("edit");
+    const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text };
+    const args = { path: "src/lib.rs", edits: [{ oldText: "a", newText: "b" }] };
+    const result = { content: [{ type: "text", text: "Found 2 occurrences of edits[0] in src/lib.rs. Each oldText must be unique." }], details: {} };
+    const context = (expanded, lastComponent) => ({
+      args, toolCallId: "e1", invalidate() {}, lastComponent, state: {}, cwd: tmpdir(), executionStarted: true, argsComplete: true,
+      isPartial: false, expanded, showImages: false, isError: true, outputPad: 1,
+    });
+    const collapsed = renderer.renderResult(result, { expanded: false, isPartial: false }, theme, context(false));
+    const expanded = renderer.renderResult(result, { expanded: true, isPartial: false }, theme, context(true, collapsed));
+    assert.match(expanded.render(120).join("\n"), /Each oldText must be unique/);
+    const call = renderer.renderCall(args, theme, context(false));
+    assert.doesNotThrow(() => renderer.renderCall(args, theme, context(true, call)).render(120));
   } finally { s.shutdown(); }
 });

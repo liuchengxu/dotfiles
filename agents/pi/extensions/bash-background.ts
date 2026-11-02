@@ -661,6 +661,14 @@ export default function bashBackground(pi: ExtensionAPI) {
 		return [definition.name, definition];
 	}));
 
+	/** Pi passes a renderer the component it returned last, and the built-in
+	 * renderers reuse it (`lastComponent ?? new Container()`, then `clear()`).
+	 * After a collapsed render that component is one of ours, which has no
+	 * such methods, so a delegate gets none and builds its own. */
+	function forDelegate<T extends { lastComponent?: unknown }>(context: T): T {
+		return { ...context, lastComponent: undefined };
+	}
+
 	function renderBashCall(
 		args: { command?: unknown; description?: unknown },
 		theme: { fg: (token: string, text: string) => string; bold: (text: string) => string },
@@ -996,7 +1004,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 				const hintRequested = call?.state === "foreground" && call.hintRequested;
 				return operationHeader(renderBashCall(input, theme, context.expanded, context.cwd, context.state?.detailsCollapsed === true && !context.isPartial, hintRequested), theme, context);
 			}
-			if (context.expanded) return (next() ?? builtInRenderers[toolName])?.renderCall?.(args, theme, context) ?? new Text(`${toolName}\n${JSON.stringify(args, null, 2)}`, 0, 0);
+			if (context.expanded) return (next() ?? builtInRenderers[toolName])?.renderCall?.(args, theme, forDelegate(context)) ?? new Text(`${toolName}\n${JSON.stringify(args, null, 2)}`, 0, 0);
 			const input = args as Record<string, unknown>;
 			const value = (key: string) => typeof input[key] === "string" ? input[key] as string : "";
 			const labels: Record<string, string> = {
@@ -1244,7 +1252,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 				}
 				return new Container();
 			}
-			return (next() ?? builtInRenderers[toolName])?.renderResult?.(result, options, theme, context) ?? new Text(result.content.filter(block => block.type === "text").map(block => block.text).join("\n"), 0, 0);
+			return (next() ?? builtInRenderers[toolName])?.renderResult?.(result, options, theme, forDelegate(context)) ?? new Text(result.content.filter(block => block.type === "text").map(block => block.text).join("\n"), 0, 0);
 		},
 	}));
 
