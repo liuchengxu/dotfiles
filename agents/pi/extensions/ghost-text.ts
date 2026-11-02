@@ -3,7 +3,6 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { editorFactoryContains } from "./input-prompt.ts";
 import {
 	matchesKey,
 	truncateToWidth,
@@ -360,7 +359,7 @@ export default function ghostText(pi: ExtensionAPI): void {
 				ctx.ui.notify(`Ghost suggestions: ${state.enabled ? modelIdentity(state.model) : "off (use /ghost on [provider/model])"} · ${state.requestCount} requests${state.incompleteRequests ? ` (${state.incompleteRequests} usage incomplete)` : ""} · ${state.inputTokens} known input tokens · ${state.outputTokens} known output tokens · $${state.cost.toFixed(4)} known cost. Pi main totals omit ghost requests.`, "info");
 				return;
 			}
-			if (ctx.mode !== "tui" || !installedFactory || !editorFactoryContains(ctx.ui.getEditorComponent(), installedFactory)) {
+			if (ctx.mode !== "tui" || !installedFactory || ctx.ui.getEditorComponent() !== installedFactory) {
 				ctx.ui.notify("Ghost suggestions require the Pi TUI editor and no competing custom editor.", "error");
 				return;
 			}
@@ -392,7 +391,7 @@ export default function ghostText(pi: ExtensionAPI): void {
 		rebuildUsageTotals(state, ctx.sessionManager.getBranch());
 		if (ctx.mode !== "tui") return;
 		const currentFactory = ctx.ui.getEditorComponent();
-		if (currentFactory && !editorFactoryContains(currentFactory, installedFactory)) {
+		if (currentFactory && currentFactory !== installedFactory) {
 			ctx.ui.notify("Ghost suggestions disabled: another custom editor is active.", "warning");
 			state.enabled = false;
 			return;

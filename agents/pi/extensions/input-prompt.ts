@@ -1,58 +1,46 @@
-import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { EditorComponent } from "@earendil-works/pi-tui";
+import { CustomEditor, InteractiveMode } from "@earendil-works/pi-coding-agent";
 
-type EditorFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
-type DecoratedFactory = EditorFactory & { [wrappedFactory]?: EditorFactory };
-const wrappedFactory = Symbol.for("pi.input-prompt.wrapped-factory");
+const patchKey = Symbol.for("pi.input-prompt.v2");
+const marker = ">";
+const padding = 2;
 
-/** Cooperating decorators can retain ownership of their underlying editor. */
-export function editorFactoryContains(factory: EditorFactory | undefined, target: EditorFactory | undefined): boolean {
-	const seen = new Set<EditorFactory>();
-	for (let current = factory; current && !seen.has(current); current = (current as DecoratedFactory)[wrappedFactory]) {
-		if (current === target) return true;
-		seen.add(current);
-	}
-	return false;
+type PromptEditor = {
+	render(width: number): string[];
+	getPaddingX?: () => number;
+	setPaddingX?: (value: number) => void;
+	borderColor?: (text: string) => string;
+};
+type Mode = { editor?: PromptEditor; setCustomEditorComponent?: (factory: unknown) => void };
+
+function withMarker(render: PromptEditor["render"]): PromptEditor["render"] {
+	return function (this: PromptEditor, width: number): string[] {
+		if ((this.getPaddingX?.() ?? 0) < padding) this.setPaddingX?.(padding);
+		const lines = render.call(this, width);
+		if (width >= 5 && lines[1]?.startsWith(" ".repeat(padding))) {
+			lines[1] = (this.borderColor?.(marker) ?? marker) + lines[1].slice(1);
+		}
+		return lines;
+	};
 }
 
-/** Display `❯` beside live input without replacing the active editor. */
-export function withInputPrompt<T extends EditorComponent>(editor: T, padding = 2): T {
-	const render = editor.render.bind(editor);
-	const setPaddingX = editor.setPaddingX?.bind(editor);
-	const borderColor = editor.borderColor?.bind(editor);
-	return new Proxy(editor, {
-		get(target, property) {
-			if (property === "render") return (width: number) => {
-				setPaddingX?.(Math.max(padding, (target as T & { getPaddingX?: () => number }).getPaddingX?.() ?? 0));
-				const lines = render(width);
-				if (width >= 5 && lines[1]?.startsWith(" ".repeat(padding))) {
-					lines[1] = (borderColor?.("❯") ?? "❯") + lines[1].slice(1);
-				}
-				return lines;
-			};
-			if (property === "setPaddingX") return (value: number) => setPaddingX?.(Math.max(padding, value));
-			const value = Reflect.get(target, property, target);
-			return typeof value === "function" ? value.bind(target) : value;
-		},
-		set(target, property, value) {
-			return Reflect.set(target, property, value, target);
-		},
-	});
-}
-
-export default function inputPrompt(pi: ExtensionAPI): void {
-	pi.on("session_start", (_event, ctx) => {
-		if (ctx.mode !== "tui") return;
-		const previous = ctx.ui.getEditorComponent();
-		const installed: NonNullable<typeof previous> = (tui, theme, keybindings) =>
-			withInputPrompt(previous?.(tui, theme, keybindings) ?? new CustomEditor(tui, theme, keybindings));
-		(installed as DecoratedFactory)[wrappedFactory] = previous;
-		ctx.ui.setEditorComponent(installed);
-		pi.on("session_shutdown", (_event, shutdownCtx) => {
-			if (shutdownCtx.mode === "tui" && shutdownCtx.ui.getEditorComponent() === installed) {
-				// Factories from the old runtime are stale after session replacement.
-				shutdownCtx.ui.setEditorComponent(undefined);
-			}
-		});
-	});
+/**
+ * Display `>` beside live input. The prototype patch covers pi's editor and every subclass of pi's
+ * `CustomEditor`, including one a package installs later. pi-prompt-suggester extends the `CustomEditor` of
+ * its own bundled pi copy instead, so editors pi installs from another class are marked one by one.
+ */
+export default function inputPrompt(): void {
+	const prototype = CustomEditor.prototype as unknown as PromptEditor & { [patchKey]?: true };
+	if (prototype[patchKey]) return;
+	prototype[patchKey] = true;
+	prototype.render = withMarker(prototype.render);
+	const mode = InteractiveMode.prototype as unknown as Mode;
+	const setCustomEditorComponent = mode.setCustomEditorComponent;
+	if (typeof setCustomEditorComponent !== "function") return;
+	mode.setCustomEditorComponent = function (this: Mode, factory: unknown) {
+		setCustomEditorComponent.call(this, factory);
+		const editor = this.editor;
+		if (editor && !(editor instanceof CustomEditor) && typeof editor.render === "function") {
+			editor.render = withMarker(editor.render);
+		}
+	};
 }
