@@ -19,12 +19,13 @@
  *
  * Settle audit: each todo result's `details.tasks` is the whole board. The
  * gate records what happened after the last todo mutation — tool work, the
- * last check command and whether it passed, and user messages that arrived
- * mid-run — and at `agent_before_settle` asks for one continuation when the
- * board no longer matches: a passed check with a task still in_progress, a
- * failed check without a recorded blocker, work with no task in_progress,
- * more than one in_progress task, or a mid-run scope change. It never edits
- * the list itself, so an exit code cannot complete a task. One continuation
+ * last check command and whether it passed — and at `agent_before_settle`
+ * asks for one continuation when the board no longer matches: a passed check
+ * with a task still in_progress, a failed check without a recorded blocker,
+ * work with no task in_progress, or more than one in_progress task. A user
+ * message sent mid-run is not a reason: the model already sees it, and the
+ * extra turn repeated the final answer. It never edits the list itself, so
+ * an exit code cannot complete a task. One continuation
  * per user input is the loop guard; any error fails open. Limits: a check is
  * recognized by its command name, so `echo cargo test` or `pytest || true`
  * counts as a passed check; only the last check counts; and a check moved to
@@ -102,7 +103,6 @@ export function replayBoard(branch: readonly unknown[]): Task[] {
 interface SinceUpdate {
 	work: boolean;
 	check?: { passed: boolean; label: string };
-	steered: boolean;
 }
 
 /** Why the board is stale, or empty when it matches the recorded events. */
@@ -119,7 +119,6 @@ export function staleReasons(board: readonly Task[], since: SinceUpdate): string
 		reasons.push(`"${since.check.label}" failed after the last todo update. Keep the task in_progress and record the blocker in its description; do not mark it completed.`);
 	}
 	if (since.work && running.length === 0) reasons.push("Work ran after the last todo update, but no task is in_progress.");
-	if (since.steered) reasons.push("The user sent a message during the run. Update task subjects, descriptions, or dependencies if the scope changed.");
 	return reasons;
 }
 
@@ -139,14 +138,14 @@ export default function todoGate(pi: ExtensionAPI) {
 	 * all-completed update cannot be nagged twice. */
 	let clearDemanded = false;
 	let board: Task[] = [];
-	let since: SinceUpdate = { work: false, steered: false };
+	let since: SinceUpdate = { work: false };
 	/** Set once the settle audit continued the run for this user input. */
 	let audited = false;
 
 	// Replay the board on resume and branch navigation, so the audit sees the
 	// board the todo tool shows before the next todo call.
 	const replay = (ctx: { sessionManager: { getBranch(): unknown[] } }) => {
-		since = { work: false, steered: false };
+		since = { work: false };
 		audited = false;
 		try {
 			board = replayBoard(ctx.sessionManager.getBranch());
@@ -157,11 +156,10 @@ export default function todoGate(pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => replay(ctx));
 	pi.on("session_tree", (_event, ctx) => replay(ctx));
 
-	pi.on("input", (event) => {
+	pi.on("input", () => {
 		// Queued follow-ups continue the run without before_agent_start, so
 		// any user input re-arms the audit. Only the user can re-arm it.
 		audited = false;
-		if (event.streamingBehavior) since.steered = true;
 	});
 
 	pi.on("agent_before_settle", (event) => {
@@ -241,7 +239,7 @@ export default function todoGate(pi: ExtensionAPI) {
 				// The todo tool reports a rejected call, such as `#9 not found`,
 				// as `details.error` without isError; it changed nothing.
 				if (next && details?.error === undefined && ["create", "update", "delete", "clear"].includes(String(event.input?.action))) {
-					since = { work: false, steered: false };
+					since = { work: false };
 				}
 			} else {
 				since.work = true;

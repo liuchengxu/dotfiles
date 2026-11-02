@@ -70,7 +70,7 @@ test("a failed check asks for the blocker and never for completion", () => {
   assert.doesNotMatch(message(result), /Mark it completed/);
 });
 
-test("a recorded blocker and an updated scope settle normally", () => {
+test("a recorded blocker and a mid-run message settle normally", () => {
   const g = gate().start();
   g.create("fix bug");
   g.update(1, { status: "in_progress" });
@@ -82,10 +82,7 @@ test("a recorded blocker and an updated scope settle normally", () => {
   s.create("fix bug");
   s.update(1, { status: "in_progress" });
   s.steer();
-  assert.match(message(s.settle()), /user sent a message during the run/);
-  s.prompt();
-  s.create("also do Y");
-  assert.equal(s.settle(), undefined);
+  assert.equal(s.settle(), undefined, "a message sent mid-run is not a reason to continue");
 });
 
 test("a current list stops normally", () => {
