@@ -138,9 +138,11 @@ function patchTools(): void {
 
 type CodeState = { fence?: { character: string; length: number; info?: string; open?: string }; indented?: boolean; paragraph?: boolean };
 
-// A small block is reply content — commands the reader is meant to run,
-// short snippets — so it renders as written. Only a dump earns a summary.
-const CODE_SUMMARY_FLOOR = 6;
+// A block up to this size is reply content — commands, configs, snippets the
+// reader is meant to read — so it renders as written. Only a dump earns a
+// summary. In past replies, code and config blocks stayed under 40 non-empty
+// lines; only large diffs and subagent reports went above it.
+const CODE_SUMMARY_FLOOR = 40;
 
 function collapseCode(text: string, state: CodeState): string {
   const lines: string[] = [];
