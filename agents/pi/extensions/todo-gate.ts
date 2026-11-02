@@ -166,7 +166,10 @@ export default function todoGate(pi: ExtensionAPI) {
 
 	pi.on("agent_before_settle", (event) => {
 		try {
-			if (audited || mode === "skipped" || event.outcome !== "completed" || !event.context?.canContinue) return;
+			// Not gated on event.context.canContinue: it previews the context
+			// before this entry, and after a final answer it is false. Pi
+			// checks continuation again after committing it.
+			if (audited || mode === "skipped" || event?.outcome !== "completed") return;
 			const reasons = staleReasons(board, since);
 			if (reasons.length === 0) return;
 			audited = true;

@@ -95,6 +95,29 @@ interface BgTask {
 	stallNotified: boolean;
 	/** bg_kill asked for this task's death: its exit is a kill, not a failure. */
 	killRequested: boolean;
+	/** A bg_status or bg_logs result showed the agent this task's final
+	 * state, so its held completion notification adds nothing. */
+	finalSeen: boolean;
+}
+
+const FINAL_STATES: ReadonlySet<BgState> = new Set(["completed", "failed", "killed"]);
+
+interface NoticeMessage {
+	customType: "bg-task-notification";
+	details: { id: string; label: string; state: BgState; summary: string };
+	content: string;
+	display: true;
+}
+
+/** A notification held during a run; `final` is the task state at send. */
+interface HeldNotice {
+	task: BgTask;
+	message: NoticeMessage;
+	final: boolean;
+}
+
+function exitText(exit: NonNullable<BgTask["exit"]>): string {
+	return String(exit.code ?? `signal ${exit.signal ?? "unknown"}`);
 }
 
 /** One foreground bash call moving through the proxy. */
@@ -174,6 +197,9 @@ export default function bashBackground(pi: ExtensionAPI) {
 	const callContext = new AsyncLocalStorage<ActiveCall>();
 	const local = createLocalBashOperations();
 	let counter = 0;
+	/** Between agent_start and agent_settled, notifications are held. */
+	let agentRunning = false;
+	const held: HeldNotice[] = [];
 	/** One redraw per running bash call, keyed by toolCallId: every partial
 	 * render replaces its entry, so the ticker cannot multiply them. */
 	const redrawHints = new Map<string, () => void>();
@@ -197,6 +223,8 @@ export default function bashBackground(pi: ExtensionAPI) {
 		redrawHints.clear();
 		stopTerminalInput?.();
 		stopTerminalInput = undefined;
+		held.length = 0;
+		agentRunning = false;
 	});
 
 	function nextTaskId(): string {
@@ -218,29 +246,79 @@ export default function bashBackground(pi: ExtensionAPI) {
 			`<id>${task.id}</id>`,
 			`<command>${task.command}</command>`,
 			`<status>${task.state}</status>`,
-			task.exit
-				? `<exit>${task.exit.code ?? `signal ${task.exit.signal ?? "unknown"}`}</exit>`
-				: "",
+			task.exit ? `<exit>${exitText(task.exit)}</exit>` : "",
 			`<duration>${duration}s</duration>`,
 			`<log>${task.logPath}</log>`,
 			`<summary>${summary}</summary>`,
 			`</bg-task-notification>`,
 		];
 		if (lastOutput !== undefined) parts.push(`Last output:\n${lastOutput.trimEnd()}`);
+		const message: NoticeMessage = {
+			customType: "bg-task-notification",
+			details: { id: task.id, label: task.description ?? "Background command", state: task.state, summary },
+			content: parts.filter(Boolean).join("\n"),
+			display: true,
+		};
+		// A follow-up queued during a run cannot be withdrawn, and pi drains
+		// each one as its own turn after the final answer. Hold it instead and
+		// decide at settle whether the agent still needs it.
+		if (agentRunning) held.push({ task, message, final: FINAL_STATES.has(task.state) });
+		else deliver(message, true);
+	}
+
+	function deliver(message: NoticeMessage, wake: boolean): void {
 		try {
-			pi.sendMessage(
-				{
-					customType: "bg-task-notification",
-					details: { id: task.id, label: task.description ?? "Background command", state: task.state, summary },
-					content: parts.filter(Boolean).join("\n"),
-					display: true,
-				},
-				{ triggerTurn: true, deliverAs: "followUp" },
-			);
+			pi.sendMessage(message, wake ? { triggerTurn: true, deliverAs: "followUp" } : { triggerTurn: false });
 		} catch {
 			// The session was replaced, reloaded or shut down: there is no
 			// one left to notify, and a throw here would kill the process.
 		}
+	}
+
+	/** Held notices the agent still needs. A completion it already read
+	 * through bg_status or bg_logs is dropped; stall warnings and watch
+	 * matches are never final, so they always get through. */
+	function takeHeld(): HeldNotice[] {
+		return held.splice(0).filter((notice) => !(notice.final && notice.task.finalSeen));
+	}
+
+	pi.on("agent_start", () => {
+		agentRunning = true;
+	});
+	pi.on("agent_before_settle", (event) => {
+		try {
+			const due = takeHeld();
+			if (due.length === 0) return;
+			// Not gated on event.context.canContinue: it previews the context
+			// before these entries, and after a final answer it is false. Pi
+			// checks continuation again after committing them.
+			if (event.outcome !== "completed") {
+				held.unshift(...due);
+				return;
+			}
+			return {
+				// Pi replaces the proposed entries with each handler's result.
+				entries: [...(event.entries ?? []), ...due.map((notice) => ({ type: "custom_message" as const, ...notice.message }))],
+				continue: true,
+			};
+		} catch {
+			return;
+		}
+	});
+	pi.on("agent_settled", (event) => {
+		agentRunning = false;
+		// One wake for the batch: each woken message would start its own
+		// run. An aborted run means the user stopped the agent: record what
+		// happened without starting a turn.
+		const due = takeHeld();
+		due.forEach((notice, index) => deliver(notice.message, !event.aborted && index === due.length - 1));
+	});
+
+	/** Pi gives a call made by another tool (a codemode script) the id
+	 * `<parent id>/<n>`, and only the script's output reaches the model, so
+	 * such a result is no evidence that the agent saw anything. */
+	function reachesModel(toolCallId: string): boolean {
+		return !toolCallId.includes("/");
 	}
 
 	function watchStall(task: BgTask): void {
@@ -307,6 +385,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			processAlive: true,
 			stallNotified: false,
 			killRequested: false,
+			finalSeen: false,
 		};
 		tasks.set(id, task);
 		const tee = (chunk: Buffer): void => {
@@ -539,6 +618,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			processAlive: true,
 			stallNotified: false,
 			killRequested: false,
+			finalSeen: false,
 		};
 		tasks.set(id, task);
 		call.task = task;
@@ -1393,18 +1473,19 @@ export default function bashBackground(pi: ExtensionAPI) {
 		name: "bg_status",
 		label: "Background task status",
 		description:
-			"List the background bash tasks of this session: id, state, command, duration, log size. Use this to see how many shells are running.",
+			"List the background bash tasks of this session: id, state, exit code once finished, command, duration, log size. Use this to see how many shells are running.",
 		parameters: {
 			type: "object",
 			properties: {},
 			additionalProperties: false,
 		} as const,
-		async execute() {
+		async execute(toolCallId) {
 			const rows = [...tasks.values()].map((task) => {
 				const duration = Math.round((Date.now() - task.startedAt) / 1000);
 				const label = task.description ?? task.command.slice(0, 60);
+				if (FINAL_STATES.has(task.state) && reachesModel(toolCallId)) task.finalSeen = true;
 				return [
-					`${task.id}  ${task.state.padEnd(9)} ${String(duration).padStart(5)}s  ${task.bytes}B`,
+					`${task.id}  ${task.state.padEnd(9)} ${String(duration).padStart(5)}s  ${task.bytes}B${task.exit ? `  exit ${exitText(task.exit)}` : ""}`,
 					`  \u23BF ${label}`,
 					`      ${task.command.slice(0, 70)}`,
 				].join("\n");
@@ -1424,7 +1505,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 		name: "bg_logs",
 		label: "Background task logs",
 		description:
-			"Read the tail of a background task's output. Takes the task id and an optional number of tail bytes (default 2000).",
+			"Read the tail of a background task's output, after a header line with its state and exit code. Takes the task id and an optional number of tail bytes (default 2000).",
 		parameters: {
 			type: "object",
 			properties: {
@@ -1434,7 +1515,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			required: ["id"],
 			additionalProperties: false,
 		} as const,
-		async execute(_id, input) {
+		async execute(toolCallId, input) {
 			const task = tasks.get((input as { id: string }).id);
 			if (!task) {
 				return {
@@ -1443,11 +1524,10 @@ export default function bashBackground(pi: ExtensionAPI) {
 				};
 			}
 			const bytes = (input as { bytes?: number }).bytes ?? 2000;
-			return {
-				content: [
-					{ type: "text", text: tailBytes(task.logPath, bytes) || "(no output yet)" },
-				],
-			};
+			const header = `[${task.id} ${task.state}${task.exit ? `, exit ${exitText(task.exit)}` : ""}]`;
+			const text = `${header}\n${tailBytes(task.logPath, bytes) || "(no output yet)"}`;
+			if (FINAL_STATES.has(task.state) && reachesModel(toolCallId)) task.finalSeen = true;
+			return { content: [{ type: "text", text }] };
 		},
 	});
 

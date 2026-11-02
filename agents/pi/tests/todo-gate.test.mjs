@@ -37,7 +37,7 @@ function gate(branch = []) {
     read() { emit("tool_result", { toolName: "read", toolCallId: "r", input: { path: "x" }, content: [], isError: false }); },
     steer() { emit("input", { text: "also do Y", source: "interactive", streamingBehavior: "steer" }); },
     settle(overrides = {}) {
-      return emit("agent_before_settle", { type: "agent_before_settle", entries: [], continue: false, outcome: "completed", context: { canContinue: true }, ...overrides });
+      return emit("agent_before_settle", { type: "agent_before_settle", entries: [], continue: false, outcome: "completed", context: { canContinue: false }, ...overrides });
     },
   };
   return g;
@@ -46,6 +46,8 @@ function gate(branch = []) {
 const message = (result) => result?.entries?.[0]?.content ?? "";
 
 test("a passed check with the task still in_progress blocks the stop", () => {
+  // The default settle context says canContinue: false, as pi's preview does
+  // after every final answer; the audit must still run.
   const g = gate().start();
   g.create("fix bug");
   g.update(1, { status: "in_progress" });
@@ -131,7 +133,6 @@ test("aborted runs, detached checks, and malformed input fail open", () => {
   assert.equal(g.settle(), undefined, "a detached check is not a result");
   g.bash("cargo test");
   assert.equal(g.settle({ outcome: "aborted" }), undefined);
-  assert.equal(g.settle({ context: { canContinue: false } }), undefined);
   assert.doesNotThrow(() => g.settle({ context: undefined }));
 
   const m = gate().start();

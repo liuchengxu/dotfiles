@@ -1,0 +1,151 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+import { pathToFileURL } from "node:url";
+import test from "node:test";
+
+const root = process.env.PI_PACKAGE_ROOT ?? dirname(dirname(dirname(realpathSync(execFileSync("which", ["pi"], { encoding: "utf8" }).trim()))));
+const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/lib/jiti.mjs")));
+const jiti = createJiti(import.meta.url, { alias: {
+  "@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
+  "@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
+} });
+const { default: extension } = await jiti.import(new URL("../extensions/bash-background.ts", import.meta.url).pathname);
+
+/** A loaded extension with helpers that replay pi's run events against it. */
+function session() {
+  const handlers = new Map();
+  const tools = new Map();
+  const sent = [];
+  extension({
+    on(event, handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]); },
+    registerTool(tool) { tools.set(tool.name, tool); },
+    sendMessage(message, options) { sent.push({ message, options }); },
+    registerCommand() {}, registerMessageRenderer() {}, registerShortcut() {}, registerToolRenderer() {},
+  });
+  const emit = (event, payload) => {
+    let result;
+    for (const handler of handlers.get(event) ?? []) result = handler(payload, {}) ?? result;
+    return result;
+  };
+  const call = async (name, input, toolCallId = "call") => {
+    const result = await tools.get(name).execute(toolCallId, input, undefined, undefined, { cwd: tmpdir() });
+    return result.content[0].text;
+  };
+  return {
+    sent,
+    start() { emit("agent_start", { type: "agent_start" }); },
+    async background(command) {
+      const text = await call("bash", { command, description: `Run ${command}`, run_in_background: true });
+      return /bg-\d+/.exec(text)[0];
+    },
+    watch(command, pattern) { return call("bg_watch", { command, pattern, description: `Watch ${command}` }); },
+    logs(id, toolCallId) { return call("bg_logs", { id }, toolCallId); },
+    /** Waits for a task to finish. A nested call (a codemode script's) is
+     * not seen by the model, so polling marks nothing as read. */
+    async finish(id) {
+      for (let i = 0; i < 200; i++) {
+        if (/^\[\S+ (completed|failed|killed)/.test(await call("bg_logs", { id }, "script/1"))) return;
+        await sleep(25);
+      }
+      throw new Error(`${id} did not finish`);
+    },
+    settle(overrides = {}) {
+      return emit("agent_before_settle", { type: "agent_before_settle", entries: [], continue: false, outcome: "completed", context: { canContinue: false }, ...overrides });
+    },
+    settled(aborted = false) { emit("agent_settled", { type: "agent_settled", aborted }); },
+    shutdown() { emit("session_shutdown", {}); },
+  };
+}
+
+test("a completion the agent already read is not delivered again", async () => {
+  const s = session();
+  try {
+    s.start();
+    const id = await s.background("exit 0");
+    await s.finish(id);
+    assert.match(await s.logs(id), new RegExp(`^\\[${id} completed, exit 0\\]`));
+    assert.equal(s.settle(), undefined, "no continuation for a result the agent saw");
+    s.settled();
+    assert.equal(s.sent.length, 0, "and no follow-up turn after the final answer");
+  } finally { s.shutdown(); }
+});
+
+test("unread completions arrive together at settle in one continuation, though the preview says it cannot continue", async () => {
+  const s = session();
+  try {
+    s.start();
+    const failed = await s.background("exit 3");
+    const passed = await s.background("exit 0");
+    await s.finish(failed);
+    await s.finish(passed);
+    assert.equal(s.sent.length, 0, "nothing is queued as a follow-up mid-run");
+    const earlier = { type: "custom_message", customType: "other", content: "x", display: true };
+    const result = s.settle({ entries: [earlier] });
+    assert.equal(result?.continue, true);
+    assert.equal(result.entries[0], earlier, "entries from earlier handlers are kept");
+    assert.deepEqual(result.entries.slice(1).map((entry) => entry.details.state), ["failed", "completed"]);
+    assert.match(result.entries[1].content, /<exit>3<\/exit>/);
+    s.settled();
+    assert.equal(s.sent.length, 0, "delivered once, not again after settle");
+  } finally { s.shutdown(); }
+});
+
+test("a result read only inside a codemode script is still delivered", async () => {
+  const s = session();
+  try {
+    s.start();
+    const id = await s.background("exit 3");
+    await s.finish(id);
+    await s.logs(id, "codemode-call/2");
+    assert.equal(s.settle()?.entries.length, 1, "the model never saw the nested result");
+  } finally { s.shutdown(); }
+});
+
+test("a watch match gets through even after the agent read the finished log", async () => {
+  const s = session();
+  try {
+    s.start();
+    const id = /bg-\d+/.exec(await s.watch("echo ready", "ready"))[0];
+    await s.finish(id);
+    assert.match(await s.logs(id), /completed, exit 0/);
+    const result = s.settle();
+    assert.equal(result?.continue, true);
+    assert.equal(result.entries.length, 1);
+    assert.match(result.entries[0].details.summary, /output matched/);
+  } finally { s.shutdown(); }
+});
+
+test("an idle agent is woken at once; an aborted run records without waking", async () => {
+  const s = session();
+  try {
+    await s.finish(await s.background("exit 0"));
+    assert.equal(s.sent.length, 1);
+    assert.deepEqual(s.sent[0].options, { triggerTurn: true, deliverAs: "followUp" });
+
+    s.start();
+    await s.finish(await s.background("exit 1"));
+    assert.equal(s.settle({ outcome: "aborted" }), undefined);
+    s.settled(true);
+    assert.equal(s.sent.length, 2);
+    assert.deepEqual(s.sent[1].options, { triggerTurn: false });
+  } finally { s.shutdown(); }
+});
+
+test("notices left for agent_settled wake the agent once for the whole batch", async () => {
+  const s = session();
+  try {
+    s.start();
+    const a = await s.background("exit 1");
+    const b = await s.background("exit 2");
+    await s.finish(a);
+    await s.finish(b);
+    assert.equal(s.settle({ outcome: "error" }), undefined);
+    s.settled();
+    assert.deepEqual(s.sent.map((sent) => sent.message.details.state), ["failed", "failed"]);
+    assert.deepEqual(s.sent.map((sent) => sent.options.triggerTurn), [false, true]);
+  } finally { s.shutdown(); }
+});
