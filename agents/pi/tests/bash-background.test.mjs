@@ -90,8 +90,10 @@ test("unread completions arrive together at settle in one continuation, though t
     const result = s.settle({ entries: [earlier] });
     assert.equal(result?.continue, true);
     assert.equal(result.entries[0], earlier, "entries from earlier handlers are kept");
-    assert.deepEqual(result.entries.slice(1).map((entry) => entry.details.state), ["failed", "completed"]);
-    assert.match(result.entries[1].content, /<exit>3<\/exit>/);
+    // Both commands exit at once, so their notices arrive in either order.
+    const notices = result.entries.slice(1).sort((a, b) => a.details.state.localeCompare(b.details.state));
+    assert.deepEqual(notices.map((entry) => entry.details.state), ["completed", "failed"]);
+    assert.match(notices[1].content, /<exit>3<\/exit>/);
     s.settled();
     assert.equal(s.sent.length, 0, "delivered once, not again after settle");
   } finally { s.shutdown(); }
