@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -176,21 +176,30 @@ test("expanding a collapsed tool row does not hand our component to the built-in
 
 test("a background task is one row: the header carries its id, time, and exit", async () => {
   const s = session();
+  // The command runs until the test creates this file, so the running
+  // display is checked while the task is certainly still running.
+  const release = join(tmpdir(), `bg-row-release-${process.pid}-${Date.now()}`);
   try {
     const renderer = s.renderer("bash");
     const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text };
-    const id = await s.background("sleep 0.3; exit 2");
-    const args = { command: "sleep 0.3; exit 2", description: "Run sleep 0.3; exit 2" };
+    const command = `while [ ! -e '${release}' ]; do sleep 0.05; done; exit 2`;
+    const id = await s.background(command);
+    const args = { command, description: "Wait then fail" };
     const context = { args, toolCallId: "call", invalidate() {}, state: {}, cwd: tmpdir(), executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: false, isError: false, outputPad: 1 };
     const header = () => renderer.renderCall(args, theme, context).render(120)[0];
-    const handoff = () => renderer.renderResult({ content: [{ type: "text", text: "" }], details: { handoff: `started ${id}` } }, { expanded: false, isPartial: false }, theme, context).render(120);
-    assert.match(header(), new RegExp(`Run sleep 0\\.3; exit 2 · ${id} · \\d+s$`));
-    assert.doesNotMatch(header(), /Running/);
+    const handoff = (state = {}) => renderer.renderResult({ content: [{ type: "text", text: "" }], details: { handoff: `started ${id}` } }, { expanded: false, isPartial: false }, theme, { ...context, state }).render(120);
+    assert.match(header(), new RegExp(`Wait then fail · ${id} · \\d+s$`));
+    assert.doesNotMatch(header(), /Running/, "the spinner says it");
     assert.deepEqual(handoff(), [], "no second row while the header is visible");
+    assert.match(handoff({ folded: true })[0], new RegExp(`^↳ Wait then fail · ${id} · Running · \\d+s$`), "a row without the spinner says Running");
+    writeFileSync(release, "");
     await s.finish(id);
-    assert.match(header(), new RegExp(`^✗ .* · ${id} · Failed · \\d+s \\(exit code 2\\)$`));
+    assert.match(header(), new RegExp(`^✗ Wait then fail · ${id} · Failed \\(exit code 2\\) · \\d+s$`));
     assert.deepEqual(handoff(), []);
-    const folded = renderer.renderResult({ content: [], details: { handoff: `started ${id}` } }, { expanded: false, isPartial: false }, theme, { ...context, state: { folded: true } }).render(120);
-    assert.match(folded[0], new RegExp(`^↳ Run sleep 0\\.3; exit 2 · ${id} · Failed · \\d+s \\(exit code 2\\)$`), "a hidden header leaves one named row");
-  } finally { s.shutdown(); }
+    assert.match(renderer.renderCall(args, theme, context).render(40)[0], /Failed \(exit code 2\)/, "a narrow row cuts the time, not the exit code");
+    assert.match(handoff({ folded: true })[0], new RegExp(`^↳ Wait then fail · ${id} · Failed \\(exit code 2\\) · \\d+s$`), "a hidden header leaves one named row");
+  } finally {
+    rmSync(release, { force: true });
+    s.shutdown();
+  }
 });

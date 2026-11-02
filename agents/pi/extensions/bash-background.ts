@@ -893,16 +893,19 @@ export default function bashBackground(pi: ExtensionAPI) {
 	}
 
 	/** A detached task's part of a row: its id, a state word only where the
-	 * row's icon does not already say it, the elapsed time, and the exit. */
-	function backgroundTag(task: BgTask): string {
+	 * row's icon does not already say it, the elapsed time, and the exit. A
+	 * row without the header's spinner (`iconless`) also says "Running". */
+	function backgroundTag(task: BgTask, iconless = false): string {
 		const state = task.processAlive
-			? task.state === "stopping" ? "Stopping" : task.state === "matched" ? "Matched" : ""
+			? task.state === "stopping" ? "Stopping" : task.state === "matched" ? "Matched" : iconless ? "Running" : ""
 			: task.state === "killed" ? "Stopped" : task.state === "failed" ? "Failed" : "";
-		const elapsed = taskElapsed(task);
 		const exit = task.processAlive || !task.exit ? ""
-			: task.exit.code !== undefined ? ` (exit code ${task.exit.code})`
-			: task.exit.signal !== undefined ? ` (signal ${task.exit.signal})` : "";
-		return `${[task.id, state, elapsed].filter(Boolean).join(" · ")}${exit}`;
+			: task.exit.code !== undefined ? `exit code ${task.exit.code}`
+			: task.exit.signal !== undefined ? `signal ${task.exit.signal}` : "";
+		const outcome = state && exit ? `${state} (${exit})` : state || exit;
+		// The outcome precedes the time, so a narrow row truncates the time
+		// first and keeps the exit code.
+		return [task.id, outcome, taskElapsed(task)].filter(Boolean).join(" · ");
 	}
 
 	const runningHeaders = new Map<string, () => void>();
@@ -1211,7 +1214,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 								// The header carries the tag; this row exists only when the
 								// header is hidden and the work would go unnamed.
 								if (!headingHidden) return [];
-								return [truncateToWidth(theme.fg(task.state === "failed" ? "error" : "muted", `↳ ${name ? `${name} · ` : ""}${backgroundTag(task)}`), width)];
+								return [truncateToWidth(theme.fg(task.state === "failed" ? "error" : "muted", `↳ ${name ? `${name} · ` : ""}${backgroundTag(task, true)}`), width)];
 							},
 							invalidate() {},
 						};
