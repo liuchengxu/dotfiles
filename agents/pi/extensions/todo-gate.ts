@@ -211,8 +211,11 @@ export default function todoGate(pi: ExtensionAPI) {
 	});
 
 	pi.on("before_agent_start", (event) => {
+		// A run that a notification or subagent wake started has no prompt
+		// and continues the user's request: keep that prompt's state.
+		if (event.messageType !== "user") return;
 		// One run per user prompt: reset the per-prompt state here.
-		if (event.messageType === "user") audited = false;
+		audited = false;
 		budget = BUDGET;
 		const bullets = event.prompt
 			.split("\n")

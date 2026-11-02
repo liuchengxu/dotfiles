@@ -26,6 +26,7 @@ function gate(branch = []) {
       return g;
     },
     prompt(prompt = "next") { emit("before_agent_start", { messageType: "user", prompt }); },
+    wake() { emit("before_agent_start", { messageType: "custom", message: { role: "custom", customType: "bg-task-notification" } }); },
     create(subject) { tasks = [...tasks, { id: tasks.length + 1, subject, status: "pending" }]; todo("create", { subject }); },
     update(id, fields) { tasks = tasks.map((task) => task.id === id ? { ...task, ...fields } : task); todo("update", { id, ...fields }); },
     rejected(id, fields) { todo("update", { id, ...fields }, `#${id} not found`); },
@@ -195,4 +196,14 @@ test("a queued follow-up re-arms the audit", () => {
   assert.equal(g.settle(), undefined);
   g.followUp();
   assert.equal(g.settle()?.continue, true, "new user work during the correction is audited too");
+});
+
+test("a run started by a notification neither throws nor resets the prompt's audit", () => {
+  const g = gate().start("- fix bug\n- write docs");
+  g.create("fix bug");
+  g.update(1, { status: "in_progress" });
+  g.bash("cargo test");
+  assert.equal(g.settle()?.continue, true);
+  assert.doesNotThrow(() => g.wake());
+  assert.equal(g.settle(), undefined, "a wake is not a new user prompt, so the audit stays spent");
 });
