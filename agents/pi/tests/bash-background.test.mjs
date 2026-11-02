@@ -173,3 +173,24 @@ test("expanding a collapsed tool row does not hand our component to the built-in
     assert.doesNotThrow(() => renderer.renderCall(args, theme, context(true, call)).render(120));
   } finally { s.shutdown(); }
 });
+
+test("a background task is one row: the header carries its id, time, and exit", async () => {
+  const s = session();
+  try {
+    const renderer = s.renderer("bash");
+    const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text };
+    const id = await s.background("sleep 0.3; exit 2");
+    const args = { command: "sleep 0.3; exit 2", description: "Run sleep 0.3; exit 2" };
+    const context = { args, toolCallId: "call", invalidate() {}, state: {}, cwd: tmpdir(), executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: false, isError: false, outputPad: 1 };
+    const header = () => renderer.renderCall(args, theme, context).render(120)[0];
+    const handoff = () => renderer.renderResult({ content: [{ type: "text", text: "" }], details: { handoff: `started ${id}` } }, { expanded: false, isPartial: false }, theme, context).render(120);
+    assert.match(header(), new RegExp(`Run sleep 0\\.3; exit 2 · ${id} · \\d+s$`));
+    assert.doesNotMatch(header(), /Running/);
+    assert.deepEqual(handoff(), [], "no second row while the header is visible");
+    await s.finish(id);
+    assert.match(header(), new RegExp(`^✗ .* · ${id} · Failed · \\d+s \\(exit code 2\\)$`));
+    assert.deepEqual(handoff(), []);
+    const folded = renderer.renderResult({ content: [], details: { handoff: `started ${id}` } }, { expanded: false, isPartial: false }, theme, { ...context, state: { folded: true } }).render(120);
+    assert.match(folded[0], new RegExp(`^↳ Run sleep 0\\.3; exit 2 · ${id} · Failed · \\d+s \\(exit code 2\\)$`), "a hidden header leaves one named row");
+  } finally { s.shutdown(); }
+});

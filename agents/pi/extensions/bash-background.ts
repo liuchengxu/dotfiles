@@ -882,10 +882,27 @@ export default function bashBackground(pi: ExtensionAPI) {
 
 	function backgroundElapsed(toolCallId: string | undefined): string {
 		const task = toolCallId ? backgroundTimings.get(toolCallId) : undefined;
-		if (!task || (!task.processAlive && task.finishedAt === undefined)) return "";
+		return task ? taskElapsed(task) : "";
+	}
+
+	function taskElapsed(task: BgTask): string {
+		if (!task.processAlive && task.finishedAt === undefined) return "";
 		const seconds = Math.max(0, Math.floor(((task.finishedAt ?? Date.now()) - (task.executionStartedAt ?? task.startedAt)) / 1000));
 		const minutes = Math.floor(seconds / 60);
 		return minutes ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
+	}
+
+	/** A detached task's part of a row: its id, a state word only where the
+	 * row's icon does not already say it, the elapsed time, and the exit. */
+	function backgroundTag(task: BgTask): string {
+		const state = task.processAlive
+			? task.state === "stopping" ? "Stopping" : task.state === "matched" ? "Matched" : ""
+			: task.state === "killed" ? "Stopped" : task.state === "failed" ? "Failed" : "";
+		const elapsed = taskElapsed(task);
+		const exit = task.processAlive || !task.exit ? ""
+			: task.exit.code !== undefined ? ` (exit code ${task.exit.code})`
+			: task.exit.signal !== undefined ? ` (signal ${task.exit.signal})` : "";
+		return `${[task.id, state, elapsed].filter(Boolean).join(" · ")}${exit}`;
 	}
 
 	const runningHeaders = new Map<string, () => void>();
@@ -911,21 +928,9 @@ export default function bashBackground(pi: ExtensionAPI) {
 				const [color, icon] = context.isError || liveTask?.state === "failed" ? ["error", "✗"]
 					: context.isPartial || liveTask?.processAlive ? ["accent", ["⠋", "⠙", "⠹", "⠸"][Math.floor(Date.now() / 120) % 4]]
 					: ["success", "⏺"];
-				const elapsed = backgroundElapsed(context.toolCallId);
-				// A detached task that completed reports its exit code here
-				// instead of on a second row: one line carries the outcome.
-				const timing = context.toolCallId ? backgroundTimings.get(context.toolCallId) : undefined;
-				const exitNote = timing && timing.state === "completed" && !timing.processAlive && timing.finishedAt !== undefined
-					? timing.exit?.code !== undefined ? ` (exit code ${timing.exit.code})`
-					: timing.exit?.signal !== undefined ? ` (signal ${timing.exit.signal})`
-					: ""
-					: "";
-				const stateLabel = timing
-					? timing.processAlive
-						? timing.state === "stopping" ? "Stopping" : timing.state === "matched" ? "Matched · running" : "Running"
-						: timing.state === "killed" ? "Stopped" : timing.state === "failed" ? "Failed" : timing.state === "completed" ? "Completed" : ""
-					: context.isPartial ? "Running" : "";
-				const suffix = `${stateLabel ? ` · ${stateLabel}` : ""}${elapsed ? ` · ${elapsed}` : ""}${exitNote}`;
+				// A detached task's id, time, and outcome ride on this one line
+				// instead of a second row.
+				const suffix = liveTask ? ` · ${backgroundTag(liveTask)}` : context.isPartial ? " · Running" : "";
 				return component.render(width - 2).map((line, index) => {
 					if (index === 0 && suffix) {
 						line = truncateToWidth(line, Math.max(0, width - 2 - suffix.length), "") + theme.fg("muted", suffix);
@@ -1199,18 +1204,14 @@ export default function bashBackground(pi: ExtensionAPI) {
 						return {
 							render(width) {
 								if (width <= 0) return [];
-								const elapsed = headingHidden ? backgroundElapsed(context.toolCallId) : "";
 								const task = context.toolCallId ? backgroundTimings.get(context.toolCallId) : undefined;
-								if (task?.id === moved[1] && !task.processAlive && ["completed", "failed", "killed"].includes(task.state ?? "")) {
-									renderedBackgroundOutcomes.add(task.id);
-									// Completion lives in the header suffix; only a bad
-									// exit keeps its own row, in error color.
-									if (task.state === "completed") return [];
-									const outcome = task.state === "killed" ? "Stopped" : "Failed";
-									const exit = task.exit?.code !== undefined ? ` (exit code ${task.exit.code})` : task.exit?.signal !== undefined ? ` (signal ${task.exit.signal})` : "";
-									return [truncateToWidth(theme.fg(task.state === "failed" ? "error" : "muted", `↳ ${headingHidden && name ? `${name}${elapsed ? ` · ${elapsed}` : ""} · ` : ""}${outcome}${exit}`), width)];
-								}
-								return [truncateToWidth(theme.fg("muted", `↳ ${headingHidden && name ? `${name}${elapsed ? ` · ${elapsed}` : ""} · ` : ""}${task?.state === "stopping" ? "Stopping" : "Running"} in background as ${moved[1]} · completion notice ahead`), width)];
+								if (task?.id !== moved[1]) return [truncateToWidth(theme.fg("muted", `↳ ${headingHidden && name ? `${name} · ` : ""}${moved[1]}`), width)];
+								// The header shows the outcome, so its notification row is redundant.
+								if (!task.processAlive && FINAL_STATES.has(task.state)) renderedBackgroundOutcomes.add(task.id);
+								// The header carries the tag; this row exists only when the
+								// header is hidden and the work would go unnamed.
+								if (!headingHidden) return [];
+								return [truncateToWidth(theme.fg(task.state === "failed" ? "error" : "muted", `↳ ${name ? `${name} · ` : ""}${backgroundTag(task)}`), width)];
 							},
 							invalidate() {},
 						};
