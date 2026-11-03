@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from "node:util";
-import { FooterComponent, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { getCurrentSystemMessage, type Message } from "@earendil-works/pi-ai";
+import { estimateTokens, FooterComponent, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { rgbColor, sliceByColumn, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { sessionUptimeLabel } from "./session-uptime.ts";
@@ -11,10 +12,16 @@ type Footer = {
   session: {
     state: { model?: Model; thinkingLevel: string };
     routedModel?: { model: Model; thinkingLevel?: string };
-    sessionManager: { getSessionName(): string | undefined; getSessionId(): string };
+    sessionManager: {
+      getSessionName(): string | undefined;
+      getSessionId(): string;
+      buildSessionProjection(): { messages: Message[] };
+    };
   };
+  getSessionStats?(): { contextUsage?: { percent: number | null; contextWindow: number } };
   [key: symbol]: unknown;
 };
+const estimateKey = Symbol.for("footer-model-prefix.context-estimate");
 const themeKey = Symbol.for("footer-model-prefix.theme");
 type ThemeState = { [key: symbol]: (() => ExtensionContext["ui"]["theme"]) | undefined };
 
@@ -44,6 +51,43 @@ function quotaMeter(quota: string, theme: ExtensionContext["ui"]["theme"]): stri
       + theme.fg("dim", "░".repeat(10 - filled))
       + theme.fg("accent", ` ${label}`);
   });
+}
+
+/**
+ * The context size pi estimates when it trusts no reported usage (the fallback of
+ * estimateProjectedContextTokens in pi's compaction.js): the current system message plus every
+ * other message.
+ */
+export function estimateContextTokens(messages: Message[]): number {
+  const system = getCurrentSystemMessage(messages);
+  let tokens = system ? estimateTokens(system) : 0;
+  for (const message of messages) if (message.role !== "system") tokens += estimateTokens(message);
+  return tokens;
+}
+
+/**
+ * After a compaction pi reports the context as unknown until the next reply, although it has the
+ * estimate above. Recompute it only when pi's own stats cache moves (session, leaf, entry count, or
+ * model), never per frame. Undefined when pi knows the size or anything here is missing.
+ */
+function estimatedPercent(footer: Footer): number | undefined {
+  let stats: ReturnType<NonNullable<Footer["getSessionStats"]>> | undefined;
+  try {
+    // getSessionStats is private to pi's footer; without it the display stays unknown.
+    stats = footer.getSessionStats?.();
+    const usage = stats?.contextUsage;
+    if (!usage || usage.percent !== null || !(usage.contextWindow > 0)) return undefined;
+    const cached = footer[estimateKey] as { stats: unknown; percent?: number } | undefined;
+    if (cached?.stats === stats) return cached.percent;
+    const tokens = estimateContextTokens(footer.session.sessionManager.buildSessionProjection().messages);
+    const percent = (tokens / usage.contextWindow) * 100;
+    footer[estimateKey] = { stats, percent };
+    return percent;
+  } catch {
+    // A failure is cached for the snapshot too, so it is not retried every frame.
+    if (stats) footer[estimateKey] = { stats, percent: undefined };
+    return undefined;
+  }
 }
 
 export default function footerModelPrefix(pi: ExtensionAPI): void {
@@ -109,14 +153,16 @@ export default function footerModelPrefix(pi: ExtensionAPI): void {
       const stats = stripVTControlCharacters(lines[1]);
       const context = /(?<usage>\d+(?:\.\d+)?%|\?)\/(?<limit>[\d.]+[kM]?)/.exec(stats);
       if (context?.groups) {
-        const percent = context.groups.usage === "?" ? undefined : Number.parseFloat(context.groups.usage);
+        const estimate = context.groups.usage === "?" ? estimatedPercent(this) : undefined;
+        const percent = estimate ?? (context.groups.usage === "?" ? undefined : Number.parseFloat(context.groups.usage));
+        const usageText = estimate === undefined ? context.groups.usage : `~${estimate.toFixed(1)}%`;
         const filled = percent === undefined ? 0 : Math.round(Math.max(0, Math.min(100, percent)) / 10);
         const bar = percent === undefined ? "??????????" : "█".repeat(filled) + "░".repeat(10 - filled);
         const color = percent === undefined ? "muted" : percent > 90 ? "error" : percent > 70 ? "warning" : "accent";
         const start = visibleWidth(stats.slice(0, context.index));
         const end = start + visibleWidth(context[0]);
         lines[1] = sliceByColumn(lines[1], 0, start)
-          + theme.fg(color, `Context ${bar} ${context.groups.usage} (${context.groups.limit})`)
+          + theme.fg(color, `Context ${bar} ${usageText} (${context.groups.limit})`)
           + sliceByColumn(lines[1], end, visibleWidth(stats));
       }
       return [modelLine, lines[1], lines[0], ...(activityLine ? [activityLine] : []), ...(remaining.length ? [remaining.join(" • ")] : [])]

@@ -10,6 +10,7 @@ const root = process.env.PI_PACKAGE_ROOT ?? dirname(dirname(dirname(realpathSync
 const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/lib/jiti.mjs")));
 const jiti = createJiti(import.meta.url, { alias: {
   "@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
+  "@earendil-works/pi-ai": join(root, "node_modules/@earendil-works/pi-ai/dist/index.js"),
   "@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
 const { FooterComponent } = await import(pathToFileURL(join(root, "dist/index.js")));
