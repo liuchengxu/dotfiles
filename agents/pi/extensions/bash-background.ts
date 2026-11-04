@@ -69,6 +69,10 @@ const SLOW_FOREGROUND_SECONDS = 60;
 /** Claude's assistant-mode budget. Overridable for tests. */
 const BUDGET_MS = Number(process.env.PI_BG_BUDGET_MS ?? 5_000);
 const MANUAL_BG_HINT_MS = Number(process.env.PI_BG_HINT_MS ?? 2_000);
+/** Ends every background-start result. Models read "you will be notified" as
+ * a cue to poll, or to call pi-subagents' bg_wait, which cannot see these tasks
+ * and answers "No active run matched". */
+const WAIT_GUIDANCE = "You will be woken when it completes. Meanwhile do other work, or end the turn if nothing else is left. Do not call bg_wait or poll bg_status/bg_logs. When the notice arrives, read the output and continue the task it belongs to. Use bg_kill to stop it.";
 
 type BgState = "running" | "stopping" | "completed" | "failed" | "killed" | "matched";
 type CallState = "foreground" | "detached" | "finished";
@@ -1334,7 +1338,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 								`Background task ${id} started: ${label}`,
 								`Command: ${rest.command}`,
 								`Output is being written to: ${tasks.get(id)?.logPath}`,
-								`You will be notified when it completes. Use bg_status to list tasks, bg_logs to read output, bg_kill to stop one.`,
+								WAIT_GUIDANCE,
 							].join("\n"),
 						},
 					],
@@ -1451,7 +1455,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 							`Background task ${task.id}: ${label}`,
 							`Command: ${rest.command}`,
 							`It is still running. Output is being written to: ${task.logPath}`,
-							`You will be notified when it completes. Use bg_status to list tasks, bg_logs to read output, bg_kill to stop one.`,
+							WAIT_GUIDANCE,
 						].join("\n"),
 					},
 				],

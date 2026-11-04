@@ -42,9 +42,9 @@ function session() {
     renderer(toolName) { return renderers[0](toolName, () => undefined); },
     start() { emit("agent_start", { type: "agent_start" }); },
     async background(command) {
-      const text = await call("bash", { command, description: `Run ${command}`, run_in_background: true });
-      return /bg-\d+/.exec(text)[0];
+      return /bg-\d+/.exec(await this.backgroundText(command))[0];
     },
+    backgroundText(command) { return call("bash", { command, description: `Run ${command}`, run_in_background: true }); },
     watch(command, pattern) { return call("bg_watch", { command, pattern, description: `Watch ${command}` }); },
     logs(id, toolCallId) { return call("bg_logs", { id }, toolCallId); },
     /** Waits for a task to finish. A nested call (a codemode script's) is
@@ -63,6 +63,16 @@ function session() {
     shutdown() { emit("session_shutdown", {}); },
   };
 }
+
+test("a background start tells the agent to keep working or end the turn, not to wait or poll", async () => {
+  const pi = session();
+  const text = await pi.backgroundText("true");
+  assert.match(text, /You will be woken when it completes\. Meanwhile do other work, or end the turn if nothing else is left\./);
+  assert.match(text, /Do not call bg_wait or poll bg_status\/bg_logs\./);
+  assert.match(text, /continue the task it belongs to/);
+  assert.doesNotMatch(text, /Use bg_status to list tasks/);
+  await pi.finish(/bg-\d+/.exec(text)[0]);
+});
 
 test("a completion the agent already read is not delivered again", async () => {
   const s = session();
