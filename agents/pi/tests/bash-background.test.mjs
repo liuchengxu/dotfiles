@@ -174,6 +174,29 @@ test("expanding a collapsed tool row does not hand our component to the built-in
   } finally { s.shutdown(); }
 });
 
+test("a collapsed edit row shows a path in the footer's worktree relative to it", () => {
+  const s = session();
+  const current = Symbol.for("pi.worktree-status.current");
+  globalThis[current] = "/r/.agents/worktrees/fix-a";
+  try {
+    const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text };
+    const component = (tool, args) => s.renderer(tool).renderCall(args, theme, { args, toolCallId: "e2", invalidate() {}, state: {}, cwd: tmpdir(),
+      executionStarted: true, argsComplete: true, isPartial: true, expanded: false, showImages: false, isError: false, outputPad: 1 });
+    const row = (path) => component("edit", { path, edits: [{ oldText: "a", newText: "b" }] }).render(200).join("\n");
+    assert.match(row("/r/.agents/worktrees/fix-a/src/lib.rs"), /Update src\/lib\.rs/);
+    assert.match(row("/r/.agents/worktrees/fix-b/src/lib.rs"), /Update ⎇ fix-b\/src\/lib\.rs/);
+    assert.match(component("read", { path: "/r/.agents/worktrees/fix-a/README.md" }).render(200).join("\n"), /Read \(README\.md\)/);
+    assert.match(component("write", { path: "/r/.agents/worktrees/fix-a/new.txt", content: "x" }).render(200).join("\n"), /Write \(new\.txt\)/);
+    // A drawn row follows the footer: after a switch it must not read as a path in the new worktree.
+    const drawn = component("edit", { path: "/r/.agents/worktrees/fix-a/src/lib.rs", edits: [{ oldText: "a", newText: "b" }] });
+    globalThis[current] = "/r/.agents/worktrees/fix-b";
+    assert.match(drawn.render(200).join("\n"), /Update ⎇ fix-a\/src\/lib\.rs/);
+  } finally {
+    delete globalThis[current];
+    s.shutdown();
+  }
+});
+
 test("a background task is one row: the header carries its id, time, and exit", async () => {
   const s = session();
   // The command runs until the test creates this file, so the running

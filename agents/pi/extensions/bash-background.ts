@@ -58,6 +58,7 @@ import {
 import { renderDiff } from "@earendil-works/pi-coding-agent";
 import { Container, matchesKey, Text, truncateToWidth, type Component } from "@earendil-works/pi-tui";
 import { colorChangeSummary, countDiffRuns, formatChangeCounts, renderDetailedDiff } from "./lib/tool-presentation.ts";
+import { worktreePath } from "./worktree-status.ts";
 
 const LOG_DIR = join(homedir(), ".pi", "agent", "bg-tasks");
 const NOTIFY_TAIL_BYTES = 1500;
@@ -1024,44 +1025,51 @@ export default function bashBackground(pi: ExtensionAPI) {
 				bg_wait: "Wait for background task",
 				todo: "Update task list",
 			};
-			let label = labels[toolName] ?? toolName.replace(/^mcp__/, "").replace(/[_-]+/g, " ");
-			let detail = value("path") || value("query") || value("pattern") || value("id");
-			if (toolName === "write") {
-				label = `Write (${value("path") || "file"})`;
-				detail = "";
-			} else if (toolName === "read") {
-				const skill = skillName(value("path"));
-				if (skill) {
-					label = `Skill(${skill})`;
+			// Built at render time, so a path stays relative to the worktree the footer names now,
+			// not the one it named when pi last called renderCall.
+			const describe = () => {
+				let label = labels[toolName] ?? toolName.replace(/^mcp__/, "").replace(/[_-]+/g, " ");
+				const path = worktreePath(value("path"));
+				let detail = path || value("query") || value("pattern") || value("id");
+				if (toolName === "write") {
+					label = `Write (${path || "file"})`;
 					detail = "";
-				} else {
-					label = `Read (${value("path") || "file"})`;
-				}
-				const offset = Number(args?.offset ?? 0);
-				const streaming = context.argsComplete === false && context.isPartial === true;
-				detail = offset > 0 && !streaming ? `from line ${offset}` : "";
+				} else if (toolName === "read") {
+					const skill = skillName(value("path"));
+					if (skill) {
+						label = `Skill(${skill})`;
+						detail = "";
+					} else {
+						label = `Read (${path || "file"})`;
+					}
+					const offset = Number(args?.offset ?? 0);
+					const streaming = context.argsComplete === false && context.isPartial === true;
+					detail = offset > 0 && !streaming ? `from line ${offset}` : "";
 
-			} else if (toolName === "codemode") {
-				const lines = value("code").split("\n");
-				label = lines.map(line => /^\s*\/\/\s?(.*)$/.exec(line)?.[1]).find(text => text?.trim())?.trim() || label;
-				const aggregate = context.toolCallId ? nestedEdits.get(context.toolCallId) : undefined;
-				if (aggregate) {
-					const counts = colorChangeSummary(formatChangeCounts(aggregate), theme);
-					const files = `${aggregate.files.size} file${aggregate.files.size === 1 ? "" : "s"}`;
-					label = `${label} (${counts ? `${counts} · ` : ""}${files})`;
+				} else if (toolName === "codemode") {
+					const lines = value("code").split("\n");
+					label = lines.map(line => /^\s*\/\/\s?(.*)$/.exec(line)?.[1]).find(text => text?.trim())?.trim() || label;
+					const aggregate = context.toolCallId ? nestedEdits.get(context.toolCallId) : undefined;
+					if (aggregate) {
+						const counts = colorChangeSummary(formatChangeCounts(aggregate), theme);
+						const files = `${aggregate.files.size} file${aggregate.files.size === 1 ? "" : "s"}`;
+						label = `${label} (${counts ? `${counts} · ` : ""}${files})`;
+					}
+					detail = "js " + (lines.find(line => line.trim() && !/^\s*\/\//.test(line)) ?? "").trim();
+				} else if (toolName === "edit") {
+					label = `Update ${path || "file"}`;
+					detail = "";
+				} else if (toolName === "bg_watch") {
+					label = value("description") || label;
+					detail = value("command");
+				} else if (toolName.startsWith("mcp__")) {
+					label = value("instruction") || label;
+					detail = toolName;
 				}
-				detail = "js " + (lines.find(line => line.trim() && !/^\s*\/\//.test(line)) ?? "").trim();
-			} else if (toolName === "edit") {
-				label = `Update ${value("path") || "file"}`;
-				detail = "";
-			} else if (toolName === "bg_watch") {
-				label = value("description") || label;
-				detail = value("command");
-			} else if (toolName.startsWith("mcp__")) {
-				label = value("instruction") || label;
-				detail = toolName;
-			}
+				return { label, detail };
+			};
 			const headerLabel = () => {
+				const { label } = describe();
 				if (toolName === "bg_kill") {
 					const task = tasks.get(value("id"));
 					const action = context.isError ? "Could not stop" : task?.processAlive
@@ -1090,6 +1098,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 				return {
 					render(width) {
 						if (width <= 0) return [];
+						const { detail } = describe();
 						const hint = detail ? ` · ${(detail.split(/\r?\n/).find(line => line.trim()) ?? "").trim()}` : "";
 						return [truncateToWidth(theme.fg("muted", `\u2514 ${headerLabel()}${hint}`), width)];
 					},
@@ -1106,6 +1115,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 					// Collapsed: label line, then detail on its own row — long tool
 				// names and arguments must not truncate into the label.
 					const lines = [theme.fg("toolTitle", headerLabel())];
+					const { detail } = describe();
 					if (detail) lines.push(theme.fg("accent", "  ⎿ " + (detail.split(/\r?\n/).find(line => line.trim()) ?? "").trim()));
 					return lines.map(line => truncateToWidth(line, width));
 				},

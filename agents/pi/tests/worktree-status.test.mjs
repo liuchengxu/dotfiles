@@ -11,7 +11,7 @@ const root = process.env.PI_PACKAGE_ROOT ?? dirname(dirname(dirname(realpathSync
 const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/lib/jiti.mjs")));
 const tuiPath = join(root, "node_modules/@earendil-works/pi-tui/dist/index.js");
 const jiti = createJiti(import.meta.url, { alias: { "@earendil-works/pi-tui": tuiPath } });
-const { default: extension, worktreeIn, prLabel } = await jiti.import(new URL("../extensions/worktree-status.ts", import.meta.url).pathname);
+const { default: extension, worktreeIn, prLabel, worktreePath } = await jiti.import(new URL("../extensions/worktree-status.ts", import.meta.url).pathname);
 const { rgbColor } = await import(pathToFileURL(tuiPath));
 
 /** A repo folder with task worktrees whose `.git` files mark them as worktrees. */
@@ -224,4 +224,23 @@ test("the worktree name is drawn in green for the theme's appearance", async (t)
 		await s.touch({ command: "git -C .agents/worktrees/fix-a status" });
 		assert.deepEqual(s.styles.at(-1), { fg: color }, appearance);
 	}
+});
+
+test("a path shows relative to the footer's worktree, tagged in another one, and unchanged elsewhere", async (t) => {
+	const dir = repo(t, "fix-a", "fix-b");
+	const s = session(t, dir, { branches: { "fix-a": "fix-a" } });
+	await s.start();
+	const a = join(dir, ".agents/worktrees/fix-a");
+	assert.equal(worktreePath(`${a}/src/x.rs`), `⎇ fix-a/src/x.rs`, "no worktree selected yet");
+	await s.touch({ command: "git -C .agents/worktrees/fix-a status" });
+	assert.equal(worktreePath(`${a}/src/x.rs`), "src/x.rs");
+	assert.equal(worktreePath(`${a}/../fix-a/src/x.rs`), "src/x.rs", "normalized first");
+	assert.equal(worktreePath(join(dir, ".agents/worktrees/fix-b/y.rs")), "⎇ fix-b/y.rs");
+	assert.equal(worktreePath(a), a, "the worktree root itself stays whole");
+	assert.equal(worktreePath("src/x.rs"), "src/x.rs", "a relative path is already short");
+	assert.equal(worktreePath("/etc/hosts"), "/etc/hosts");
+	assert.equal(worktreePath("~/.dotfiles/.agents/worktrees/w/z", "/h"), "⎇ w/z");
+	assert.equal(worktreePath(`~${a.slice(dirname(dir).length)}/src/x.rs`, dirname(dir)), "src/x.rs", "~ expands to the given home");
+	await s.shutdown();
+	assert.equal(worktreePath(`${a}/src/x.rs`), `⎇ fix-a/src/x.rs`, "a shutdown clears the shared worktree");
 });

@@ -13,6 +13,8 @@
  * configuration (forks included). It runs in the background, at most once a minute per branch unless
  * the branch changes; any failure shows no PR. A reused branch name can still match an older PR.
  * At each settle the worktree is checked again, and a removed one clears the status.
+ *
+ * `worktreePath` lets tool rows show paths relative to the worktree the footer names.
  */
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -24,6 +26,10 @@ const statusKey = "worktree";
 const PR_TTL_MS = 60_000;
 const MARK = ".agents/worktrees/";
 const SEPARATOR = /[\s;&|()<>"'`=,]+/;
+// Shared through globalThis, as session-uptime does: another extension's import of this file may
+// load a second module instance.
+const currentKey = Symbol.for("pi.worktree-status.current");
+type Shared = { [currentKey]?: string };
 
 const isWorktree = (path: string): boolean => existsSync(join(path, ".git"));
 
@@ -54,6 +60,23 @@ export function worktreeIn(input: unknown, cwd: string, home = homedir(), exists
 	};
 	visit(input);
 	return found;
+}
+
+/**
+ * A path as tool rows show it: relative to the worktree the footer names, or with its worktree
+ * name in front when it is in another one. A path outside any worktree is returned as given.
+ */
+export function worktreePath(path: string, home = homedir()): string {
+	const expanded = path.startsWith("~/") ? home + path.slice(1) : path;
+	if (!expanded.startsWith("/")) return path;
+	const absolute = resolve(expanded);
+	const at = absolute.indexOf(`/${MARK}`);
+	if (at < 0) return path;
+	const start = at + 1 + MARK.length;
+	const slash = absolute.indexOf("/", start);
+	if (slash < 0 || slash === absolute.length - 1) return path;
+	const inside = absolute.slice(slash + 1);
+	return absolute.slice(0, slash) === (globalThis as Shared)[currentKey] ? inside : `⎇ ${absolute.slice(start)}`;
 }
 
 /** `PR #N`, plus the state when it is not open, from `gh pr view --json number,state`. */
@@ -96,6 +119,7 @@ export default function worktreeStatus(pi: ExtensionAPI): void {
 		abort.abort();
 		abort = new AbortController();
 		path = next;
+		(globalThis as Shared)[currentKey] = next;
 		branch = "";
 		pr = "";
 		show();
