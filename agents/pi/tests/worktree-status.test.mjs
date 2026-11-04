@@ -9,7 +9,10 @@ import test from "node:test";
 
 const root = process.env.PI_PACKAGE_ROOT ?? dirname(dirname(dirname(realpathSync(execFileSync("which", ["pi"], { encoding: "utf8" }).trim()))));
 const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/lib/jiti.mjs")));
-const { default: extension, worktreeIn, prLabel } = await createJiti(import.meta.url).import(new URL("../extensions/worktree-status.ts", import.meta.url).pathname);
+const tuiPath = join(root, "node_modules/@earendil-works/pi-tui/dist/index.js");
+const jiti = createJiti(import.meta.url, { alias: { "@earendil-works/pi-tui": tuiPath } });
+const { default: extension, worktreeIn, prLabel } = await jiti.import(new URL("../extensions/worktree-status.ts", import.meta.url).pathname);
+const { rgbColor } = await import(pathToFileURL(tuiPath));
 
 /** A repo folder with task worktrees whose `.git` files mark them as worktrees. */
 function repo(t, ...names) {
@@ -27,7 +30,7 @@ function repo(t, ...names) {
  * computed when its command starts. With `hold`, each git or gh call named there waits until the test
  * releases it, so replies can arrive out of order; an abort ends a held call as pi.exec does.
  */
-function session(t, cwd, { mode = "tui", branches = {}, prs = {}, hold = [] } = {}) {
+function session(t, cwd, { mode = "tui", branches = {}, prs = {}, hold = [], appearance = "dark" } = {}) {
 	let now = 0;
 	t.mock.method(Date, "now", () => now);
 	const handlers = new Map();
@@ -62,12 +65,15 @@ function session(t, cwd, { mode = "tui", branches = {}, prs = {}, hold = [] } = 
 		},
 	};
 	extension(pi);
-	const ctx = { mode, cwd, ui: { setStatus(key, text) { statuses.push([key, text]); }, theme: { fg: (_color, text) => text } } };
+	const styles = [];
+	const theme = { appearance, fg: (_color, text) => text, style: (text, style) => { styles.push(style); return text; } };
+	const ctx = { mode, cwd, ui: { setStatus(key, text) { statuses.push([key, text]); }, theme } };
 	const flush = async () => { for (let i = 0; i < 8; i++) await tick(); };
 	const emit = async (event, payload = {}) => { handlers.get(event)?.(payload, ctx); await flush(); };
 	return {
 		calls,
 		held,
+		styles,
 		flush,
 		maxInFlight: () => maxInFlight,
 		release: async (index) => { held[index].release(); await flush(); },
@@ -208,4 +214,14 @@ test("a path that is not a worktree, and non-TUI modes, show nothing", async (t)
 	await print.touch({ command: "git -C .agents/worktrees/fix-a status" });
 	assert.equal(print.calls.length, 0);
 	assert.equal(print.status(), undefined);
+});
+
+test("the worktree name is drawn in green for the theme's appearance", async (t) => {
+	for (const [appearance, color] of [["dark", rgbColor(74, 222, 128)], ["light", rgbColor(21, 128, 61)]]) {
+		const dir = repo(t, "fix-a");
+		const s = session(t, dir, { branches: { "fix-a": "fix-a" }, appearance });
+		await s.start();
+		await s.touch({ command: "git -C .agents/worktrees/fix-a status" });
+		assert.deepEqual(s.styles.at(-1), { fg: color }, appearance);
+	}
 });

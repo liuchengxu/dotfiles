@@ -18,6 +18,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { rgbColor } from "@earendil-works/pi-tui";
 
 const statusKey = "worktree";
 const PR_TTL_MS = 60_000;
@@ -81,8 +82,11 @@ export default function worktreeStatus(pi: ExtensionAPI): void {
 
 	const show = (): void => {
 		try {
-			const text = path ? [`⎇ ${basename(path)}`, pr].filter(Boolean).join(" · ") : undefined;
-			ctx?.ui.setStatus(statusKey, text && ctx.ui.theme.fg("muted", text));
+			if (!ctx) return;
+			const theme = ctx.ui.theme;
+			// Green, as git prompts draw a branch, so it stands apart from the model and session colors.
+			const name = path && theme.style(`⎇ ${basename(path)}`, { fg: theme.appearance === "light" ? rgbColor(21, 128, 61) : rgbColor(74, 222, 128) });
+			ctx.ui.setStatus(statusKey, name ? `${name}${pr ? theme.fg("muted", ` · ${pr}`) : ""}` : undefined);
 		} catch {
 			// A ctx from a replaced session throws; the next session_start replaces it.
 		}
