@@ -13,7 +13,19 @@ const jiti = createJiti(import.meta.url, { alias: {
   "@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
   "@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
-const { default: extension } = await jiti.import(new URL("../extensions/bash-background.ts", import.meta.url).pathname);
+const { default: extension, dockTask } = await jiti.import(new URL("../extensions/bash-background.ts", import.meta.url).pathname);
+
+test("a dock label is one line: edge newlines that pass validation are stripped from the description", () => {
+  const task = { id: "bg-1", command: "sleep 1", description: "\nRun a short check\n", startedAt: 0, state: "running" };
+  assert.deepEqual(dockTask(task), { id: "bg-1", label: "Run a short check", startedAt: 0, state: "running" });
+});
+
+test("the 30-character cut never leaves a lone surrogate half", () => {
+  const task = { id: "bg-1", command: "sleep 1", description: "a".repeat(30) + "\u{1F600}", startedAt: 0, state: "running" };
+  const label = dockTask(task).label;
+  assert.equal(label, "a".repeat(30));
+  assert.equal([...label].length, 30);
+});
 
 /** A loaded extension with helpers that replay pi's run events against it. */
 function session() {

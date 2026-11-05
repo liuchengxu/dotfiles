@@ -74,6 +74,31 @@ const MANUAL_BG_HINT_MS = Number(process.env.PI_BG_HINT_MS ?? 2_000);
  * and answers "No active run matched". */
 const WAIT_GUIDANCE = "You will be woken when it completes. Meanwhile do other work, or end the turn if nothing else is left. Do not call bg_wait or poll bg_status/bg_logs. When the notice arrives, read the output and continue the task it belongs to. Use bg_kill to stop it.";
 
+/** The running tasks the footer dock renders one line each for. Shared through
+ * globalThis, as worktree-status does: another extension's import of this file
+ * may load a second module instance. */
+const runningKey = Symbol.for("pi.bash-background.running");
+interface RunningBgTask {
+	id: string;
+	label: string;
+	startedAt: number;
+	state: BgState;
+}
+type SharedRunning = { [runningKey]?: RunningBgTask[] };
+
+/** The dock's view of a task. The description is validated with its edges trimmed, so the record
+ * can still carry edge newlines that would split a footer row; shape the label here, once. Cut by
+ * code points: a UTF-16 slice could leave a lone surrogate half of an emoji at 30. */
+export function dockTask(task: BgTask): RunningBgTask {
+	const label = (task.description ?? task.command).replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+	return {
+		id: task.id,
+		label: [...label].slice(0, 30).join(""),
+		startedAt: task.startedAt,
+		state: task.state,
+	};
+}
+
 type BgState = "running" | "stopping" | "completed" | "failed" | "killed" | "matched";
 type CallState = "foreground" | "detached" | "finished";
 
@@ -1754,31 +1779,34 @@ export default function bashBackground(pi: ExtensionAPI) {
 		};
 	});
 
-	// The dock: a footer segment with the running background tasks.
+	// The dock: footer-model-prefix renders one footer line per entry of the
+	// published snapshot; setStatus carries no text and is only the render
+	// heartbeat that keeps the seconds ticking while pi is otherwise idle.
+	let dockTimer: ReturnType<typeof setInterval> | undefined;
 	pi.on("session_start", (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
+		// A rebind fires session_start again; the old tick dies with its stale ctx.
+		if (dockTimer !== undefined) clearInterval(dockTimer);
+		let published = false;
 		const timer = setInterval(() => {
-			const running = [...tasks.values()].filter((task) => task.processAlive);
-			if (running.length === 0) {
-				ctx.ui.setStatus("bg-tasks", undefined);
-				return;
-			}
-			const newest = running[running.length - 1];
-			const seconds = Math.round((Date.now() - newest.startedAt) / 1000);
-			const label = (newest.description ?? newest.command).slice(0, 30);
-			try {
-				ctx.ui.setStatus(
-					"bg-tasks",
-					ctx.ui.theme.fg("accent", `bg ${running.length} \u25B6 ${label} ${seconds}s`),
-				);
-			} catch {
-				// The ctx went stale between ticks; the interval dies with the
-				// session's shutdown handler.
+			const running = [...tasks.values()].filter((task) => task.processAlive).map(dockTask);
+			(globalThis as unknown as SharedRunning)[runningKey] = running;
+			if (running.length > 0 || published) {
+				published = running.length > 0;
+				try {
+					ctx.ui.setStatus("bg-tasks", undefined);
+				} catch {
+					// The ctx went stale between ticks; the interval dies with the
+					// session's shutdown handler.
+				}
 			}
 		}, 1000);
+		dockTimer = timer;
 		timer.unref?.();
 		pi.on("session_shutdown", () => {
-			clearInterval(timer);
+			if (dockTimer !== undefined) clearInterval(dockTimer);
+			dockTimer = undefined;
+			(globalThis as unknown as SharedRunning)[runningKey] = [];
 			ctx.ui.setStatus("bg-tasks", undefined);
 		});
 	});

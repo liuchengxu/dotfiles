@@ -26,14 +26,14 @@ const messages = [
 ];
 
 /** A footer whose pi stats and session projection the test controls. */
-function footer(t, contextUsage) {
+function footer(t, contextUsage, statuses = new Map(), overrides = {}) {
   const handlers = new Map();
   extension({ on(event, handler) { handlers.set(event, handler); } });
   const projection = t.mock.fn(() => ({ messages }));
   const state = { model: { provider: "kimi-coding", id: "k3.1-pro" }, thinkingLevel: "off" };
   const component = new FooterComponent({ state, modelRuntime: { isUsingSubscription: () => true }, sessionManager: {
-    getCwd: () => "/tmp/project", getSessionName: () => "Test", getSessionId: () => "context-test", buildSessionProjection: projection,
-  } }, { getGitBranch: () => "main", getAvailableProviderCount: () => 1, getExtensionStatuses: () => new Map() });
+    getCwd: () => overrides.cwd ?? "/tmp/project", getSessionName: () => overrides.sessionName ?? "Test", getSessionId: () => "context-test", buildSessionProjection: projection,
+  } }, { getGitBranch: () => overrides.branch ?? "main", getAvailableProviderCount: () => 1, getExtensionStatuses: () => statuses });
   let stats = { usageTotals: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: 0 }, contextUsage };
   component.getSessionStats = () => stats;
   themes.initTheme("dark", false);
@@ -41,9 +41,16 @@ function footer(t, contextUsage) {
   t.after(() => handlers.get("session_shutdown")());
   return {
     projection,
+    lines: () => component.render(240).map(stripVTControlCharacters),
     context: () => /Context .*?\)/.exec(stripVTControlCharacters(component.render(240)[1]))?.[0],
     setStats(next) { stats = { ...stats, contextUsage: next }; },
   };
+}
+
+const runningBgKey = Symbol.for("pi.bash-background.running");
+
+function publishRunningBgTasks(tasks) {
+  (globalThis)[runningBgKey] = tasks;
 }
 
 test("the estimate counts the replayed system state once, plus every other message", () => {
@@ -80,4 +87,56 @@ test("a failed estimate keeps the unknown display and is not retried every frame
   assert.equal(f.context(), "Context ?????????? ? (2.0k)");
   f.context();
   assert.equal(f.projection.mock.callCount(), 1);
+});
+
+test("the footer ends with one line per running background task, in publish order", (t) => {
+  t.after(() => publishRunningBgTasks(undefined));
+  publishRunningBgTasks([
+    { id: "bg-1", label: "first command", startedAt: Date.now() - 65_000, state: "running" },
+    { id: "bg-2", label: "second command", startedAt: Date.now() - 12_000, state: "running" },
+  ]);
+  const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
+  const lines = f.lines();
+  assert.equal(lines.at(-2), "bg1 \u25B6 first command 65s");
+  assert.equal(lines.at(-1), "bg2 \u25B6 second command 12s");
+});
+
+test("an alive task that is not plainly running shows its state", (t) => {
+  t.after(() => publishRunningBgTasks(undefined));
+  publishRunningBgTasks([
+    { id: "bg-1", label: "dying command", startedAt: Date.now() - 5_000, state: "stopping" },
+    { id: "bg-2", label: "watched command", startedAt: Date.now() - 12_000, state: "matched" },
+  ]);
+  const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
+  const lines = f.lines();
+  assert.equal(lines.at(-2), "bg1 \u25B6 dying command 5s stopping");
+  assert.equal(lines.at(-1), "bg2 \u25B6 watched command 12s matched");
+});
+
+test("without running background tasks the footer grows no dock lines", (t) => {
+  t.after(() => publishRunningBgTasks(undefined));
+  publishRunningBgTasks([]);
+  const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
+  const lines = f.lines();
+  assert.ok(!lines.some((line) => line.startsWith("bg")), JSON.stringify(lines));
+});
+
+test("the task worktree sits beside the cwd's branch, not in the statuses line", (t) => {
+  const statuses = new Map([["worktree", "\u001b[38;2;74;222;128m\u2475 bg-footer-lines\u001b[0m"]]);
+  const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 }, statuses);
+  const lines = f.lines();
+  assert.ok(lines[2].includes("/tmp/project (main) \u2475 bg-footer-lines"), lines[2]);
+  assert.ok(!lines.slice(3).some((line) => line.includes("bg-footer-lines")), JSON.stringify(lines.slice(3)));
+});
+
+test("wide characters in the cwd do not shift the worktree splice", (t) => {
+  const statuses = new Map([["worktree", "\u2475 bg-footer-lines"]]);
+  const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 }, statuses, { cwd: "/tmp/\u9879\u76ee" });
+  assert.ok(f.lines()[2].endsWith("/tmp/\u9879\u76ee (main) \u2475 bg-footer-lines"), f.lines()[2]);
+});
+
+test("a parenthesis in the session name without a branch cannot steal the splice", (t) => {
+  const statuses = new Map([["worktree", "\u2475 bg-footer-lines"]]);
+  const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 }, statuses, { branch: "", sessionName: "Test (review)" });
+  assert.ok(f.lines()[2].endsWith("Test (review) \u2022 /tmp/project \u2475 bg-footer-lines"), f.lines()[2]);
 });

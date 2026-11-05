@@ -5,6 +5,13 @@ import { rgbColor, sliceByColumn, truncateToWidth, visibleWidth } from "@earendi
 
 import { sessionUptimeLabel } from "./session-uptime.ts";
 
+// bash-background publishes its running tasks for the dock here; globalThis
+// and the same symbol key as there, because the extensions load as separate
+// module instances.
+const runningBgKey = Symbol.for("pi.bash-background.running");
+type RunningBgTask = { id: string; label: string; startedAt: number; state: string };
+type RunningBgGlobal = { [key: symbol]: RunningBgTask[] | undefined };
+
 type Model = { provider: string; id: string; reasoning?: boolean };
 type Footer = {
   render(width: number): string[];
@@ -65,6 +72,9 @@ export function estimateContextTokens(messages: Message[]): number {
   return tokens;
 }
 
+/** One-line status text: newlines and tabs collapse to spaces, runs of spaces to one. */
+const cleanStatus = (value: string): string => value.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+
 /**
  * After a compaction pi reports the context as unknown until the next reply, although it has the
  * estimate above. Recompute it only when pi's own stats cache moves (session, leaf, entry count, or
@@ -117,18 +127,29 @@ export default function footerModelPrefix(pi: ExtensionAPI): void {
         const uptime = sessionUptimeLabel(this.session.sessionManager.getSessionId());
         lines[0] = `${sliceByColumn(lines[0], pathWidth + 3, visibleWidth(heading))}${uptime ? ` • ${theme.fg("muted", uptime)}` : ""} • ${sliceByColumn(lines[0], 0, pathWidth)}`;
       }
+      const statuses = this.footerData.getExtensionStatuses();
+      // The task worktree sits beside the cwd's branch instead of in the statuses line. The branch,
+      // when pi's cwd has one, is the only paren group at the line's end: a parenthesis in the
+      // session name or path cannot steal the splice, and with no branch the worktree falls back
+      // to the line's end. The prefix is measured in display columns, so wide characters in the
+      // path cannot shift the cut.
+      const worktree = statuses.get("worktree");
+      if (worktree) {
+        const plain = stripVTControlCharacters(lines[0]);
+        const branch = / \([^()]*\)$/.exec(plain);
+        const at = branch ? visibleWidth(plain.slice(0, branch.index + branch[0].length)) : visibleWidth(plain);
+        lines[0] = `${sliceByColumn(lines[0], 0, at)} ${cleanStatus(worktree)}${sliceByColumn(lines[0], at, visibleWidth(plain))}`;
+      }
 
       const model = this.session.state.model;
       let label = `(${model.provider}) ${model.id}`;
       if (model.reasoning) label += ` • ${this.session.state.thinkingLevel === "off" ? "thinking off" : this.session.state.thinkingLevel}`;
       const routed = this.session.routedModel;
       if (routed) label += ` → ${routed.model.id}${routed.thinkingLevel ? ` • ${routed.thinkingLevel}` : ""}`;
-      const statuses = this.footerData.getExtensionStatuses();
       const quota = statuses.get("usage");
       const quotaPrefix = QUOTA_PREFIX[model.provider] ?? model.provider;
       const quotaText = quota ? stripVTControlCharacters(quota) : "";
       const moveQuota = quotaText === quotaPrefix || quotaText.startsWith(`${quotaPrefix} `);
-      const cleanStatus = (value: string): string => value.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
       const speed = statuses.get("token-throughput");
       const modelParts = [theme.style(label, {
         fg: theme.appearance === "light" ? rgbColor(3, 105, 161) : rgbColor(56, 189, 248),
@@ -145,7 +166,7 @@ export default function footerModelPrefix(pi: ExtensionAPI): void {
         .filter((value): value is string => Boolean(value))
         .map(cleanStatus).filter(Boolean).join(" • ");
       const remaining = Array.from(statuses.entries())
-        .filter(([key]) => !activityKeys.includes(key) && key !== "token-throughput" && !(moveQuota && key === "usage"))
+        .filter(([key]) => !activityKeys.includes(key) && key !== "token-throughput" && key !== "worktree" && !(moveQuota && key === "usage"))
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([, value]) => cleanStatus(value))
         .filter(Boolean);
@@ -165,7 +186,13 @@ export default function footerModelPrefix(pi: ExtensionAPI): void {
           + theme.fg(color, `Context ${bar} ${usageText} (${context.groups.limit})`)
           + sliceByColumn(lines[1], end, visibleWidth(stats));
       }
-      return [modelLine, lines[1], lines[0], ...(activityLine ? [activityLine] : []), ...(remaining.length ? [remaining.join(" • ")] : [])]
+      const bgLines = ((globalThis as unknown as RunningBgGlobal)[runningBgKey] ?? []).map((task) => {
+        // Being in the dock is the running state; stopping and matched are alive but not plainly running, as bg_status renders them.
+        const state = task.state === "stopping" || task.state === "matched" ? ` ${task.state}` : "";
+        const seconds = Math.max(0, Math.round((Date.now() - task.startedAt) / 1000));
+        return theme.fg("accent", `bg${task.id.replace(/^bg-/, "")} \u25B6 ${task.label} ${seconds}s${state}`);
+      });
+      return [modelLine, lines[1], lines[0], ...(activityLine ? [activityLine] : []), ...(remaining.length ? [remaining.join(" • ")] : []), ...bgLines]
         .map((line) => truncateToWidth(line, width, "..."));
     };
     prototype[patchKey] = true;
