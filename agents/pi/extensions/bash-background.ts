@@ -128,6 +128,7 @@ interface BgTask {
 	/** A bg_status or bg_logs result showed the agent this task's final
 	 * state, so its held completion notification adds nothing. */
 	finalSeen: boolean;
+	[Symbol.for("pi.bash-background.poll-key")]?: string;
 }
 
 const FINAL_STATES: ReadonlySet<BgState> = new Set(["completed", "failed", "killed"]);
@@ -1837,26 +1838,52 @@ export default function bashBackground(pi: ExtensionAPI) {
 	// these tasks, so calling it for one is always wrong. bg_logs/bg_status
 	// are legitimate to read once, but repeated calls with no state change
 	// mean the model is polling instead of waiting for the notification.
+	// Eligibility resets when the task's state or output size changes, so a
+	// completed task or fresh output is always readable.
 	const pollTimes = new Map<string, number[]>();
+	const pollKey = Symbol.for("pi.bash-background.poll-key");
 	const POLL_COOLDOWN_MS = 30_000;
 	const POLL_MAX = 2;
+	const POLL_STATUS_MAX = 3;
+	let statusTimes: number[] = [];
 	pi.on("tool_call", (event) => {
 		const input = event.input as { id?: string };
 		const id = typeof input?.id === "string" ? input.id : undefined;
-		if (!id) return;
-		if (event.toolName === "bg_wait" && tasks.has(id)) {
+		if (event.toolName === "bg_wait" && id && tasks.has(id)) {
 			return {
 				block: true,
-				reason: `${id} is a background bash task, not a subagent run. It will notify you when it completes. Do not call bg_wait for it; do other work or end your turn.`,
+				reason: `${id} is a background bash task, not a subagent run. Do not call bg_wait for it; do other work or end your turn.`,
 			};
 		}
-		if (event.toolName !== "bg_logs" && event.toolName !== "bg_status") return;
+		if (event.toolName === "bg_status") {
+			// bg_status lists all tasks (no id parameter): rate-limit globally.
+			const now = Date.now();
+			statusTimes = statusTimes.filter((t) => now - t < POLL_COOLDOWN_MS);
+			if (statusTimes.length >= POLL_STATUS_MAX) {
+				return {
+					block: true,
+					reason: `You have listed background tasks ${statusTimes.length} times in the last ${POLL_COOLDOWN_MS / 1000}s. Do other work or end your turn; do not poll again.`,
+				};
+			}
+			statusTimes.push(now);
+			return;
+		}
+		if (event.toolName !== "bg_logs" || !id) return;
+		const task = tasks.get(id);
+		if (task) {
+			const key = `${task.state}:${task.bytes}`;
+			if (task[pollKey] !== key) {
+				task[pollKey] = key;
+				pollTimes.delete(id);
+			}
+		}
 		const now = Date.now();
 		const times = (pollTimes.get(id) ?? []).filter((t) => now - t < POLL_COOLDOWN_MS);
 		if (times.length >= POLL_MAX) {
+			const state = task ? task.state : "unknown";
 			return {
 				block: true,
-				reason: `You have checked ${id} ${times.length} times in the last ${POLL_COOLDOWN_MS / 1000}s. It is still running and will notify you when it completes. Do other work or end your turn; do not poll again.`,
+				reason: `You have checked ${id} ${times.length} times in the last ${POLL_COOLDOWN_MS / 1000}s (state: ${state}). Do other work or end your turn; do not poll again.`,
 			};
 		}
 		times.push(now);

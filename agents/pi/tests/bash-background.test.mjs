@@ -49,6 +49,44 @@ test("bg_logs is allowed twice per cooldown, then blocked", () => {
   } finally { s.shutdown(); }
 });
 
+test("bg_status (list all) is rate-limited globally", () => {
+  const s = session();
+  try {
+    const call = () => s.emit("tool_call", { toolName: "bg_status", input: {} });
+    assert.equal(call(), undefined);
+    assert.equal(call(), undefined);
+    assert.equal(call(), undefined);
+    const fourth = call();
+    assert.equal(fourth?.block, true);
+    assert.match(fourth?.reason ?? "", /3 times.*Do other work or end your turn/);
+  } finally { s.shutdown(); }
+});
+
+test("a task state change resets poll eligibility", async () => {
+  const s = session();
+  try {
+    const id = await s.background("exit 0");
+    const call = () => s.emit("tool_call", { toolName: "bg_logs", input: { id } });
+    assert.equal(call(), undefined);
+    assert.equal(call(), undefined);
+    assert.equal(call()?.block, true, "third call blocked while running");
+    await s.finish(id);
+    assert.equal(call(), undefined, "completed task resets eligibility");
+  } finally { s.shutdown(); }
+});
+
+test("the refusal text uses the task's actual state, not fabricated liveness", () => {
+  const s = session();
+  try {
+    const call = () => s.emit("tool_call", { toolName: "bg_logs", input: { id: "bg-nonexistent" } });
+    assert.equal(call(), undefined);
+    assert.equal(call(), undefined);
+    const third = call();
+    assert.equal(third?.block, true);
+    assert.match(third?.reason ?? "", /state: unknown/);
+  } finally { s.shutdown(); }
+});
+
 test("bg_wait for an unknown task falls through to pi-subagents", () => {
   const s = session();
   try {
