@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { setLiveRate } from "./lib/working-line.ts";
+import { setLiveRate, setPhase } from "./lib/working-line.ts";
 
 // Live output throughput for the current assistant message. Streaming values
 // estimate tokens from emitted text, thinking, and tool-call JSON. Final values
@@ -9,6 +9,9 @@ const STATUS_KEY = "token-throughput";
 const CHARACTERS_PER_TOKEN = 4;
 const RENDER_INTERVAL_MS = 120;
 const MIN_RATE_DURATION_MS = 50;
+/** A phase publishes only after its delta type held this long, so a reply
+ * alternating thinking and text within one message does not flicker. */
+const PHASE_STABILITY_MS = 300;
 
 type OutputDeltaType = "text_delta" | "thinking_delta" | "toolcall_delta";
 
@@ -38,6 +41,10 @@ function isOutputDelta(type: string): type is OutputDeltaType {
   return type === "text_delta" || type === "thinking_delta" || type === "toolcall_delta";
 }
 
+function phaseFor(type: OutputDeltaType): string {
+  return type === "thinking_delta" ? "Thinking" : type === "text_delta" ? "Replying" : "Preparing tool";
+}
+
 export default function tokenThroughputExtension(pi: ExtensionAPI): void {
   let active = false;
   let characters = 0;
@@ -45,6 +52,15 @@ export default function tokenThroughputExtension(pi: ExtensionAPI): void {
   let lastDeltaAt: number | undefined;
   let lastRenderAt: number | undefined;
   let streamFailed = false;
+  let pendingPhase: string | undefined;
+  let pendingPhaseAt: number | undefined;
+
+  /** Publishes the phase and drops any candidate it supersedes. */
+  const publishPhase = (text: string): void => {
+    pendingPhase = undefined;
+    pendingPhaseAt = undefined;
+    setPhase(text);
+  };
 
   const reset = (): void => {
     active = false;
@@ -53,6 +69,9 @@ export default function tokenThroughputExtension(pi: ExtensionAPI): void {
     lastDeltaAt = undefined;
     lastRenderAt = undefined;
     streamFailed = false;
+    pendingPhase = undefined;
+    pendingPhaseAt = undefined;
+    setPhase("");
   };
 
   const elapsedOutputMs = (): number | undefined => {
@@ -110,6 +129,9 @@ export default function tokenThroughputExtension(pi: ExtensionAPI): void {
 
     reset();
     active = true;
+    // Entering waiting cannot flicker: publish at once; the first sustained
+    // deltas replace it.
+    publishPhase("Waiting for model");
     render(ctx, { final: false });
   });
 
@@ -121,6 +143,13 @@ export default function tokenThroughputExtension(pi: ExtensionAPI): void {
       firstDeltaAt ??= now;
       lastDeltaAt = now;
       characters += streamEvent.delta.length;
+      const phase = phaseFor(streamEvent.type);
+      if (phase !== pendingPhase) {
+        pendingPhase = phase;
+        pendingPhaseAt = now;
+      } else if (pendingPhaseAt !== undefined && now - pendingPhaseAt >= PHASE_STABILITY_MS) {
+        publishPhase(phase);
+      }
     } else if (streamEvent.type === "error") {
       streamFailed = true;
     }

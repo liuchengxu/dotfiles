@@ -1,5 +1,6 @@
 // Shared state for the working line. token-throughput owns the live rate
-// text; working-elapsed renders it next to the elapsed time.
+// text and the model phase; working-elapsed renders them around the
+// activity.
 //
 // pi loads every extension with moduleCache disabled, so each importer would
 // get its own module instance. The store therefore lives on a global symbol:
@@ -14,23 +15,40 @@ export type LiveRateListener = () => void;
 
 interface WorkingLineStore {
 	rateText: string;
+	phaseText: string;
 	listeners: Set<LiveRateListener>;
 }
 
 const STORE_KEY = Symbol.for("pi.extensions.working-line");
 const store: WorkingLineStore = ((globalThis as Record<symbol, WorkingLineStore>)[STORE_KEY] ??= {
 	rateText: "",
+	phaseText: "",
 	listeners: new Set<LiveRateListener>(),
 });
+
+function notify(): void {
+	for (const listener of store.listeners) listener();
+}
 
 export function setLiveRate(text: string): void {
 	if (store.rateText === text) return;
 	store.rateText = text;
-	for (const listener of store.listeners) listener();
+	notify();
 }
 
 export function getLiveRate(): string {
 	return store.rateText;
+}
+
+/** What the model is producing while no tool runs: Waiting for model, Thinking, Replying, Preparing tool. */
+export function setPhase(text: string): void {
+	if (store.phaseText === text) return;
+	store.phaseText = text;
+	notify();
+}
+
+export function getPhase(): string {
+	return store.phaseText;
 }
 
 export function onLiveRate(listener: LiveRateListener): () => void {

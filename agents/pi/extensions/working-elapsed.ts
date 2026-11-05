@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { basename } from "node:path";
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import { getLiveRate, onLiveRate } from "./lib/working-line.ts";
+import { getLiveRate, getPhase, onLiveRate } from "./lib/working-line.ts";
 
 export default function workingElapsed(pi: ExtensionAPI): void {
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -28,8 +29,10 @@ export default function workingElapsed(pi: ExtensionAPI): void {
     // The live stream rate joins the line only while a message streams: it
     // goes stale the moment a tool takes over and the clock keeps ticking.
     const rate = getLiveRate();
+    // A live tool names itself; between tools the model phase names the wait.
+    const label = activity || getPhase();
     ctx.ui.setWorkingMessage(
-      `Working${activity ? ` · ${activity}` : ""} · ${elapsed}${rate ? ` · ${rate}` : ""}`,
+      `Working${label ? ` · ${label}` : ""} · ${elapsed}${rate ? ` · ${rate}` : ""}`,
     );
   };
 
@@ -49,17 +52,24 @@ export default function workingElapsed(pi: ExtensionAPI): void {
     if (currentCtx) render(currentCtx);
   });
 
-  // Name the step the reader is waiting on: a bash command's description,
-  // or the tool name otherwise. The running row holds the same fact; this
-  // puts it in the footer, next to the elapsed time.
+  // Name the step the reader is waiting on. A bash command shows its
+  // description; file tools show the file's basename — the one argument
+  // field that is both informative and safe to print. Everything else keeps
+  // the generic verb. The running row holds the same fact; this puts it in
+  // the footer, next to the elapsed time.
   const active = new Map<string, string>();
 
   pi.on("tool_execution_start", (event, ctx) => {
-    const args = event.args as { description?: unknown } | undefined;
+    const args = event.args as { description?: unknown; path?: unknown } | undefined;
     const phase: Record<string, string> = { read: "Reading", write: "Writing", edit: "Editing", grep: "Searching", find: "Finding", bash: "Running" };
-    const label = event.toolName === "bash" && typeof args?.description === "string" && args.description.trim()
-      ? args.description.trim()
-      : phase[event.toolName] ?? event.toolName.replace(/^mcp__.+?__/, "").replace(/[_-]+/g, " ");
+    let label = phase[event.toolName] ?? event.toolName.replace(/^mcp__.+?__/, "").replace(/[_-]+/g, " ");
+    if (event.toolName === "bash" && typeof args?.description === "string" && args.description.trim()) {
+      label = args.description.trim();
+    } else if (["read", "write", "edit"].includes(event.toolName) && typeof args?.path === "string" && args.path.trim()) {
+      // One line: edge newlines and runs of spaces collapse before the cut.
+      const name = basename(args.path).replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+      if (name) label = `${label} ${name.slice(0, 40)}`;
+    }
     active.set(event.toolCallId, label);
     activity = label;
     render(ctx);
