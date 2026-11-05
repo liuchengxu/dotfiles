@@ -32,7 +32,7 @@ test("an editor subclass made after the extension loads still shows the marker",
 	}
 	const editor = new LateEditor(tui, theme, keybindings, { paddingX: 1 });
 	editor.setText("hello");
-	assert.match(strip(editor.render(40)[1]), /^> hello/);
+	assert.match(strip(editor.render(40)[1]), /^❯ hello/);
 });
 
 test("an editor from another CustomEditor copy is marked when pi installs it", () => {
@@ -57,12 +57,12 @@ test("an editor from another CustomEditor copy is marked when pi installs it", (
 	InteractiveMode.prototype.setCustomEditorComponent.call(mode, () => new ForeignEditor());
 	mode.editor.setText("hello");
 	assert.ok(mode.editor instanceof ForeignEditor);
-	assert.equal(mode.editor.render(40)[1], "> hello");
+	assert.equal(mode.editor.render(40)[1], "❯ hello");
 });
 
 test("a narrow editor is left alone", () => {
 	const editor = new CustomEditor(tui, theme, keybindings, { paddingX: 2 });
 	editor.setText("hi");
-	assert.match(strip(editor.render(40)[1]), /^> hi/);
+	assert.match(strip(editor.render(40)[1]), /^❯ hi/);
 	assert.doesNotMatch(strip(editor.render(4)[1] ?? ""), />/);
 });
