@@ -1,7 +1,7 @@
 import { CustomEditor, InteractiveMode } from "@earendil-works/pi-coding-agent";
 
 const patchKey = Symbol.for("pi.input-prompt.v2");
-const marker = ">";
+const marker = "❯";
 const padding = 2;
 
 type PromptEditor = {
@@ -24,7 +24,7 @@ function withMarker(render: PromptEditor["render"]): PromptEditor["render"] {
 }
 
 /**
- * Display `>` beside live input. The prototype patch covers pi's editor and every subclass of pi's
+ * Display `❯` beside live input, matching the ❯ user-message border. The prototype patch covers pi's editor and every subclass of pi's
  * `CustomEditor`, including one a package installs later. pi-prompt-suggester extends the `CustomEditor` of
  * its own bundled pi copy instead, so editors pi installs from another class are marked one by one.
  */

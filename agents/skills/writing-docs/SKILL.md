@@ -61,6 +61,25 @@ review notes, runbooks, hand-offs), must also carry its provenance:
   findings and for excerpts likely to be copied without that section.
 - Never present an unpushed or dirty SHA as immutable evidence.
 
+## Plain words
+
+- Keep code identifiers and technical terms the intended reader already knows:
+  `tonic::Status`, beacon state, typed errors, acceptance testing.
+- Expand session shorthand that hides behavior: name the actor, action, and
+  relevant trigger or limit. "Durable retry" → "a retry loop that persists
+  across restarts." Do not invent missing details; flag them.
+- Anchor unfamiliar necessary terms at first use with their practical meaning:
+  "vaultd stops retrying; recovery waits for an operator (quarantined
+  state)." Then reuse the term; repeat the anchor only in independently read
+  excerpts.
+- Use one name per concept; do not use that name for another meaning nearby.
+- Before delivery, reread behavior and state descriptions without session
+  context. Check for hidden mechanisms, unexplained states, ambiguous names,
+  and session shorthand where source terminology is clearer. Fix each or
+  flag missing facts.
+- In reviews, apply this pass; report concrete reader effects in existing
+  findings.
+
 ## By type
 
 Combine entries when a document spans types. Apply the summary checks to any
