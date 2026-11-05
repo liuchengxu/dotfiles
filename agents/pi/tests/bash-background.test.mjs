@@ -27,6 +27,35 @@ test("the 30-character cut never leaves a lone surrogate half", () => {
   assert.equal([...label].length, 30);
 });
 
+test("bg_wait for a background task is blocked with a clear reason", async () => {
+  const s = session();
+  try {
+    const id = await s.background("sleep 60");
+    const result = s.emit("tool_call", { toolName: "bg_wait", input: { id } });
+    assert.equal(result?.block, true);
+    assert.match(result?.reason ?? "", /not a subagent run.*Do not call bg_wait/);
+  } finally { s.shutdown(); }
+});
+
+test("bg_logs is allowed twice per cooldown, then blocked", () => {
+  const s = session();
+  try {
+    const call = () => s.emit("tool_call", { toolName: "bg_logs", input: { id: "bg-1" } });
+    assert.equal(call(), undefined, "first call passes");
+    assert.equal(call(), undefined, "second call passes");
+    const third = call();
+    assert.equal(third?.block, true);
+    assert.match(third?.reason ?? "", /2 times.*Do other work or end your turn/);
+  } finally { s.shutdown(); }
+});
+
+test("bg_wait for an unknown task falls through to pi-subagents", () => {
+  const s = session();
+  try {
+    assert.equal(s.emit("tool_call", { toolName: "bg_wait", input: { id: "run-999" } }), undefined);
+  } finally { s.shutdown(); }
+});
+
 /** A loaded extension with helpers that replay pi's run events against it. */
 function session() {
   const handlers = new Map();
@@ -50,6 +79,7 @@ function session() {
     return result.content[0].text;
   };
   return {
+    emit,
     sent,
     renderer(toolName) { return renderers[0](toolName, () => undefined); },
     start() { emit("agent_start", { type: "agent_start" }); },

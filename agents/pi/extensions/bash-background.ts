@@ -1833,6 +1833,36 @@ export default function bashBackground(pi: ExtensionAPI) {
 		}
 	});
 
+	// The dead-loop guard: bg_wait belongs to pi-subagents and never matches
+	// these tasks, so calling it for one is always wrong. bg_logs/bg_status
+	// are legitimate to read once, but repeated calls with no state change
+	// mean the model is polling instead of waiting for the notification.
+	const pollTimes = new Map<string, number[]>();
+	const POLL_COOLDOWN_MS = 30_000;
+	const POLL_MAX = 2;
+	pi.on("tool_call", (event) => {
+		const input = event.input as { id?: string };
+		const id = typeof input?.id === "string" ? input.id : undefined;
+		if (!id) return;
+		if (event.toolName === "bg_wait" && tasks.has(id)) {
+			return {
+				block: true,
+				reason: `${id} is a background bash task, not a subagent run. It will notify you when it completes. Do not call bg_wait for it; do other work or end your turn.`,
+			};
+		}
+		if (event.toolName !== "bg_logs" && event.toolName !== "bg_status") return;
+		const now = Date.now();
+		const times = (pollTimes.get(id) ?? []).filter((t) => now - t < POLL_COOLDOWN_MS);
+		if (times.length >= POLL_MAX) {
+			return {
+				block: true,
+				reason: `You have checked ${id} ${times.length} times in the last ${POLL_COOLDOWN_MS / 1000}s. It is still running and will notify you when it completes. Do other work or end your turn; do not poll again.`,
+			};
+		}
+		times.push(now);
+		pollTimes.set(id, times);
+	});
+
 	// Nested edit and write calls made by a codemode script leave no rows of
 	// their own; their diffs roll up onto the script's row so the change stays
 	// visible after the script finishes.
