@@ -54,12 +54,27 @@ export default function tokenThroughputExtension(pi: ExtensionAPI): void {
   let streamFailed = false;
   let pendingPhase: string | undefined;
   let pendingPhaseAt: number | undefined;
+  let phaseDeadline: ReturnType<typeof setTimeout> | undefined;
 
   /** Publishes the phase and drops any candidate it supersedes. */
   const publishPhase = (text: string): void => {
+    if (phaseDeadline !== undefined) clearTimeout(phaseDeadline);
+    phaseDeadline = undefined;
     pendingPhase = undefined;
     pendingPhaseAt = undefined;
     setPhase(text);
+  };
+
+  /** A candidate publishes on the deadline even if no further delta arrives:
+   * "held for 300ms" is wall-clock, not contingent on the next event. */
+  const schedulePhase = (phase: string, now: number): void => {
+    pendingPhase = phase;
+    pendingPhaseAt = now;
+    if (phaseDeadline !== undefined) clearTimeout(phaseDeadline);
+    phaseDeadline = setTimeout(() => {
+      phaseDeadline = undefined;
+      if (pendingPhase !== undefined) publishPhase(pendingPhase);
+    }, PHASE_STABILITY_MS);
   };
 
   const reset = (): void => {
@@ -69,6 +84,8 @@ export default function tokenThroughputExtension(pi: ExtensionAPI): void {
     lastDeltaAt = undefined;
     lastRenderAt = undefined;
     streamFailed = false;
+    if (phaseDeadline !== undefined) clearTimeout(phaseDeadline);
+    phaseDeadline = undefined;
     pendingPhase = undefined;
     pendingPhaseAt = undefined;
     setPhase("");
@@ -144,14 +161,11 @@ export default function tokenThroughputExtension(pi: ExtensionAPI): void {
       lastDeltaAt = now;
       characters += streamEvent.delta.length;
       const phase = phaseFor(streamEvent.type);
-      if (phase !== pendingPhase) {
-        pendingPhase = phase;
-        pendingPhaseAt = now;
-      } else if (pendingPhaseAt !== undefined && now - pendingPhaseAt >= PHASE_STABILITY_MS) {
-        publishPhase(phase);
-      }
+      if (phase !== pendingPhase) schedulePhase(phase, now);
     } else if (streamEvent.type === "error") {
       streamFailed = true;
+      // A failed stream produces nothing further to name.
+      publishPhase("");
     }
     render(ctx, { final: false });
   });

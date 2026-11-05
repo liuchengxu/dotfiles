@@ -66,8 +66,10 @@ export default function workingElapsed(pi: ExtensionAPI): void {
     if (event.toolName === "bash" && typeof args?.description === "string" && args.description.trim()) {
       label = args.description.trim();
     } else if (["read", "write", "edit"].includes(event.toolName) && typeof args?.path === "string" && args.path.trim()) {
-      // One line: edge newlines and runs of spaces collapse before the cut.
-      const name = basename(args.path).replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+      // One line and control-free: filenames are unvalidated input, so strip
+      // every control character (a filename with an escape could restyle the
+      // line), collapse runs of spaces, then cut.
+      const name = basename(args.path).replace(/[\u0000-\u001f\u007f]/g, " ").replace(/ +/g, " ").trim();
       if (name) label = `${label} ${name.slice(0, 40)}`;
     }
     active.set(event.toolCallId, label);
