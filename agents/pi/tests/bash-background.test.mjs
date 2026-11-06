@@ -371,6 +371,47 @@ test("a collapsed error row names the file the way the heading does, and the too
   }
 });
 
+test("a dock label strips terminal escapes that a bg_watch description can carry", () => {
+  const task = { id: "bg-1", command: "sleep 1", description: "\x1b[31mRed\x1b[0m run\u0007", startedAt: 0, state: "running" };
+  assert.equal(dockTask(task).label, "Red run");
+});
+
+test("a line that names its own failure outranks a retry note that says could not", () => {
+  const s = session();
+  const current = Symbol.for("pi.worktree-status.current");
+  globalThis[current] = "/r/.agents/worktrees/fix-a";
+  try {
+    const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text };
+    const args = { path: "/r/.agents/worktrees/fix-a/src/lib.rs", edits: [{ oldText: "a", newText: "b" }] };
+    const result = { content: [{ type: "text", text: "Retrying: could not connect to host\nError: permission denied for key" }] };
+    const context = { args, toolCallId: "e4", invalidate() {}, state: { detailsCollapsed: true }, cwd: tmpdir(), executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: false, isError: true, outputPad: 1 };
+    const row = s.renderer("edit").renderResult(result, { expanded: false, isPartial: false }, theme, context).render(200).join("\n");
+    assert.match(row, /✗ Update src\/lib\.rs: Error: permission denied for key/);
+    assert.doesNotMatch(row, /Retrying/);
+  } finally {
+    delete globalThis[current];
+    s.shutdown();
+  }
+});
+
+test("a drawn error row follows the footer's worktree after a switch", () => {
+  const s = session();
+  const current = Symbol.for("pi.worktree-status.current");
+  globalThis[current] = "/r/.agents/worktrees/fix-a";
+  try {
+    const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text };
+    const args = { path: "/r/.agents/worktrees/fix-a/src/lib.rs", edits: [{ oldText: "a", newText: "b" }] };
+    const result = { content: [{ type: "text", text: "Could not find the exact text in /r/.agents/worktrees/fix-a/src/lib.rs." }] };
+    const context = { args, toolCallId: "e5", invalidate() {}, state: { detailsCollapsed: true }, cwd: tmpdir(), executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: false, isError: true, outputPad: 1 };
+    const component = s.renderer("edit").renderResult(result, { expanded: false, isPartial: false }, theme, context);
+    globalThis[current] = "/r/.agents/worktrees/fix-b";
+    assert.match(component.render(200).join("\n"), /✗ Update ⎇ fix-a\/src\/lib\.rs: Could not find the exact text in ⎇ fix-a\/src\/lib\.rs\./);
+  } finally {
+    delete globalThis[current];
+    s.shutdown();
+  }
+});
+
 test("a background task is one row: the header carries its id, time, and exit", async () => {
   const s = session();
   // The command runs until the test creates this file, so the running

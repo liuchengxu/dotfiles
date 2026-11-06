@@ -101,6 +101,15 @@ test("the footer ends with one line per running background task, in publish orde
   assert.equal(lines.at(-1), "bg2 \u25C6 second command 12s");
 });
 
+test("a long label truncates into the space the time leaves, and the time stays visible", (t) => {
+  t.after(() => publishRunningBgTasks(undefined));
+  publishRunningBgTasks([
+    { id: "bg-1", label: "L".repeat(200), startedAt: Date.now() - 65_000, state: "running" },
+  ]);
+  const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
+  assert.match(f.lines().at(-1), /1m 5s$/);
+});
+
 test("an alive task that is not plainly running shows its state", (t) => {
   t.after(() => publishRunningBgTasks(undefined));
   publishRunningBgTasks([

@@ -189,14 +189,12 @@ export default function footerModelPrefix(pi: ExtensionAPI): void {
       const bgLines = ((globalThis as unknown as RunningBgGlobal)[runningBgKey] ?? []).map((task) => {
         // Being in the dock is the running state; stopping and matched are alive but not plainly running, as bg_status renders them.
         const state = task.state === "stopping" || task.state === "matched" ? ` ${task.state}` : "";
-        // Sectors carry distinct weights: id and marker accent, label default,
-        // elapsed time dim.
-        return [
-          theme.fg("accent", `bg${task.id.replace(/^bg-/, "")}`),
-          theme.fg("accent", " \u25C6 "),
-          `${task.label} `,
-          theme.fg("dim", `${formatUptime(Date.now() - task.startedAt)}${state}`),
-        ].join("");
+        const suffix = theme.fg("dim", `${formatUptime(Date.now() - task.startedAt)}${state}`);
+        const head = theme.fg("accent", `bg${task.id.replace(/^bg-/, "")} \u25C6 `) + task.label;
+        // The time stays visible beside any label: the label truncates into the
+        // space left by the suffix, not the whole row off its edge.
+        const room = width - visibleWidth(suffix) - 1;
+        return room > 0 ? truncateToWidth(head, room, "") + " " + suffix : truncateToWidth(head + " " + suffix, width, "...");
       });
       return [modelLine, lines[1], lines[0], ...(activityLine ? [activityLine] : []), ...(remaining.length ? [remaining.join(" • ")] : []), ...bgLines]
         .map((line) => truncateToWidth(line, width, "..."));

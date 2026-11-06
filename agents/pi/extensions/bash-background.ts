@@ -89,9 +89,15 @@ type SharedRunning = { [runningKey]?: RunningBgTask[] };
 /** The dock's view of a task. The description is validated with its edges trimmed, so the record
  * can still carry edge newlines that would split a footer row; shape the label here, once. The
  * label is stored whole: every footer row truncates to the terminal width at render, so a capture
- * cut here would clip wide terminals and double-truncate narrow ones. */
+ * cut here would clip wide terminals and double-truncate narrow ones. This is the one boundary
+ * every producer's label crosses — bash descriptions are control-checked, bg_watch's are not —
+ * so terminal escapes and other controls die here, not at the 30th code point as before. */
 export function dockTask(task: BgTask): RunningBgTask {
-	const label = (task.description ?? task.command).replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+	const label = (task.description ?? task.command)
+		.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+		.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+		.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+		.replace(/ +/g, " ").trim();
 	return {
 		id: task.id,
 		label,
@@ -1132,21 +1138,26 @@ export default function bashBackground(pi: ExtensionAPI) {
 			}
 			if (!options.expanded && context.isError) {
 				const lines = result.content.filter(block => block.type === "text").flatMap(block => block.text.split(/\r?\n/)).map(line => line.trim()).filter(Boolean);
-				const error = lines.find(line => /error|failed|rejected|terminated|denied|not found|no such|could not/i.test(line)) ?? "Operation failed (Ctrl+O for details)";
+				// A line that names its own failure outranks a retry note that merely says "could not".
+				const error = lines.find(line => /error|failed|rejected|terminated|denied|not found|no such/i.test(line))
+					?? lines.find(line => /could not/i.test(line))
+					?? "Operation failed (Ctrl+O for details)";
 				const args = context.args as { description?: unknown; path?: unknown } | undefined;
-				// The same relative form the call heading shows: an absolute path here would
-				// name the worktree the footer already names, twice.
 				const verbs: Record<string, string> = { edit: "Update", write: "Write", read: "Read" };
 				const rawPath = typeof args?.path === "string" ? args.path : "";
-				const relPath = rawPath ? worktreePath(rawPath) : "";
-				const label = context.state?.detailsCollapsed && typeof args?.description === "string" && args.description.trim()
-					? args.description.trim().replace(/\s+/g, " ")
-					: context.state?.detailsCollapsed && relPath ? `${verbs[toolName] ?? toolName} ${relPath}` : verbs[toolName] ?? toolName;
-				// The tool's own message embeds the path it was given; show it the way the
-				// row names it, so one screen does not carry both forms.
-				const text = rawPath && relPath && relPath !== rawPath ? error.split(rawPath).join(relPath) : error;
 				return {
+					// Built at render time, so the row follows the footer's worktree the way
+					// call headings do, instead of naming the one it had when it failed.
 					render(width) {
+						// The same relative form the call heading shows: an absolute path here would
+						// name the worktree the footer already names, twice.
+						const relPath = rawPath ? worktreePath(rawPath) : "";
+						const label = context.state?.detailsCollapsed && typeof args?.description === "string" && args.description.trim()
+							? args.description.trim().replace(/\s+/g, " ")
+							: context.state?.detailsCollapsed && relPath ? `${verbs[toolName] ?? toolName} ${relPath}` : verbs[toolName] ?? toolName;
+						// The tool's own message embeds the path it was given; show it the way the
+						// row names it, so one screen does not carry both forms.
+						const text = rawPath && relPath && relPath !== rawPath ? error.split(rawPath).join(relPath) : error;
 						return width > 0 ? [truncateToWidth(theme.fg("error", `✗ ${label}: ${text.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")}`), width)] : [];
 					},
 					invalidate() {},
