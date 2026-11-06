@@ -80,9 +80,14 @@ machine after cloning:
 
 ```bash
 for d in ~/.agents/skills ~/.claude/skills ~/.codex/skills ~/.pi/agent/skills; do
-  rm -rf "$d" && ln -s ~/.dotfiles/agents/skills "$d"
+  [ -e "$d" ] && [ ! -L "$d" ] && mv "$d" "$d.pre-single-source"
+  ln -sfn ~/.dotfiles/agents/skills "$d"
 done
 ```
+
+A real directory is moved aside, never deleted: it may hold skills that were
+never linked into the repo. Merge anything worth keeping into the repository
+directory, then remove the `.pre-single-source` copy.
 
 An agent-specific skill that must not be shared goes in a subdirectory of that
 agent's own config outside these four paths. Pi silently skips a skill whose
@@ -268,9 +273,9 @@ Steps, each with the user's approval:
    `~/.local/state/agent-rules/backups/pre-migration-<UTC time>/`, then apply
    and check.
 4. Move `shared-working-rules.ts` aside, or Pi loads the old rules as well.
-5. Replace the three skill-directory symlinks with real directories. Link each
-   skill in use into `~/.agents/skills` and `~/.claude/skills` (see Skills).
-   Leave `~/.pi/agent/skills` without these links.
+5. Replace the four skill directories with links to the whole repository skills
+   directory (see Skills). Move any real directory aside first; its skills are
+   worth merging into the repository directory before the copy is removed.
 6. Add the Grafana MCP server to Codex. Claude and Pi already have it.
 7. Make the Claude plugins match the table in Claude plugins. MacBook also has
    `code-review`, `frontend-design`, `superpowers`, `warp`, and disabled
