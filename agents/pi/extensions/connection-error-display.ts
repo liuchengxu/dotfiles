@@ -26,8 +26,12 @@ export function enrichError(errorMessage: string, model: { provider: string; id:
 
 export default function connectionErrorDisplay(pi: ExtensionAPI): void {
 	let selected: { provider: string; id: string } | undefined;
-	// Consecutive failures of the same model count up; a reply that completes,
-	// a new user message, or a model switch starts the count over.
+	// Consecutive failures of the same model count up. The streak ends at any
+	// assistant message that is not itself a generic-transport error — completed,
+	// tool-use, or aborted: a new run deserves the full explanation again — and at
+	// a user message or a model selection. A non-generic error (rate limit) between
+	// two connection failures leaves the streak intact: the reader still saw the
+	// cause once and wants the count, not the paragraph again.
 	let attempts = 0;
 	let failing = "";
 
@@ -60,7 +64,7 @@ export default function connectionErrorDisplay(pi: ExtensionAPI): void {
 		failing = key;
 		const original = (message.errorMessage ?? "").trim().replace(/\.$/, "");
 		const errorMessage = attempts === 1
-			? `${original}.${hint(key)}`
+			? enrichError(message.errorMessage, model)
 			: `${original}. — retry ${attempts} for ${key}.`;
 		// Idempotent: an enriched message no longer matches the generic pattern.
 		return { message: { ...event.message, errorMessage } };
