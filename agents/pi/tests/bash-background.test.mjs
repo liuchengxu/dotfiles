@@ -118,6 +118,7 @@ function session() {
   };
   return {
     emit,
+    call,
     sent,
     renderer(toolName) { return renderers[0](toolName, () => undefined); },
     start() { emit("agent_start", { type: "agent_start" }); },
@@ -211,6 +212,69 @@ test("a watch match gets through even after the agent read the finished log", as
     assert.equal(result?.continue, true);
     assert.equal(result.entries.length, 1);
     assert.match(result.entries[0].details.summary, /output matched/);
+  } finally { s.shutdown(); }
+});
+
+test("a watch match does not suppress the later exit notification", async () => {
+  const s = session();
+  try {
+    s.start();
+    const id = /bg-\d+/.exec(await s.watch("echo ready; sleep 0.2; exit 3", "ready"))[0];
+    await s.finish(id);
+    const result = s.settle();
+    assert.equal(result?.continue, true);
+    const summaries = result.entries.map((entry) => entry.details.summary);
+    assert.equal(summaries.length, 2, "the agent never read the log, so both notices are due");
+    assert.match(summaries[0], /output matched/);
+    assert.match(summaries[1], /failed with exit code 3/);
+  } finally { s.shutdown(); }
+});
+
+test("a matched watch that exits 0 reports a consistent outcome", async () => {
+  const s = session();
+  try {
+    s.start();
+    const id = /bg-\d+/.exec(await s.watch("echo ready", "ready"))[0];
+    await s.finish(id);
+    const summaries = s.settle().entries.map((entry) => entry.details.summary);
+    assert.equal(summaries.length, 2);
+    assert.match(summaries[0], /output matched/);
+    assert.match(summaries[1], /completed after "ready" matched/);
+  } finally { s.shutdown(); }
+});
+
+test("killOnMatch delivers the match and the kill outcome", async () => {
+  const s = session();
+  try {
+    s.start();
+    const id = /bg-\d+/.exec(await s.call("bg_watch", {
+      command: "echo ready; sleep 60", pattern: "ready", killOnMatch: true, description: "Watch and kill",
+    }))[0];
+    await s.finish(id);
+    const result = s.settle();
+    const summaries = result.entries.map((entry) => entry.details.summary);
+    assert.equal(summaries.length, 2);
+    assert.match(summaries[0], /output matched/);
+    assert.match(summaries[1], /killed/);
+  } finally { s.shutdown(); }
+});
+
+test("bg_kill on a settled task is blocked with its actual state", async () => {
+  const s = session();
+  try {
+    const id = await s.background("exit 0");
+    await s.finish(id);
+    const result = s.emit("tool_call", { toolName: "bg_kill", input: { id } });
+    assert.equal(result?.block, true);
+    assert.match(result?.reason ?? "", /already completed.*killing it again changes nothing/);
+  } finally { s.shutdown(); }
+});
+
+test("bg_kill on a running task passes the guard", async () => {
+  const s = session();
+  try {
+    const id = await s.background("sleep 60");
+    assert.equal(s.emit("tool_call", { toolName: "bg_kill", input: { id } }), undefined);
   } finally { s.shutdown(); }
 });
 

@@ -447,15 +447,18 @@ export default function bashBackground(pi: ExtensionAPI) {
 			task.processAlive = false;
 			task.finishedAt ??= Date.now();
 			task.exit = { code: code ?? undefined, signal: signal ?? undefined };
+			const matched = task.state === "matched";
 			task.state = signal || task.killRequested ? "killed" : code === 0 ? "completed" : "failed";			const tail = tailBytes(task.logPath, NOTIFY_TAIL_BYTES);
 			const summary = signal
 				? `killed by signal ${signal}`
 				: task.killRequested && (code ?? 0) > 128
 					? `killed on request (exit code ${code})`
 					: code === 0
-					? task.watchPattern
-						? `completed without ${JSON.stringify(task.watchPattern)} ever matching`
-						: "completed successfully"
+					? matched
+						? `completed after ${JSON.stringify(task.watchPattern)} matched`
+						: task.watchPattern
+							? `completed without ${JSON.stringify(task.watchPattern)} ever matching`
+							: "completed successfully"
 					: `failed with exit code ${code}`;
 			notify(task, summary, tail);
 		});
@@ -1647,7 +1650,8 @@ export default function bashBackground(pi: ExtensionAPI) {
 		timer.unref?.();
 	}
 
-	/** A watch: the notification fires on an output match, not on exit. */
+	/** A watch: the match notification fires on output; the exit notification
+	 * still fires when the process ends. */
 	function startWatch(
 		command: string,
 		pattern: string,
@@ -1670,7 +1674,9 @@ export default function bashBackground(pi: ExtensionAPI) {
 			carry = window.slice(-8192);
 			if (task.state === "running" && regex.test(window)) {
 				task.state = "matched";
-				notify(
+				// A match is not terminal: the process may still be running, and
+				// its exit notification must not be consumed here.
+				sendNotification(
 					task,
 					`output matched ${JSON.stringify(pattern)}`,
 					tailBytes(task.logPath, NOTIFY_TAIL_BYTES),
@@ -1854,6 +1860,15 @@ export default function bashBackground(pi: ExtensionAPI) {
 				block: true,
 				reason: `${id} is a background bash task, not a subagent run. Do not call bg_wait for it; do other work or end your turn.`,
 			};
+		}
+		if (event.toolName === "bg_kill" && id) {
+			const task = tasks.get(id);
+			if (task && (FINAL_STATES.has(task.state) || task.state === "stopping")) {
+				return {
+					block: true,
+					reason: `${id} is already ${task.state}; killing it again changes nothing. Do other work or end your turn.`,
+				};
+			}
 		}
 		if (event.toolName === "bg_status") {
 			// bg_status lists all tasks (no id parameter): rate-limit globally.
