@@ -33,6 +33,7 @@ test("bg_wait for a background task is blocked with a clear reason", async () =>
     const id = await s.background("sleep 60");
     const result = s.emit("tool_call", { toolName: "bg_wait", input: { id } });
     assert.equal(result?.block, true);
+    assert.equal(result?.terminate, true);
     assert.match(result?.reason ?? "", /not a subagent run.*Do not call bg_wait/);
   } finally { s.shutdown(); }
 });
@@ -45,6 +46,7 @@ test("bg_logs is allowed twice per cooldown, then blocked", () => {
     assert.equal(call(), undefined, "second call passes");
     const third = call();
     assert.equal(third?.block, true);
+    assert.equal(third?.terminate, true);
     assert.match(third?.reason ?? "", /2 times.*Do other work or end your turn/);
   } finally { s.shutdown(); }
 });
@@ -58,6 +60,7 @@ test("bg_status (list all) is rate-limited globally", () => {
     assert.equal(call(), undefined);
     const fourth = call();
     assert.equal(fourth?.block, true);
+    assert.equal(fourth?.terminate, true);
     assert.match(fourth?.reason ?? "", /3 times.*Do other work or end your turn/);
   } finally { s.shutdown(); }
 });
@@ -155,20 +158,23 @@ test("a background start tells the agent to keep working or end the turn, not to
   await pi.finish(/bg-\d+/.exec(text)[0]);
 });
 
-test("a completion the agent already read is not delivered again", async () => {
+test("a completion during a run is steered mid-run exactly once, however the agent reads the log", async () => {
   const s = session();
   try {
     s.start();
     const id = await s.background("exit 0");
     await s.finish(id);
+    assert.equal(s.sent.length, 1);
+    assert.deepEqual(s.sent[0].options, { triggerTurn: false, deliverAs: "steer" });
+    assert.match(s.sent[0].message.content, /<summary>completed successfully<\/summary>/);
     assert.match(await s.logs(id), new RegExp(`^\\[${id} completed, exit 0\\]`));
-    assert.equal(s.settle(), undefined, "no continuation for a result the agent saw");
+    assert.equal(s.settle(), undefined, "nothing is held for settle");
     s.settled();
-    assert.equal(s.sent.length, 0, "and no follow-up turn after the final answer");
+    assert.equal(s.sent.length, 1, "reading the log changes nothing; settle does not re-deliver");
   } finally { s.shutdown(); }
 });
 
-test("unread completions arrive together at settle in one continuation, though the preview says it cannot continue", async () => {
+test("completions during a run are steered as they happen, never held for settle", async () => {
   const s = session();
   try {
     s.start();
@@ -176,42 +182,41 @@ test("unread completions arrive together at settle in one continuation, though t
     const passed = await s.background("exit 0");
     await s.finish(failed);
     await s.finish(passed);
-    assert.equal(s.sent.length, 0, "nothing is queued as a follow-up mid-run");
-    const earlier = { type: "custom_message", customType: "other", content: "x", display: true };
-    const result = s.settle({ entries: [earlier] });
-    assert.equal(result?.continue, true);
-    assert.equal(result.entries[0], earlier, "entries from earlier handlers are kept");
-    // Both commands exit at once, so their notices arrive in either order.
-    const notices = result.entries.slice(1).sort((a, b) => a.details.state.localeCompare(b.details.state));
-    assert.deepEqual(notices.map((entry) => entry.details.state), ["completed", "failed"]);
-    assert.match(notices[1].content, /<exit>3<\/exit>/);
+    assert.equal(s.sent.length, 2, "each completion steered mid-run");
+    for (const notice of s.sent) assert.deepEqual(notice.options, { triggerTurn: false, deliverAs: "steer" });
+    assert.deepEqual(s.sent.map((notice) => notice.message.details.state).sort(), ["completed", "failed"]);
+    assert.match(s.sent.map((notice) => notice.message.content).join("\n"), /<exit>3<\/exit>/);
+    assert.equal(s.settle(), undefined);
     s.settled();
-    assert.equal(s.sent.length, 0, "delivered once, not again after settle");
+    assert.equal(s.sent.length, 2, "delivered once, not again after settle");
   } finally { s.shutdown(); }
 });
 
-test("a result read only inside a codemode script is still delivered", async () => {
+test("a result read only inside a codemode script does not change delivery", async () => {
   const s = session();
   try {
     s.start();
     const id = await s.background("exit 3");
     await s.finish(id);
     await s.logs(id, "codemode-call/2");
-    assert.equal(s.settle()?.entries.length, 1, "the model never saw the nested result");
+    assert.equal(s.sent.length, 1);
+    assert.equal(s.sent[0].message.details.state, "failed");
+    assert.equal(s.settle(), undefined);
   } finally { s.shutdown(); }
 });
 
-test("a watch match gets through even after the agent read the finished log", async () => {
+test("a watch match is steered even when the agent read the finished log", async () => {
   const s = session();
   try {
     s.start();
     const id = /bg-\d+/.exec(await s.watch("echo ready", "ready"))[0];
     await s.finish(id);
     assert.match(await s.logs(id), /completed, exit 0/);
-    const result = s.settle();
-    assert.equal(result?.continue, true);
-    assert.equal(result.entries.length, 1);
-    assert.match(result.entries[0].details.summary, /output matched/);
+    const summaries = s.sent.map((notice) => notice.message.details.summary);
+    assert.equal(summaries.length, 2, "match and exit are both steered; the log read drops nothing");
+    assert.match(summaries[0], /output matched/);
+    assert.match(summaries[1], /completed after "ready" matched/);
+    assert.equal(s.settle(), undefined);
   } finally { s.shutdown(); }
 });
 
@@ -221,10 +226,8 @@ test("a watch match does not suppress the later exit notification", async () => 
     s.start();
     const id = /bg-\d+/.exec(await s.watch("echo ready; sleep 0.2; exit 3", "ready"))[0];
     await s.finish(id);
-    const result = s.settle();
-    assert.equal(result?.continue, true);
-    const summaries = result.entries.map((entry) => entry.details.summary);
-    assert.equal(summaries.length, 2, "the agent never read the log, so both notices are due");
+    const summaries = s.sent.map((notice) => notice.message.details.summary);
+    assert.equal(summaries.length, 2, "match and exit are both steered mid-run");
     assert.match(summaries[0], /output matched/);
     assert.match(summaries[1], /failed with exit code 3/);
   } finally { s.shutdown(); }
@@ -236,7 +239,7 @@ test("a matched watch that exits 0 reports a consistent outcome", async () => {
     s.start();
     const id = /bg-\d+/.exec(await s.watch("echo ready", "ready"))[0];
     await s.finish(id);
-    const summaries = s.settle().entries.map((entry) => entry.details.summary);
+    const summaries = s.sent.map((notice) => notice.message.details.summary);
     assert.equal(summaries.length, 2);
     assert.match(summaries[0], /output matched/);
     assert.match(summaries[1], /completed after "ready" matched/);
@@ -251,8 +254,7 @@ test("killOnMatch delivers the match and the kill outcome", async () => {
       command: "echo ready; sleep 60", pattern: "ready", killOnMatch: true, description: "Watch and kill",
     }))[0];
     await s.finish(id);
-    const result = s.settle();
-    const summaries = result.entries.map((entry) => entry.details.summary);
+    const summaries = s.sent.map((notice) => notice.message.details.summary);
     assert.equal(summaries.length, 2);
     assert.match(summaries[0], /output matched/);
     assert.match(summaries[1], /killed/);
@@ -266,6 +268,7 @@ test("bg_kill on a settled task is blocked with its actual state", async () => {
     await s.finish(id);
     const result = s.emit("tool_call", { toolName: "bg_kill", input: { id } });
     assert.equal(result?.block, true);
+    assert.equal(result?.terminate, true);
     assert.match(result?.reason ?? "", /already completed.*killing it again changes nothing/);
   } finally { s.shutdown(); }
 });
@@ -278,7 +281,7 @@ test("bg_kill on a running task passes the guard", async () => {
   } finally { s.shutdown(); }
 });
 
-test("an idle agent is woken at once; an aborted run records without waking", async () => {
+test("an idle agent is woken at once; a running agent is steered, and an aborted run adds nothing", async () => {
   const s = session();
   try {
     await s.finish(await s.background("exit 0"));
@@ -287,14 +290,15 @@ test("an idle agent is woken at once; an aborted run records without waking", as
 
     s.start();
     await s.finish(await s.background("exit 1"));
+    assert.equal(s.sent.length, 2);
+    assert.deepEqual(s.sent[1].options, { triggerTurn: false, deliverAs: "steer" });
     assert.equal(s.settle({ outcome: "aborted" }), undefined);
     s.settled(true);
-    assert.equal(s.sent.length, 2);
-    assert.deepEqual(s.sent[1].options, { triggerTurn: false });
+    assert.equal(s.sent.length, 2, "the steered notice is not re-delivered after an abort");
   } finally { s.shutdown(); }
 });
 
-test("notices left for agent_settled wake the agent once for the whole batch", async () => {
+test("steered notices leave nothing for settle, even after an error outcome", async () => {
   const s = session();
   try {
     s.start();
@@ -302,10 +306,10 @@ test("notices left for agent_settled wake the agent once for the whole batch", a
     const b = await s.background("exit 2");
     await s.finish(a);
     await s.finish(b);
+    assert.equal(s.sent.length, 2, "both steered mid-run");
     assert.equal(s.settle({ outcome: "error" }), undefined);
     s.settled();
-    assert.deepEqual(s.sent.map((sent) => sent.message.details.state), ["failed", "failed"]);
-    assert.deepEqual(s.sent.map((sent) => sent.options.triggerTurn), [false, true]);
+    assert.equal(s.sent.length, 2, "nothing left for settle");
   } finally { s.shutdown(); }
 });
 

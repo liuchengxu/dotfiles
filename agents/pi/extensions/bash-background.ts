@@ -125,9 +125,6 @@ interface BgTask {
 	stallNotified: boolean;
 	/** bg_kill asked for this task's death: its exit is a kill, not a failure. */
 	killRequested: boolean;
-	/** A bg_status or bg_logs result showed the agent this task's final
-	 * state, so its held completion notification adds nothing. */
-	finalSeen: boolean;
 	[Symbol.for("pi.bash-background.poll-key")]?: string;
 }
 
@@ -140,12 +137,6 @@ interface NoticeMessage {
 	display: true;
 }
 
-/** A notification held during a run; `final` is the task state at send. */
-interface HeldNotice {
-	task: BgTask;
-	message: NoticeMessage;
-	final: boolean;
-}
 
 function exitText(exit: NonNullable<BgTask["exit"]>): string {
 	return String(exit.code ?? `signal ${exit.signal ?? "unknown"}`);
@@ -228,9 +219,9 @@ export default function bashBackground(pi: ExtensionAPI) {
 	const callContext = new AsyncLocalStorage<ActiveCall>();
 	const local = createLocalBashOperations();
 	let counter = 0;
-	/** Between agent_start and agent_settled, notifications are held. */
+	/** Between agent_start and agent_settled, notifications steer into
+	 * the running turn; they are never held for settle. */
 	let agentRunning = false;
-	const held: HeldNotice[] = [];
 	/** One redraw per running bash call, keyed by toolCallId: every partial
 	 * render replaces its entry, so the ticker cannot multiply them. */
 	const redrawHints = new Map<string, () => void>();
@@ -254,7 +245,6 @@ export default function bashBackground(pi: ExtensionAPI) {
 		redrawHints.clear();
 		stopTerminalInput?.();
 		stopTerminalInput = undefined;
-		held.length = 0;
 		agentRunning = false;
 	});
 
@@ -290,67 +280,29 @@ export default function bashBackground(pi: ExtensionAPI) {
 			content: parts.filter(Boolean).join("\n"),
 			display: true,
 		};
-		// A follow-up queued during a run cannot be withdrawn, and pi drains
-		// each one as its own turn after the final answer. Hold it instead and
-		// decide at settle whether the agent still needs it.
-		if (agentRunning) held.push({ task, message, final: FINAL_STATES.has(task.state) });
+		// Steer into the running turn: a notice held for settle would never
+		// arrive while the agent keeps calling tools, so a waiting agent
+		// could suppress the very signal it waits for. A redundant notice
+		// is recoverable; a suppressed one is not.
+		if (agentRunning) deliver(message, false, "steer");
 		else deliver(message, true);
 	}
 
-	function deliver(message: NoticeMessage, wake: boolean): void {
+	function deliver(message: NoticeMessage, wake: boolean, mode?: "steer"): void {
 		try {
-			pi.sendMessage(message, wake ? { triggerTurn: true, deliverAs: "followUp" } : { triggerTurn: false });
+			pi.sendMessage(message, wake ? { triggerTurn: true, deliverAs: "followUp" } : { triggerTurn: false, deliverAs: mode });
 		} catch {
 			// The session was replaced, reloaded or shut down: there is no
 			// one left to notify, and a throw here would kill the process.
 		}
 	}
 
-	/** Held notices the agent still needs. A completion it already read
-	 * through bg_status or bg_logs is dropped; stall warnings and watch
-	 * matches are never final, so they always get through. */
-	function takeHeld(): HeldNotice[] {
-		return held.splice(0).filter((notice) => !(notice.final && notice.task.finalSeen));
-	}
-
 	pi.on("agent_start", () => {
 		agentRunning = true;
 	});
-	pi.on("agent_before_settle", (event) => {
-		try {
-			const due = takeHeld();
-			if (due.length === 0) return;
-			// Not gated on event.context.canContinue: it previews the context
-			// before these entries, and after a final answer it is false. Pi
-			// checks continuation again after committing them.
-			if (event.outcome !== "completed") {
-				held.unshift(...due);
-				return;
-			}
-			return {
-				// Pi replaces the proposed entries with each handler's result.
-				entries: [...(event.entries ?? []), ...due.map((notice) => ({ type: "custom_message" as const, ...notice.message }))],
-				continue: true,
-			};
-		} catch {
-			return;
-		}
-	});
-	pi.on("agent_settled", (event) => {
+	pi.on("agent_settled", () => {
 		agentRunning = false;
-		// One wake for the batch: each woken message would start its own
-		// run. An aborted run means the user stopped the agent: record what
-		// happened without starting a turn.
-		const due = takeHeld();
-		due.forEach((notice, index) => deliver(notice.message, !event.aborted && index === due.length - 1));
 	});
-
-	/** Pi gives a call made by another tool (a codemode script) the id
-	 * `<parent id>/<n>`, and only the script's output reaches the model, so
-	 * such a result is no evidence that the agent saw anything. */
-	function reachesModel(toolCallId: string): boolean {
-		return !toolCallId.includes("/");
-	}
 
 	function watchStall(task: BgTask): void {
 		const started = task.bytes;
@@ -416,7 +368,6 @@ export default function bashBackground(pi: ExtensionAPI) {
 			processAlive: true,
 			stallNotified: false,
 			killRequested: false,
-			finalSeen: false,
 		};
 		tasks.set(id, task);
 		const tee = (chunk: Buffer): void => {
@@ -652,7 +603,6 @@ export default function bashBackground(pi: ExtensionAPI) {
 			processAlive: true,
 			stallNotified: false,
 			killRequested: false,
-			finalSeen: false,
 		};
 		tasks.set(id, task);
 		call.task = task;
@@ -1538,7 +1488,6 @@ export default function bashBackground(pi: ExtensionAPI) {
 			const rows = [...tasks.values()].map((task) => {
 				const duration = Math.round((Date.now() - task.startedAt) / 1000);
 				const label = task.description ?? task.command.slice(0, 60);
-				if (FINAL_STATES.has(task.state) && reachesModel(toolCallId)) task.finalSeen = true;
 				return [
 					`${task.id}  ${task.state.padEnd(9)} ${String(duration).padStart(5)}s  ${task.bytes}B${task.exit ? `  exit ${exitText(task.exit)}` : ""}`,
 					`  \u23BF ${label}`,
@@ -1581,7 +1530,6 @@ export default function bashBackground(pi: ExtensionAPI) {
 			const bytes = (input as { bytes?: number }).bytes ?? 2000;
 			const header = `[${task.id} ${task.state}${task.exit ? `, exit ${exitText(task.exit)}` : ""}]`;
 			const text = `${header}\n${tailBytes(task.logPath, bytes) || "(no output yet)"}`;
-			if (FINAL_STATES.has(task.state) && reachesModel(toolCallId)) task.finalSeen = true;
 			return { content: [{ type: "text", text }] };
 		},
 	});
@@ -1844,6 +1792,8 @@ export default function bashBackground(pi: ExtensionAPI) {
 	// these tasks, so calling it for one is always wrong. bg_logs/bg_status
 	// are legitimate to read once, but repeated calls with no state change
 	// mean the model is polling instead of waiting for the notification.
+	// Every block sets terminate so the turn stops after the batch instead
+	// of alternating refusals.
 	// Eligibility resets when the task's state or output size changes, so a
 	// completed task or fresh output is always readable.
 	const pollTimes = new Map<string, number[]>();
@@ -1858,6 +1808,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 		if (event.toolName === "bg_wait" && id && tasks.has(id)) {
 			return {
 				block: true,
+				terminate: true,
 				reason: `${id} is a background bash task, not a subagent run. Do not call bg_wait for it; do other work or end your turn.`,
 			};
 		}
@@ -1866,6 +1817,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			if (task && (FINAL_STATES.has(task.state) || task.state === "stopping")) {
 				return {
 					block: true,
+					terminate: true,
 					reason: `${id} is already ${task.state}; killing it again changes nothing. Do other work or end your turn.`,
 				};
 			}
@@ -1877,6 +1829,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			if (statusTimes.length >= POLL_STATUS_MAX) {
 				return {
 					block: true,
+					terminate: true,
 					reason: `You have listed background tasks ${statusTimes.length} times in the last ${POLL_COOLDOWN_MS / 1000}s. Do other work or end your turn; do not poll again.`,
 				};
 			}
@@ -1898,6 +1851,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			const state = task ? task.state : "unknown";
 			return {
 				block: true,
+				terminate: true,
 				reason: `You have checked ${id} ${times.length} times in the last ${POLL_COOLDOWN_MS / 1000}s (state: ${state}). Do other work or end your turn; do not poll again.`,
 			};
 		}
