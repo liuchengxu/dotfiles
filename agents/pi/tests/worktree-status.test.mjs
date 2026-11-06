@@ -11,7 +11,7 @@ const root = process.env.PI_PACKAGE_ROOT ?? dirname(dirname(dirname(realpathSync
 const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/lib/jiti.mjs")));
 const tuiPath = join(root, "node_modules/@earendil-works/pi-tui/dist/index.js");
 const jiti = createJiti(import.meta.url, { alias: { "@earendil-works/pi-tui": tuiPath } });
-const { default: extension, worktreeIn, prLabel, worktreePath } = await jiti.import(new URL("../extensions/worktree-status.ts", import.meta.url).pathname);
+const { default: extension, worktreeIn, prLabel, diffLabel, worktreePath } = await jiti.import(new URL("../extensions/worktree-status.ts", import.meta.url).pathname);
 const { rgbColor } = await import(pathToFileURL(tuiPath));
 
 /** A repo folder with task worktrees whose `.git` files mark them as worktrees. */
@@ -30,7 +30,7 @@ function repo(t, ...names) {
  * computed when its command starts. With `hold`, each git or gh call named there waits until the test
  * releases it, so replies can arrive out of order; an abort ends a held call as pi.exec does.
  */
-function session(t, cwd, { mode = "tui", branches = {}, prs = {}, hold = [], appearance = "dark" } = {}) {
+function session(t, cwd, { mode = "tui", branches = {}, prs = {}, stats = {}, hold = [], appearance = "dark" } = {}) {
 	let now = 0;
 	t.mock.method(Date, "now", () => now);
 	const handlers = new Map();
@@ -39,7 +39,8 @@ function session(t, cwd, { mode = "tui", branches = {}, prs = {}, hold = [], app
 	const held = [];
 	let inFlight = 0;
 	let maxInFlight = 0;
-	const reply = (command, name) => {
+	const reply = (command, name, args) => {
+		if (command === "git" && args.includes("diff")) return { code: 0, stdout: stats[name] ?? "", stderr: "" };
 		if (command === "git") return branches[name] ? { code: 0, stdout: `${branches[name]}\n`, stderr: "" } : { code: 128, stdout: "", stderr: "" };
 		return prs[name] ? { code: 0, stdout: JSON.stringify(prs[name]), stderr: "" } : { code: 1, stdout: "", stderr: "no pull requests found" };
 	};
@@ -48,7 +49,7 @@ function session(t, cwd, { mode = "tui", branches = {}, prs = {}, hold = [], app
 		async exec(command, args, options) {
 			calls.push({ command, args, cwd: options?.cwd });
 			const name = basename(command === "git" ? args[1] : options.cwd);
-			const result = reply(command, name);
+			const result = reply(command, name, args);
 			if (!hold.includes(command)) return result;
 			inFlight += 1;
 			maxInFlight = Math.max(maxInFlight, inFlight);
@@ -108,6 +109,41 @@ test("the PR label names a state only when the PR is not open", () => {
 	assert.equal(prLabel("not json"), "");
 });
 
+test("the diff label counts uncommitted line changes, and hides zero", () => {
+	assert.equal(diffLabel(" 1 file changed, 2 insertions(+), 10 deletions(-)\n"), "[+2 -10]");
+	assert.equal(diffLabel(" 1 file changed, 1 insertion(+)\n"), "[+1 -0]");
+	assert.equal(diffLabel(" 2 files changed, 5 deletions(-)\n"), "[+0 -5]");
+	assert.equal(diffLabel(""), "");
+	assert.equal(diffLabel(" 1 file changed, 0 insertions(+), 0 deletions(-)\n"), "");
+});
+
+test("the footer shows line changes after the worktree name, before the PR", async (t) => {
+	const dir = repo(t, "fix-a");
+	const s = session(t, dir, {
+		branches: { "fix-a": "fix-a" },
+		prs: { "fix-a": { number: 12, state: "OPEN" } },
+		stats: { "fix-a": " 1 file changed, 2 insertions(+), 10 deletions(-)\n" },
+	});
+	await s.start();
+	await s.touch({ command: "git -C .agents/worktrees/fix-a status" });
+	assert.equal(s.status(), "⎇ fix-a [+2 -10] · PR #12");
+});
+
+test("stats refresh at each settle and vanish when the worktree is clean", async (t) => {
+	const dir = repo(t, "fix-a");
+	const stats = { "fix-a": "" };
+	const s = session(t, dir, { branches: { "fix-a": "fix-a" }, stats });
+	await s.start();
+	await s.touch({ command: "git -C .agents/worktrees/fix-a status" });
+	assert.equal(s.status(), "⎇ fix-a", "no changes, no bracket");
+	stats["fix-a"] = " 1 file changed, 3 insertions(+)\n";
+	await s.settle();
+	assert.equal(s.status(), "⎇ fix-a [+3 -0]", "edits appear after the next settle");
+	stats["fix-a"] = "";
+	await s.settle();
+	assert.equal(s.status(), "⎇ fix-a", "committed work clears the bracket");
+});
+
 test("the footer shows the touched worktree and its PR, and follows a switch", async (t) => {
 	const dir = repo(t, "fix-a", "fix-b");
 	const s = session(t, dir, { branches: { "fix-a": "fix-a", "fix-b": "fix-b" }, prs: { "fix-a": { number: 12, state: "OPEN" } } });
@@ -159,8 +195,11 @@ test("one lookup runs at a time, so a branch reply cannot arrive out of order", 
 	branches.wt = "new";
 	await s.settle();
 	assert.equal(s.held.length, 1, "the settle waits for the lookup in flight");
+	// Each refresh fetches the branch and then the diff stats before gh runs.
 	await s.release(0);
 	await s.release(1);
+	await s.release(2);
+	await s.release(3);
 	assert.equal(s.maxInFlight(), 1);
 	assert.equal(s.gh().length, 2, "the branch change forces a fresh PR lookup");
 	assert.equal(s.status(), "⎇ wt · PR #1");
