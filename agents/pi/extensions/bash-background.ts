@@ -87,13 +87,14 @@ interface RunningBgTask {
 type SharedRunning = { [runningKey]?: RunningBgTask[] };
 
 /** The dock's view of a task. The description is validated with its edges trimmed, so the record
- * can still carry edge newlines that would split a footer row; shape the label here, once. Cut by
- * code points: a UTF-16 slice could leave a lone surrogate half of an emoji at 30. */
+ * can still carry edge newlines that would split a footer row; shape the label here, once. The
+ * label is stored whole: every footer row truncates to the terminal width at render, so a capture
+ * cut here would clip wide terminals and double-truncate narrow ones. */
 export function dockTask(task: BgTask): RunningBgTask {
 	const label = (task.description ?? task.command).replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
 	return {
 		id: task.id,
-		label: [...label].slice(0, 30).join(""),
+		label,
 		startedAt: task.startedAt,
 		state: task.state,
 	};

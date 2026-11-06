@@ -3,7 +3,7 @@ import { getCurrentSystemMessage, type Message } from "@earendil-works/pi-ai";
 import { estimateTokens, FooterComponent, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { rgbColor, sliceByColumn, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
-import { sessionUptimeLabel } from "./session-uptime.ts";
+import { formatUptime, sessionUptimeLabel } from "./session-uptime.ts";
 
 // bash-background publishes its running tasks for the dock here; globalThis
 // and the same symbol key as there, because the extensions load as separate
@@ -189,8 +189,7 @@ export default function footerModelPrefix(pi: ExtensionAPI): void {
       const bgLines = ((globalThis as unknown as RunningBgGlobal)[runningBgKey] ?? []).map((task) => {
         // Being in the dock is the running state; stopping and matched are alive but not plainly running, as bg_status renders them.
         const state = task.state === "stopping" || task.state === "matched" ? ` ${task.state}` : "";
-        const seconds = Math.max(0, Math.round((Date.now() - task.startedAt) / 1000));
-        return theme.fg("accent", `bg${task.id.replace(/^bg-/, "")} \u25B6 ${task.label} ${seconds}s${state}`);
+        return theme.fg("accent", `bg${task.id.replace(/^bg-/, "")} \u25B6 ${task.label} ${formatUptime(Date.now() - task.startedAt)}${state}`);
       });
       return [modelLine, lines[1], lines[0], ...(activityLine ? [activityLine] : []), ...(remaining.length ? [remaining.join(" • ")] : []), ...bgLines]
         .map((line) => truncateToWidth(line, width, "..."));

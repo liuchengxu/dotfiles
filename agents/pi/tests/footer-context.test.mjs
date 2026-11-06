@@ -97,7 +97,7 @@ test("the footer ends with one line per running background task, in publish orde
   ]);
   const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
   const lines = f.lines();
-  assert.equal(lines.at(-2), "bg1 \u25B6 first command 65s");
+  assert.equal(lines.at(-2), "bg1 \u25B6 first command 1m 5s");
   assert.equal(lines.at(-1), "bg2 \u25B6 second command 12s");
 });
 

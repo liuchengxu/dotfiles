@@ -20,11 +20,9 @@ test("a dock label is one line: edge newlines that pass validation are stripped 
   assert.deepEqual(dockTask(task), { id: "bg-1", label: "Run a short check", startedAt: 0, state: "running" });
 });
 
-test("the 30-character cut never leaves a lone surrogate half", () => {
-  const task = { id: "bg-1", command: "sleep 1", description: "a".repeat(30) + "\u{1F600}", startedAt: 0, state: "running" };
-  const label = dockTask(task).label;
-  assert.equal(label, "a".repeat(30));
-  assert.equal([...label].length, 30);
+test("the label is stored whole: no capture-time cut, emoji intact", () => {
+  const task = { id: "bg-1", command: "sleep 1", description: "a".repeat(30) + " \u{1F600} verify five findings", startedAt: 0, state: "running" };
+  assert.equal(dockTask(task).label, "a".repeat(30) + " \u{1F600} verify five findings");
 });
 
 test("bg_wait for a background task is blocked with a clear reason", async () => {
