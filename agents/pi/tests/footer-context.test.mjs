@@ -97,8 +97,8 @@ test("the footer ends with one line per running background task, in publish orde
   ]);
   const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
   const lines = f.lines();
-  assert.equal(lines.at(-2), "bg1 \u25B6 first command 1m 5s");
-  assert.equal(lines.at(-1), "bg2 \u25B6 second command 12s");
+  assert.equal(lines.at(-2), "bg1 \u25C6 first command 1m 5s");
+  assert.equal(lines.at(-1), "bg2 \u25C6 second command 12s");
 });
 
 test("an alive task that is not plainly running shows its state", (t) => {
@@ -109,8 +109,8 @@ test("an alive task that is not plainly running shows its state", (t) => {
   ]);
   const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
   const lines = f.lines();
-  assert.equal(lines.at(-2), "bg1 \u25B6 dying command 5s stopping");
-  assert.equal(lines.at(-1), "bg2 \u25B6 watched command 12s matched");
+  assert.equal(lines.at(-2), "bg1 \u25C6 dying command 5s stopping");
+  assert.equal(lines.at(-1), "bg2 \u25C6 watched command 12s matched");
 });
 
 test("without running background tasks the footer grows no dock lines", (t) => {
