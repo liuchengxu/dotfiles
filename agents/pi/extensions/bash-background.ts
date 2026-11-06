@@ -282,15 +282,16 @@ export default function bashBackground(pi: ExtensionAPI) {
 		};
 		// Steer into the running turn: a notice held for settle would never
 		// arrive while the agent keeps calling tools, so a waiting agent
-		// could suppress the very signal it waits for. A redundant notice
-		// is recoverable; a suppressed one is not.
-		if (agentRunning) deliver(message, false, "steer");
-		else deliver(message, true);
+		// could suppress the very signal it waits for. triggerTurn must be
+		// true: with false, pi defers the message to end of turn even with
+		// deliverAs steer, which is the same trap. A redundant notice is
+		// recoverable; a suppressed one is not.
+		deliver(message, agentRunning ? "steer" : "followUp");
 	}
 
-	function deliver(message: NoticeMessage, wake: boolean, mode?: "steer"): void {
+	function deliver(message: NoticeMessage, mode: "steer" | "followUp"): void {
 		try {
-			pi.sendMessage(message, wake ? { triggerTurn: true, deliverAs: "followUp" } : { triggerTurn: false, deliverAs: mode });
+			pi.sendMessage(message, { triggerTurn: true, deliverAs: mode });
 		} catch {
 			// The session was replaced, reloaded or shut down: there is no
 			// one left to notify, and a throw here would kill the process.

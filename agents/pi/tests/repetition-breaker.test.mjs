@@ -50,8 +50,8 @@ test("four identical calls with unchanged results warn once; the fifth stays qui
   const s = session();
   for (let i = 0; i < 5; i++) assert.equal(s.call("bash", { command: "true" }), undefined);
   assert.equal(s.warnings().length, 1);
-  assert.match(s.warnings()[0].message.content, /4 times with unchanged results/);
-  assert.deepEqual(s.warnings()[0].options, { triggerTurn: false, deliverAs: "steer" });
+  assert.match(s.warnings()[0].message.content, /4 times in a row with unchanged results/);
+  assert.deepEqual(s.warnings()[0].options, { triggerTurn: true, deliverAs: "steer" });
   assert.equal(s.aborted.count, 0);
 });
 
@@ -131,6 +131,33 @@ test("distinct calls with distinct arguments never warn", () => {
   for (let i = 0; i < 12; i++) s.call("read", { path: `file-${i}.ts` });
   assert.equal(s.warnings().length, 0);
   assert.equal(s.sent.length, 0);
+});
+
+test("cycling many fingerprints cannot evade the block: streaks ignore interleaving", () => {
+  const s = session();
+  let blocked;
+  let calls = 0;
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 7; j++) s.call("bash", { command: `echo ${j}` });
+    calls += 7;
+  }
+  assert.equal(s.warnings().length, 7, "every fingerprint warned at four unchanged executions");
+  blocked = s.call("bash", { command: "echo 0" });
+  assert.equal(blocked?.block, true, "the sixth execution of a fingerprint blocks even after 35 other calls");
+  assert.equal(calls, 35);
+  const after = s.call("bash", { command: "echo 0" });
+  assert.equal(after?.block, true);
+  assert.equal(s.aborted.count, 1);
+});
+
+test("edit-test cycles are safe: a successful edit resets every streak", () => {
+  const s = session();
+  for (let i = 0; i < 6; i++) {
+    s.call("edit", { path: `fix-${i}.ts` }, "edited");
+    assert.equal(s.call("bash", { command: "npm test" }, "all pass"), undefined, `test run ${i + 1} must not block`);
+  }
+  assert.equal(s.warnings().length, 0, "productive edits disarm the warning too");
+  assert.equal(s.aborted.count, 0);
 });
 
 test("argument key order does not change the fingerprint, array order does", () => {

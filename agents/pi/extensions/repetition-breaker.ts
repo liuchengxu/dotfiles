@@ -7,18 +7,19 @@
  * this extension bounds the whole class.
  *
  * A fingerprint is the tool name plus the arguments with recursively sorted
- * keys (bash's presentation-only `description` is excluded). Fingerprints are
- * tracked over the last 32 top-level calls, so alternating loops count too.
- * Four executions with unchanged results produce one model-visible warning;
- * the sixth matching attempt is blocked with `terminate`, and any attempt
- * after that aborts the run. Only a genuine user message resets escalation:
- * automatic notification wakes, turn boundaries, and unrelated calls do not.
- * A changed substantive result resets that fingerprint's streak.
+ * keys (bash's presentation-only `description` is excluded). Each fingerprint's
+ * streak counts consecutive executions with the same result, so alternating
+ * or cycling through many different calls cannot evade it. Four unchanged
+ * executions produce one model-visible warning; the sixth is blocked with
+ * `terminate`, and any attempt after that aborts the run. A changed result
+ * resets that fingerprint's streak; a successful edit or write resets every
+ * streak, because productive filesystem progress is not a loop. Only a
+ * genuine user message resets escalation otherwise: automatic notification
+ * wakes, turn boundaries, and unrelated calls do not.
  */
 import { createHash } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const WINDOW = 32;
 const WARN_AT = 4;
 const BLOCK_AT = 6;
 const RESULT_CAP = 8000;
@@ -51,29 +52,26 @@ export function fingerprint(toolName: string, input: unknown): string {
 }
 
 export default function repetitionBreaker(pi: ExtensionAPI) {
-	let window: string[] = [];
 	const states = new Map<string, FpState>();
 	const pending = new Map<string, string>();
 
 	function reset(): void {
-		window = [];
 		states.clear();
 		pending.clear();
 	}
 
 	function tell(text: string): void {
 		try {
+			// triggerTurn must be true: with false, pi defers to end of turn
+			// even with deliverAs steer, and the warning would never arrive
+			// while the agent keeps calling tools.
 			pi.sendMessage(
 				{ customType: "repetition-breaker", content: text, display: true, details: {} },
-				{ triggerTurn: false, deliverAs: "steer" },
+				{ triggerTurn: true, deliverAs: "steer" },
 			);
 		} catch {
 			// A replaced or shut-down session has no one left to warn.
 		}
-	}
-
-	function occurrences(fp: string): number {
-		return window.reduce((count, item) => count + (item === fp ? 1 : 0), 0);
 	}
 
 	pi.on("session_start", reset);
@@ -92,7 +90,7 @@ export default function repetitionBreaker(pi: ExtensionAPI) {
 			ctx.abort();
 			return { block: true, terminate: true, reason: text };
 		}
-		if (occurrences(fp) + 1 >= BLOCK_AT && st.streak >= WARN_AT) {
+		if (st.streak >= BLOCK_AT - 1) {
 			st.abortArmed = true;
 			states.set(fp, st);
 			const text = `Repetition breaker: paused after ${BLOCK_AT} repetitions of the same ${event.toolName} call with unchanged results. Background tasks were not cancelled. To continue, give a new instruction; do not resume the same call.`;
@@ -100,19 +98,19 @@ export default function repetitionBreaker(pi: ExtensionAPI) {
 			try { ctx.ui.notify(text, "warning"); } catch { /* print mode */ }
 			return { block: true, terminate: true, reason: text };
 		}
-		window.push(fp);
-		if (window.length > WINDOW) window = window.slice(-WINDOW);
 		pending.set(event.toolCallId, fp);
 		states.set(fp, st);
 	});
 
 	pi.on("tool_result", (event) => {
 		if (event.parentToolCallId) return;
+		// A successful edit or write is productive progress, not a loop:
+		// disarm every streak so edit-test cycles never trip the breaker.
+		if ((event.toolName === "edit" || event.toolName === "write") && !event.isError) reset();
 		const fp = pending.get(event.toolCallId);
 		if (!fp) return;
 		pending.delete(event.toolCallId);
-		const st = states.get(fp);
-		if (!st) return;
+		const st = states.get(fp) ?? { streak: 0, warned: false, abortArmed: false };
 		const text = event.content
 			.map((part) => (part.type === "text" ? part.text : ""))
 			.join("\n")
@@ -124,10 +122,10 @@ export default function repetitionBreaker(pi: ExtensionAPI) {
 			st.lastHash = hash;
 			st.warned = false;
 		}
-		if (occurrences(fp) >= WARN_AT && st.streak >= WARN_AT && !st.warned) {
+		if (st.streak >= WARN_AT && !st.warned) {
 			st.warned = true;
 			tell(
-				`Repetition breaker: this ${event.toolName} call has run ${occurrences(fp)} times with unchanged results. ` +
+				`Repetition breaker: this ${event.toolName} call has run ${st.streak} times in a row with unchanged results. ` +
 				`If you are waiting for something, read its output or log file directly, or end your turn. ` +
 				`Further identical calls will be blocked.`,
 			);

@@ -165,7 +165,7 @@ test("a completion during a run is steered mid-run exactly once, however the age
     const id = await s.background("exit 0");
     await s.finish(id);
     assert.equal(s.sent.length, 1);
-    assert.deepEqual(s.sent[0].options, { triggerTurn: false, deliverAs: "steer" });
+    assert.deepEqual(s.sent[0].options, { triggerTurn: true, deliverAs: "steer" });
     assert.match(s.sent[0].message.content, /<summary>completed successfully<\/summary>/);
     assert.match(await s.logs(id), new RegExp(`^\\[${id} completed, exit 0\\]`));
     assert.equal(s.settle(), undefined, "nothing is held for settle");
@@ -183,7 +183,7 @@ test("completions during a run are steered as they happen, never held for settle
     await s.finish(failed);
     await s.finish(passed);
     assert.equal(s.sent.length, 2, "each completion steered mid-run");
-    for (const notice of s.sent) assert.deepEqual(notice.options, { triggerTurn: false, deliverAs: "steer" });
+    for (const notice of s.sent) assert.deepEqual(notice.options, { triggerTurn: true, deliverAs: "steer" });
     assert.deepEqual(s.sent.map((notice) => notice.message.details.state).sort(), ["completed", "failed"]);
     assert.match(s.sent.map((notice) => notice.message.content).join("\n"), /<exit>3<\/exit>/);
     assert.equal(s.settle(), undefined);
@@ -291,7 +291,7 @@ test("an idle agent is woken at once; a running agent is steered, and an aborted
     s.start();
     await s.finish(await s.background("exit 1"));
     assert.equal(s.sent.length, 2);
-    assert.deepEqual(s.sent[1].options, { triggerTurn: false, deliverAs: "steer" });
+    assert.deepEqual(s.sent[1].options, { triggerTurn: true, deliverAs: "steer" });
     assert.equal(s.settle({ outcome: "aborted" }), undefined);
     s.settled(true);
     assert.equal(s.sent.length, 2, "the steered notice is not re-delivered after an abort");
