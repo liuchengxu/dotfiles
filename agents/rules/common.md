@@ -19,6 +19,10 @@
 - Comments state only an invariant, an external contract, a surprise, a safety argument, or a workaround with what retires it, never what the code already says.
 - Before you start, define what success means, then check the result against it.
 - A bug fix gets a regression test that fails without the fix. Before you fix a bug, state its cause and what allowed it; fix the same cause on related paths within scope, and report the rest.
+- Before handing off edits, apply the comment policy
+  (`code-minimalism`'s `references/comment-policy.md`) and meaning-preserving
+  compression to the comments and documentation the task touched. A
+  whole-repository trim is a separate, explicitly requested task.
 - When you add or rely on validation, authorization, a signature, or a proof, trace each trusted input to its source and check whether an attacker can fabricate, replay, or make it stale.
 
 ## Operational evidence

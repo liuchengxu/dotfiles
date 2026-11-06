@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 # Global git hook (core.hooksPath); every hook name here links to this file.
-# A global hooks path hides each repository's own hooks, so after this
-# machine's checks run, the repository's hook of the same name runs too.
+# A global hooks path hides each repository's own hooks, so this dispatcher
+# runs the repository's own hook of the same name. There are no machine-level
+# checks: comment hygiene is owned at write time (code-minimalism) and review
+# time, not in the commit path.
 set -u
 
 name=$(basename "$0")
 dir=$(cd "$(dirname "$0")" && pwd -P)
-
-if [ "$name" = pre-commit ]; then
-  "$dir/check-comments" || exit $?
-fi
 
 common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
 repo_hook="$common/hooks/$name"

@@ -16,7 +16,7 @@ these sources. Nothing syncs automatically: preview, apply, then check.
 | `rules/tests/` | Renderer tests. |
 | `skills/<skill>/` | One skill. Only skills in use live here. |
 | `claude-hud.json` | Claude status line layout (claude-hud plugin). |
-| `git-hooks/` | Global git hooks: the pre-commit comment check. |
+| `git-hooks/` | Global git hooks: forwarding to each repository's own hooks. |
 
 ## Where a rule belongs
 
@@ -189,20 +189,16 @@ git config --global core.hooksPath ~/.dotfiles/agents/git-hooks
 - Each hook name links to `hook`, which runs this directory's checks, then the
   repository's own hook of the same name. A global hooks path would otherwise
   hide the repository's hooks.
-- **pre-commit** runs `check-comments`, an **opt-in** audit: it does nothing
-  unless `COMMENT_CHECK=1 git commit` asks for it. Comment hygiene is owned
-  where it is cheap — the code-minimalism skill applies
-  `comment-rule.md` before comments are written, and the review pass
-  (adversarial-review, model rounds) re-checks added comments before a PR —
-  so the guarantee is clean-before-review, not clean-before-every-commit.
-  When the audit runs, it checks staged added comment lines (`//`, `/*`, `#`)
-  outside Markdown, text, lock, and JSON files; a `FAIL` blocks the commit,
-  and no verdict (timeout after 90 s, provider error) also stops it — a
-  deliberate audit must not pass on a shrug. It runs before commit, not
-  push: during a push over SSH, GitHub closes the connection while the model
-  is still answering.
-- The model is `deepseek/deepseek-flash`; set `COMMENT_CHECK_MODEL` to change it.
-- `git commit --no-verify` skips this and the repository's own hook.
+- **pre-commit** only forwards to the repository's own hook; there are no
+  machine-level checks of our own. Comment hygiene is owned at three
+  moments, none of them the commit: at write time (the code-minimalism gate
+  applies `skills/code-minimalism/references/comment-policy.md` before
+  comments are written), at finish time (the task's touched comments and
+  docs are trimmed before handoff, per the common rules), and at review time
+  (adversarial-review and model-review prompts check added comments). A
+  whole-repository trim is the trim-docs skill, run only when explicitly
+  asked. The guarantee is clean-before-review, not clean-before-every-commit.
+- `git commit --no-verify` skips the repository's own hook.
 - A repository that sets its own `core.hooksPath` does not run these hooks.
   The `pre-commit` framework refuses to install while a global hooks path is
   set: unset it, run `pre-commit install`, then set it again.
