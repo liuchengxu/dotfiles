@@ -80,14 +80,18 @@ machine after cloning:
 
 ```bash
 for d in ~/.agents/skills ~/.claude/skills ~/.codex/skills ~/.pi/agent/skills; do
-  [ -e "$d" ] && [ ! -L "$d" ] && mv "$d" "$d.pre-single-source"
+  if [ -e "$d" ] && [ ! -L "$d" ]; then
+    mv "$d" "$d.pre-single-source" || { echo "skip $d: $d.pre-single-source already exists"; continue; }
+  fi
   ln -sfn ~/.dotfiles/agents/skills "$d"
 done
 ```
 
 A real directory is moved aside, never deleted: it may hold skills that were
-never linked into the repo. Merge anything worth keeping into the repository
-directory, then remove the `.pre-single-source` copy.
+never linked into the repo, and a move that fails stops that directory —
+linking into a surviving real directory would nest a `skills` symlink inside
+it. Merge anything worth keeping into the repository directory, then remove
+the `.pre-single-source` copy.
 
 An agent-specific skill that must not be shared goes in a subdirectory of that
 agent's own config outside these four paths. Pi silently skips a skill whose
