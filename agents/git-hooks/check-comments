@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Before a commit, ask a model whether the comments it adds earn their place
-# (comment-rule.md). Runs only when the staged change adds comment lines.
-# If the model gives no verdict, the commit goes ahead with a warning.
-# Skip once with SKIP_COMMENT_CHECK=1 git commit.
+# An opt-in audit (COMMENT_CHECK=1) that asks a model whether the comments a
+# commit adds earn their place (comment-rule.md). Runs only when the staged
+# change adds comment lines, and only when asked: the write-time gate and the
+# review pass own comment hygiene day to day.
 set -u
 
-[ "${SKIP_COMMENT_CHECK:-}" = 1 ] && exit 0
+# Opt-in audit of the comments a commit would add, judged against
+# comment-rule.md. Off by default: comment hygiene is enforced where comments
+# are written (the code-minimalism skill's write-time gate) and re-checked by
+# the review pass before a PR; running a model session inside every commit
+# cost more than it caught. Run deliberately: COMMENT_CHECK=1 git commit.
+[ "${COMMENT_CHECK:-}" = 1 ] || exit 0
 dir=$(cd "$(dirname "$0")" && pwd -P)
 model=${COMMENT_CHECK_MODEL:-deepseek/deepseek-flash}
 top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
@@ -40,12 +45,14 @@ case $verdict in
       printf '%s\n' "$out" | awk 'NF' | sed 1d
       echo
       echo "Fix these comments, stage them, and commit again."
-      echo "If the check is wrong: SKIP_COMMENT_CHECK=1 git commit ..."
+      echo "To skip this deliberate audit: git commit --no-verify ..."
     } >&2
     exit 1
     ;;
   *)
-    echo "comment check: no verdict from $model (exit $status); commit allowed." >&2
-    exit 0
+    # A deliberate audit must not pass on a shrug: with no verdict the audit
+    # is incomplete, so the commit stops. Rerun it, or --no-verify to skip.
+    echo "comment check: no verdict from $model (exit $status); audit incomplete." >&2
+    exit 1
     ;;
 esac

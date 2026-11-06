@@ -40,6 +40,9 @@ the id was not recognized, say so; never substitute another model.
 - Write one self-contained prompt file: the context, where the material is, the
   exact questions, a length cap, and "mark claims you did not verify". Give
   every model the same prompt.
+- For a code review, add one question naming the comment policy
+  (`~/.dotfiles/agents/git-hooks/comment-rule.md` when present): do the added
+  comment lines meet it, with its keep-list and exceptions?
 
 ## Run
 

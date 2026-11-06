@@ -24,6 +24,10 @@ at the decision points, not as a narrated checklist before every function:
   an imperfect existing API beats wrapping it.
 - Decide where each invariant is first guaranteed (construction) and where
   each failure is earliest detected, before writing the check.
+- Before writing or keeping a comment, apply the comment policy in
+  `~/.dotfiles/agents/git-hooks/comment-rule.md`: a comment earns its place
+  only by that policy's reasons, and its keep-list and exceptions apply
+  unchanged. That file is the one authority; do not paraphrase it here.
 - Name the distinct behavioral boundaries the tests must prove; do not assume
   the proposed mechanism is necessary for them.
 

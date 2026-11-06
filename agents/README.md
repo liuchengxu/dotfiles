@@ -189,15 +189,20 @@ git config --global core.hooksPath ~/.dotfiles/agents/git-hooks
 - Each hook name links to `hook`, which runs this directory's checks, then the
   repository's own hook of the same name. A global hooks path would otherwise
   hide the repository's hooks.
-- **pre-commit** runs `check-comments` when the staged change adds comment
-  lines (`//`, `/*`, or `#`) outside Markdown, text, lock, and JSON files. A
-  model judges them against `comment-rule.md` and blocks the commit on `FAIL`.
-  With no verdict (timeout after 90 s, provider error), the commit goes ahead
-  with a warning. It runs before commit, not push: during a push over SSH,
-  GitHub closes the connection while the model is still answering.
+- **pre-commit** runs `check-comments`, an **opt-in** audit: it does nothing
+  unless `COMMENT_CHECK=1 git commit` asks for it. Comment hygiene is owned
+  where it is cheap — the code-minimalism skill applies
+  `comment-rule.md` before comments are written, and the review pass
+  (adversarial-review, model rounds) re-checks added comments before a PR —
+  so the guarantee is clean-before-review, not clean-before-every-commit.
+  When the audit runs, it checks staged added comment lines (`//`, `/*`, `#`)
+  outside Markdown, text, lock, and JSON files; a `FAIL` blocks the commit,
+  and no verdict (timeout after 90 s, provider error) also stops it — a
+  deliberate audit must not pass on a shrug. It runs before commit, not
+  push: during a push over SSH, GitHub closes the connection while the model
+  is still answering.
 - The model is `deepseek/deepseek-flash`; set `COMMENT_CHECK_MODEL` to change it.
-- Skip one commit with `SKIP_COMMENT_CHECK=1 git commit`. `git commit
-  --no-verify` also skips the repository's own hook.
+- `git commit --no-verify` skips this and the repository's own hook.
 - A repository that sets its own `core.hooksPath` does not run these hooks.
   The `pre-commit` framework refuses to install while a global hooks path is
   set: unset it, run `pre-commit install`, then set it again.

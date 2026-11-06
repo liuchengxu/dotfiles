@@ -68,6 +68,9 @@ Apply the relevant checks; report material omissions.
   cancellation, partial completion, reorg.
 - **Conventions:** check the repository's stated rules, not your taste. Cite the
   rule and its exceptions; label a pure policy deviation as one.
+- **Comments:** judge added comment lines against the policy in
+  `~/.dotfiles/agents/git-hooks/comment-rule.md` when that file exists —
+  reasons, keep-list, and exceptions as written.
 - **Tests:** for each changed guarantee, name a plausible wrong implementation
   and the assertion that rejects it. Then try to break the assertion: find the
   smallest change to the guarded code that still passes it, such as a renamed
