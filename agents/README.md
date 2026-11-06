@@ -192,14 +192,16 @@ git config --global core.hooksPath ~/.dotfiles/agents/git-hooks
 
 ## Pi extensions
 
-`~/.dotfiles/agents/pi/extensions/` holds the Pi extensions in use. Link each file and
-the `lib` folder into `~/.pi/agent/extensions`.
+`~/.dotfiles/agents/pi/extensions/` holds the Pi extensions in use. Pi loads the whole
+directory through the `extensions` array in `~/.pi/agent/settings.json` (machine-local):
 
-```bash
-cd ~/.pi/agent/extensions
-for f in ~/.dotfiles/agents/pi/extensions/*.ts; do ln -sf "$f" .; done
-ln -sfn ~/.dotfiles/agents/pi/extensions/lib lib
+```json
+"extensions": ["/Users/xlc/.dotfiles/agents/pi/extensions"]
 ```
+
+New `.ts` files need no link step and load at the next session start or `/reload`. Two
+extensions are exceptions that live only in their worktrees and stay linked individually
+in `~/.pi/agent/extensions/`: `auto-session-name.ts` and `idle-compaction.ts`.
 
 Pi packages install per machine with `pi install npm:<package>`:
 
