@@ -48,6 +48,10 @@ flags. A signing command that seems to hang may be waiting for the user.
   only when the user asks.
 - A tap timeout is a different failure, and you may retry it. Do not assume
   that "incorrect passphrase" or "invalid format" is a timeout.
+- Exception: on a PoC branch (a branch whose name ends in `-poc`), commit
+  unsigned with `git commit --no-gpg-sign`. Do not change the signing
+  config. Commits that leave the PoC branch for a PR branch are signed
+  again there, by the normal rule.
 
 ## Repository worktrees
 

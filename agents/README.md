@@ -183,7 +183,7 @@ git config --global core.hooksPath ~/.dotfiles/agents/git-hooks
   With no verdict (timeout after 90 s, provider error), the commit goes ahead
   with a warning. It runs before commit, not push: during a push over SSH,
   GitHub closes the connection while the model is still answering.
-- The model is `zai/glm-5.3-flash`; set `COMMENT_CHECK_MODEL` to change it.
+- The model is `deepseek/deepseek-flash`; set `COMMENT_CHECK_MODEL` to change it.
 - Skip one commit with `SKIP_COMMENT_CHECK=1 git commit`. `git commit
   --no-verify` also skips the repository's own hook.
 - A repository that sets its own `core.hooksPath` does not run these hooks.

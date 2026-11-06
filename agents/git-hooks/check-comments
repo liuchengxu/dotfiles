@@ -7,7 +7,7 @@ set -u
 
 [ "${SKIP_COMMENT_CHECK:-}" = 1 ] && exit 0
 dir=$(cd "$(dirname "$0")" && pwd -P)
-model=${COMMENT_CHECK_MODEL:-zai/glm-5.3-flash}
+model=${COMMENT_CHECK_MODEL:-deepseek/deepseek-flash}
 top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
