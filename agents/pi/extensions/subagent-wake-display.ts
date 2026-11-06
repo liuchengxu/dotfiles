@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
+import { homedir } from "node:os";
 import { InteractiveMode, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { PARENT_WAKE_TEXT } from "../npm/node_modules/pi-subagents/src/shared/parent-wake.js";
+
+// Resolve through the pi agent directory: the same file loads from the live
+// extensions dir and from the repo checkout (settings.json extensions path).
+const { PARENT_WAKE_TEXT } = createRequire(import.meta.url)(
+	`${homedir()}/.pi/agent/npm/node_modules/pi-subagents/src/shared/parent-wake.js`,
+);
 
 const wakeTexts = new Set([PARENT_WAKE_TEXT, "Subagent updates above."]);
 const runtimeKey = Symbol.for("pi.subagent-wake-display.runtime");
