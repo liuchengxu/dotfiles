@@ -192,9 +192,13 @@ export default function footerModelPrefix(pi: ExtensionAPI): void {
         const suffix = theme.fg("dim", `${formatUptime(Date.now() - task.startedAt)}${state}`);
         const head = theme.fg("accent", `bg${task.id.replace(/^bg-/, "")} \u25C6 `) + task.label;
         // The time stays visible beside any label: the label truncates into the
-        // space left by the suffix, not the whole row off its edge.
+        // space left by the suffix, not the whole row off its edge. When even
+        // the marker cannot fit, the suffix still outranks it: how long the
+        // task has run is the one fact a cramped row can still carry.
         const room = width - visibleWidth(suffix) - 1;
-        return room > 0 ? truncateToWidth(head, room, "") + " " + suffix : truncateToWidth(head + " " + suffix, width, "...");
+        return room > 0 ? truncateToWidth(head, room, "") + " " + suffix
+          : room >= 3 ? truncateToWidth(head, room, "…") + " " + suffix
+          : truncateToWidth(head + " " + suffix, width, "...");
       });
       return [modelLine, lines[1], lines[0], ...(activityLine ? [activityLine] : []), ...(remaining.length ? [remaining.join(" • ")] : []), ...bgLines]
         .map((line) => truncateToWidth(line, width, "..."));

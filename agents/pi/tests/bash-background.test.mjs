@@ -376,6 +376,11 @@ test("a dock label strips terminal escapes that a bg_watch description can carry
   assert.equal(dockTask(task).label, "Red run");
 });
 
+test("a dock label leaves no debris from colon CSI, charset, or DCS sequences", () => {
+  const task = { id: "bg-1", command: "sleep 1", description: "a\x1b[38:2:1:2:3mb\x1b(Bc\x1bP1;2q payload\x1b\\d", startedAt: 0, state: "running" };
+  assert.equal(dockTask(task).label, "abcd");
+});
+
 test("a line that names its own failure outranks a retry note that says could not", () => {
   const s = session();
   const current = Symbol.for("pi.worktree-status.current");

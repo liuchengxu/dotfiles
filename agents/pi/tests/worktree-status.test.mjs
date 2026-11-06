@@ -11,7 +11,7 @@ const root = process.env.PI_PACKAGE_ROOT ?? dirname(dirname(dirname(realpathSync
 const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/lib/jiti.mjs")));
 const tuiPath = join(root, "node_modules/@earendil-works/pi-tui/dist/index.js");
 const jiti = createJiti(import.meta.url, { alias: { "@earendil-works/pi-tui": tuiPath } });
-const { default: extension, worktreeIn, prLabel, diffLabel, worktreePath } = await jiti.import(new URL("../extensions/worktree-status.ts", import.meta.url).pathname);
+const { default: extension, worktreeIn, prLabel, diffCounts, worktreePath } = await jiti.import(new URL("../extensions/worktree-status.ts", import.meta.url).pathname);
 const { rgbColor } = await import(pathToFileURL(tuiPath));
 
 /** A repo folder with task worktrees whose `.git` files mark them as worktrees. */
@@ -109,12 +109,12 @@ test("the PR label names a state only when the PR is not open", () => {
 	assert.equal(prLabel("not json"), "");
 });
 
-test("the diff label counts uncommitted line changes, and hides zero", () => {
-	assert.equal(diffLabel(" 1 file changed, 2 insertions(+), 10 deletions(-)\n"), "[+2 -10]");
-	assert.equal(diffLabel(" 1 file changed, 1 insertion(+)\n"), "[+1 -0]");
-	assert.equal(diffLabel(" 2 files changed, 5 deletions(-)\n"), "[+0 -5]");
-	assert.equal(diffLabel(""), "");
-	assert.equal(diffLabel(" 1 file changed, 0 insertions(+), 0 deletions(-)\n"), "");
+test("the diff counts read insertions and deletions, and both zero means nothing changed", () => {
+	assert.deepEqual(diffCounts(" 1 file changed, 2 insertions(+), 10 deletions(-)\n"), { added: 2, removed: 10 });
+	assert.deepEqual(diffCounts(" 1 file changed, 1 insertion(+)\n"), { added: 1, removed: 0 });
+	assert.deepEqual(diffCounts(" 2 files changed, 5 deletions(-)\n"), { added: 0, removed: 5 });
+	assert.deepEqual(diffCounts(""), { added: 0, removed: 0 });
+	assert.deepEqual(diffCounts(" 1 file changed, 0 insertions(+), 0 deletions(-)\n"), { added: 0, removed: 0 });
 });
 
 test("the footer shows line changes after the worktree name, before the PR", async (t) => {

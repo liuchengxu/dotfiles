@@ -41,7 +41,7 @@ function footer(t, contextUsage, statuses = new Map(), overrides = {}) {
   t.after(() => handlers.get("session_shutdown")());
   return {
     projection,
-    lines: () => component.render(240).map(stripVTControlCharacters),
+    lines: (w = 240) => component.render(w).map(stripVTControlCharacters),
     context: () => /Context .*?\)/.exec(stripVTControlCharacters(component.render(240)[1]))?.[0],
     setStats(next) { stats = { ...stats, contextUsage: next }; },
   };
@@ -107,7 +107,18 @@ test("a long label truncates into the space the time leaves, and the time stays 
     { id: "bg-1", label: "L".repeat(200), startedAt: Date.now() - 65_000, state: "running" },
   ]);
   const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
-  assert.match(f.lines().at(-1), /1m 5s$/);
+  const row = f.lines(60).at(-1);
+  assert.match(row, /1m 5s$/, "the time survives a label longer than the row");
+  assert.ok(row.length <= 60, `the truncated row fits its width: ${row.length}`);
+});
+
+test("a row too narrow for label and time keeps the time", (t) => {
+  t.after(() => publishRunningBgTasks(undefined));
+  publishRunningBgTasks([
+    { id: "bg-1", label: "L".repeat(200), startedAt: Date.now() - 65_000, state: "running" },
+  ]);
+  const f = footer(t, { tokens: 100, percent: 5, contextWindow: 2_000 });
+  assert.match(f.lines(10).at(-1), /1m 5s$/);
 });
 
 test("an alive task that is not plainly running shows its state", (t) => {

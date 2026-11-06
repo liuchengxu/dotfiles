@@ -94,17 +94,11 @@ export function prLabel(stdout: string): string {
 	}
 }
 
-/** Line counts from `git diff --shortstat HEAD`: `[+N -M]` when anything changed. */
+/** Line counts from `git diff --shortstat HEAD`; both zero means nothing changed. */
 export function diffCounts(stdout: string): { added: number; removed: number } {
 	const added = Number(/(\d+) insertions?\(\+\)/.exec(stdout)?.[1] ?? 0);
 	const removed = Number(/(\d+) deletions?\(-\)/.exec(stdout)?.[1] ?? 0);
 	return { added, removed };
-}
-
-/** `[+N -M]` from `git diff --shortstat HEAD`, or "" when nothing changed. */
-export function diffLabel(stdout: string): string {
-	const { added, removed } = diffCounts(stdout);
-	return added || removed ? `[+${added} -${removed}]` : "";
 }
 
 export default function worktreeStatus(pi: ExtensionAPI): void {
@@ -114,8 +108,8 @@ export default function worktreeStatus(pi: ExtensionAPI): void {
 	let pr = "";
 	let stats: { added: number; removed: number } = { added: 0, removed: 0 };
 	let checkedAt = 0;
-	// One refresh runs at a time, so replies cannot arrive out of order; a request made meanwhile is
-	// folded into one follow-up. Selecting another worktree aborts the git or gh in flight.
+	// The queue folds a request made mid-refresh into one follow-up — not
+	// necessarily one total refresh — so replies cannot arrive out of order. Selecting another worktree aborts the git or gh in flight.
 	let running = false;
 	let queued: { force: boolean } | undefined;
 	let abort = new AbortController();

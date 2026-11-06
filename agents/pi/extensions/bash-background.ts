@@ -94,8 +94,10 @@ type SharedRunning = { [runningKey]?: RunningBgTask[] };
  * so terminal escapes and other controls die here, not at the 30th code point as before. */
 export function dockTask(task: BgTask): RunningBgTask {
 	const label = (task.description ?? task.command)
-		.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+		.replace(/\x1b\[[0-9:;<=>?]*[ -/]*[@-~]/g, "")
 		.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+		.replace(/\x1b[()][0-9A-B]/g, "")
+		.replace(/\x1b[P^_][\s\S]*?(?:\x1b\\|\x07)/g, "")
 		.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
 		.replace(/ +/g, " ").trim();
 	return {
