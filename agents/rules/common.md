@@ -42,6 +42,10 @@ Commits under `~/src/github.com/babylonlabs-io/` are signed with the user's
 YubiKey. When a commit is authorized, run plain `git commit`; add no signing
 flags. A signing command that seems to hang may be waiting for the user.
 
+For agent-run rebases, set `GIT_SEQUENCE_EDITOR=true GIT_EDITOR=true` to avoid
+nvim. If an editor opens, abort only the rebase you started and rerun with
+those settings; signing controls stay unchanged.
+
 - Never work around a signing failure: no `--no-gpg-sign`, no change to
   `commit.gpgsign` or `gpg.ssh.program`, no other key.
 - `YUBIKEY_SIGNING_CANCELLED` means the user cancelled. Stop the whole

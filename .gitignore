@@ -16,3 +16,6 @@ Thumbs.db
 !bin
 
 *.un~
+
+# Client-managed system skills (Codex writes these through its skills symlink).
+agents/skills/.system/
