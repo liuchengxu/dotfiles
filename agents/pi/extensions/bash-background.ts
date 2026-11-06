@@ -1132,14 +1132,22 @@ export default function bashBackground(pi: ExtensionAPI) {
 			}
 			if (!options.expanded && context.isError) {
 				const lines = result.content.filter(block => block.type === "text").flatMap(block => block.text.split(/\r?\n/)).map(line => line.trim()).filter(Boolean);
-				const error = lines.find(line => /error|failed|rejected|terminated|denied|not found|no such/i.test(line)) ?? "Operation failed (Ctrl+O for details)";
+				const error = lines.find(line => /error|failed|rejected|terminated|denied|not found|no such|could not/i.test(line)) ?? "Operation failed (Ctrl+O for details)";
 				const args = context.args as { description?: unknown; path?: unknown } | undefined;
+				// The same relative form the call heading shows: an absolute path here would
+				// name the worktree the footer already names, twice.
+				const verbs: Record<string, string> = { edit: "Update", write: "Write", read: "Read" };
+				const rawPath = typeof args?.path === "string" ? args.path : "";
+				const relPath = rawPath ? worktreePath(rawPath) : "";
 				const label = context.state?.detailsCollapsed && typeof args?.description === "string" && args.description.trim()
 					? args.description.trim().replace(/\s+/g, " ")
-					: context.state?.detailsCollapsed && typeof args?.path === "string" ? `${toolName} ${args.path}` : toolName;
+					: context.state?.detailsCollapsed && relPath ? `${verbs[toolName] ?? toolName} ${relPath}` : verbs[toolName] ?? toolName;
+				// The tool's own message embeds the path it was given; show it the way the
+				// row names it, so one screen does not carry both forms.
+				const text = rawPath && relPath && relPath !== rawPath ? error.split(rawPath).join(relPath) : error;
 				return {
 					render(width) {
-						return width > 0 ? [truncateToWidth(theme.fg("error", `✗ ${label}: ${error.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")}`), width)] : [];
+						return width > 0 ? [truncateToWidth(theme.fg("error", `✗ ${label}: ${text.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")}`), width)] : [];
 					},
 					invalidate() {},
 				};

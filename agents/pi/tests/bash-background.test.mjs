@@ -353,6 +353,24 @@ test("a collapsed edit row shows a path in the footer's worktree relative to it"
   }
 });
 
+test("a collapsed error row names the file the way the heading does, and the tool's own absolute path in the message follows", () => {
+  const s = session();
+  const current = Symbol.for("pi.worktree-status.current");
+  globalThis[current] = "/r/.agents/worktrees/fix-a";
+  try {
+    const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => text };
+    const args = { path: "/r/.agents/worktrees/fix-a/src/lib.rs", edits: [{ oldText: "a", newText: "b" }] };
+    const result = { content: [{ type: "text", text: `Could not find the exact text in /r/.agents/worktrees/fix-a/src/lib.rs. The old text must match exactly including all whitespace and newlines.` }] };
+    const context = { args, toolCallId: "e3", invalidate() {}, state: { detailsCollapsed: true }, cwd: tmpdir(), executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: false, isError: true, outputPad: 1 };
+    const row = s.renderer("edit").renderResult(result, { expanded: false, isPartial: false }, theme, context).render(200).join("\n");
+    assert.match(row, /^✗ Update src\/lib\.rs: Could not find the exact text in src\/lib\.rs\./);
+    assert.doesNotMatch(row, /\/r\/\.agents/);
+  } finally {
+    delete globalThis[current];
+    s.shutdown();
+  }
+});
+
 test("a background task is one row: the header carries its id, time, and exit", async () => {
   const s = session();
   // The command runs until the test creates this file, so the running
