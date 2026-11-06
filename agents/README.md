@@ -73,18 +73,21 @@ A missing file is created.
 
 ## Skills
 
-Link each skill into two places. Codex and Pi read `~/.agents/skills`; Claude
-Code reads `~/.claude/skills`. Do not also link into `~/.pi/agent/skills`, or
-Pi loads the skill twice.
+One source: each agent's skill directory is a symlink to the whole
+`~/.dotfiles/agents/skills` directory, so a skill added to the repo is visible
+to Codex, Claude Code, and Pi with no per-skill link step. Run once per
+machine after cloning:
 
 ```bash
-ln -s ~/.dotfiles/agents/skills/<skill> ~/.agents/skills/<skill>
-ln -s ~/.dotfiles/agents/skills/<skill> ~/.claude/skills/<skill>
+for d in ~/.agents/skills ~/.claude/skills ~/.codex/skills ~/.pi/agent/skills; do
+  rm -rf "$d" && ln -s ~/.dotfiles/agents/skills "$d"
+done
 ```
 
-Pi silently skips a skill whose frontmatter is not strict YAML; Claude loads
-it anyway. Quote a `description` that contains `: `. After adding a skill,
-confirm that Pi lists it:
+An agent-specific skill that must not be shared goes in a subdirectory of that
+agent's own config outside these four paths. Pi silently skips a skill whose
+frontmatter is not strict YAML; Claude loads it anyway. Quote a `description`
+that contains `: `. After adding a skill, confirm that Pi lists it:
 `pi -p --no-session "List your skills by name." < /dev/null`.
 
 Skills in use:
