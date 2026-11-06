@@ -5,7 +5,8 @@
  * a task worktree at `<repo>/.agents/worktrees/<name>`. This extension takes the last such worktree a
  * tool call names (any string in the input: read/edit/write paths, `cd` or `git -C` in a shell
  * command) and shows `⎇ <name> [+N -M] · PR #N`, with the state when the PR is not open. The
- * bracket counts uncommitted line changes against HEAD and refreshes at each settle; it is
+ * bracket counts uncommitted line changes against HEAD and refresh after each edit
+ * and at each settle; it is
  * hidden when nothing changed. A relative path
  * resolves against pi's cwd, and only a path that has a `.git` entry counts. Strings are split at
  * whitespace and the characters in `SEPARATOR`, so a repository path that contains one of them (a
@@ -93,10 +94,16 @@ export function prLabel(stdout: string): string {
 	}
 }
 
-/** `[+N -M]` from `git diff --shortstat HEAD`, or "" when nothing changed. */
-export function diffLabel(stdout: string): string {
+/** Line counts from `git diff --shortstat HEAD`: `[+N -M]` when anything changed. */
+export function diffCounts(stdout: string): { added: number; removed: number } {
 	const added = Number(/(\d+) insertions?\(\+\)/.exec(stdout)?.[1] ?? 0);
 	const removed = Number(/(\d+) deletions?\(-\)/.exec(stdout)?.[1] ?? 0);
+	return { added, removed };
+}
+
+/** `[+N -M]` from `git diff --shortstat HEAD`, or "" when nothing changed. */
+export function diffLabel(stdout: string): string {
+	const { added, removed } = diffCounts(stdout);
 	return added || removed ? `[+${added} -${removed}]` : "";
 }
 
@@ -105,7 +112,7 @@ export default function worktreeStatus(pi: ExtensionAPI): void {
 	let path: string | undefined;
 	let branch = "";
 	let pr = "";
-	let stats = "";
+	let stats: { added: number; removed: number } = { added: 0, removed: 0 };
 	let checkedAt = 0;
 	// One refresh runs at a time, so replies cannot arrive out of order; a request made meanwhile is
 	// folded into one follow-up. Selecting another worktree aborts the git or gh in flight.
@@ -119,7 +126,15 @@ export default function worktreeStatus(pi: ExtensionAPI): void {
 			const theme = ctx.ui.theme;
 			// Green, as git prompts draw a branch, so it stands apart from the model and session colors.
 			const name = path && theme.style(`⎇ ${basename(path)}`, { fg: theme.appearance === "light" ? rgbColor(21, 128, 61) : rgbColor(74, 222, 128) });
-			ctx.ui.setStatus(statusKey, name ? `${name}${stats ? theme.fg("muted", ` ${stats}`) : ""}${pr ? theme.fg("muted", ` · ${pr}`) : ""}` : undefined);
+			// The counts read as git draws them: additions green, deletions red.
+			const diff = stats.added || stats.removed
+				? theme.fg("muted", " [")
+					+ theme.style(`+${stats.added}`, { fg: theme.appearance === "light" ? rgbColor(21, 128, 61) : rgbColor(74, 222, 128) })
+					+ theme.fg("muted", " ")
+					+ theme.style(`-${stats.removed}`, { fg: theme.appearance === "light" ? rgbColor(185, 28, 28) : rgbColor(248, 113, 113) })
+					+ theme.fg("muted", "]")
+				: "";
+			ctx.ui.setStatus(statusKey, name ? `${name}${diff}${pr ? theme.fg("muted", ` · ${pr}`) : ""}` : undefined);
 		} catch {
 			// A ctx from a replaced session throws; the next session_start replaces it.
 		}
@@ -132,7 +147,7 @@ export default function worktreeStatus(pi: ExtensionAPI): void {
 		(globalThis as Shared)[currentKey] = next;
 		branch = "";
 		pr = "";
-		stats = "";
+		stats = { added: 0, removed: 0 };
 		show();
 	};
 
@@ -155,7 +170,7 @@ export default function worktreeStatus(pi: ExtensionAPI): void {
 		show();
 		const diff = await pi.exec("git", ["-C", target, "diff", "--shortstat", "HEAD"], { timeout: 5_000, signal });
 		if (signal.aborted) return;
-		stats = diff.code === 0 ? diffLabel(diff.stdout) : "";
+		stats = diff.code === 0 ? diffCounts(diff.stdout) : { added: 0, removed: 0 };
 		show();
 		if (!branch || (!force && Date.now() - checkedAt < PR_TTL_MS)) return;
 		checkedAt = Date.now();
@@ -199,6 +214,12 @@ export default function worktreeStatus(pi: ExtensionAPI): void {
 
 	pi.on("agent_settled", () => {
 		if (ctx) void refresh(false);
+	});
+
+	// The counts follow each edit as it lands, not only when the turn settles;
+	// the queue coalesces bursts from codemode's nested edits into one git call.
+	pi.on("tool_result", (event) => {
+		if (ctx && (event.toolName === "edit" || event.toolName === "write")) void refresh(false);
 	});
 
 	pi.on("session_shutdown", () => {
