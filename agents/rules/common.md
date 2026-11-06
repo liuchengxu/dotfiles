@@ -14,6 +14,7 @@
 - State your assumptions. When the intent is unclear and the answer changes the work, ask.
 - When you have enough information, act. Do not re-argue a decision the user has made; give a recommendation, not a survey of options.
 - Make the simplest change that does the job. Add no abstraction, option, or state that the task does not need.
+- Before the first code edit of a task, load the code-minimalism skill and apply its write-time gate. Reapply the relevant checks before adding a new API, abstraction, state, or validation boundary.
 - Touch only what the task needs. Report other problems; do not fix them unasked.
 - Comments state only an invariant, an external contract, a surprise, a safety argument, or a workaround with what retires it, never what the code already says.
 - Before you start, define what success means, then check the result against it.
