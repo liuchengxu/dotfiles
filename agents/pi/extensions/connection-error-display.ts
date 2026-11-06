@@ -26,19 +26,43 @@ export function enrichError(errorMessage: string, model: { provider: string; id:
 
 export default function connectionErrorDisplay(pi: ExtensionAPI): void {
 	let selected: { provider: string; id: string } | undefined;
+	// Consecutive failures of the same model count up; a reply that completes,
+	// a new user message, or a model switch starts the count over.
+	let attempts = 0;
+	let failing = "";
+
+	const reset = (): void => {
+		attempts = 0;
+		failing = "";
+	};
 
 	pi.on("model_select", event => {
 		selected = { provider: event.model.provider, id: event.model.id };
+		reset();
 	});
 
 	pi.on("message_end", (event, ctx) => {
 		const message = event.message as { role: string; stopReason?: string; errorMessage?: string };
-		if (message.role !== "assistant" || message.stopReason !== "error") return;
+		if (message.role === "user") {
+			reset();
+			return;
+		}
+		if (message.role !== "assistant" || message.stopReason !== "error") {
+			if (message.role === "assistant") reset();
+			return;
+		}
 		if (!isGenericFailure(message.errorMessage)) return;
 		// model_select fires only on explicit switches; ctx.model also covers the
 		// session's initial model, so the first failure after a restart is named.
 		const model = ctx?.model ?? selected;
+		const key = label(model);
+		attempts = key === failing ? attempts + 1 : 1;
+		failing = key;
+		const original = (message.errorMessage ?? "").trim().replace(/\.$/, "");
+		const errorMessage = attempts === 1
+			? `${original}.${hint(key)}`
+			: `${original}. — retry ${attempts} for ${key}.`;
 		// Idempotent: an enriched message no longer matches the generic pattern.
-		return { message: { ...event.message, errorMessage: enrichError(message.errorMessage!, model) } };
+		return { message: { ...event.message, errorMessage } };
 	});
 }
