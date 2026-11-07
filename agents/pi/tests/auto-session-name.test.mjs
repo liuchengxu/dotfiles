@@ -7,7 +7,7 @@ import test from "node:test";
 
 const root = process.env.PI_PACKAGE_ROOT ?? "/Users/xlc/.config/nvm/versions/node/v24.22.1/lib/node_modules/@earendil-works/pi-coding-agent";
 const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/lib/jiti.mjs")));
-const { default: extension, cleanTitle, firstExchange } = await createJiti(import.meta.url, { fsCache: false }).import(new URL("../extensions/auto-session-name.ts", import.meta.url).pathname);
+const { default: extension, cleanTitle, firstExchange, lastExchange } = await createJiti(import.meta.url, { fsCache: false }).import(new URL("../extensions/auto-session-name.ts", import.meta.url).pathname);
 const { SessionManager } = await import(pathToFileURL(join(root, "dist/core/session-manager.js")));
 const turn = () => new Promise((resolve) => setImmediate(resolve));
 const user = { type: "message", id: "u", message: { role: "user", content: "Fix Kitty left padding" } };
@@ -195,4 +195,58 @@ test("a name with no auto record is never drift-checked, and small drift never a
   const small = { type: "message", id: "su", message: { role: "user", content: "s".repeat(2_000) } };
   h.pushBranch(small); advance(31 * 60_000); h.emit("agent_settled");
   assert.equal(h.requests.length, 1, "2k new characters is below the drift threshold");
+});
+
+test("an observed manual rename releases the name permanently, even renamed back to the auto title", async (t) => {
+  const { h, advance } = await namedSession(t);
+  h.setName("my own name");
+  h.pushBranch(bigUser); h.pushBranch(bigAssistant); advance(31 * 60_000);
+  h.emit("agent_settled");
+  assert.equal(h.receipts.at(-1)[1].kind, "released", "the divergence is observed and recorded");
+  h.setName("Fix Kitty padding on external monitor");
+  h.pushBranch(bigUser); h.pushBranch(bigAssistant); advance(31 * 60_000); h.emit("agent_settled");
+  assert.equal(h.requests.length, 1, "renaming back does not restore auto control");
+});
+
+test("a branch moved under an in-flight drift call cannot write a stale rename", async (t) => {
+  const { h, advance } = await namedSession(t);
+  h.pushBranch(bigUser); h.pushBranch(bigAssistant); advance(31 * 60_000);
+  h.emit("agent_settled");
+  h.setBranch([user, assistant]);
+  h.requests[1].resolve(reply("A different branch title")); await turn();
+  assert.deepEqual(h.names, ["Fix Kitty padding on external monitor"], "the judged exchange is gone from the current branch");
+});
+
+test("a resumed session counts drift from its load-time branch, not after the first settle", async (t) => {
+  let now = 1_000_000_000_000;
+  t.mock.method(Date, "now", () => now);
+  const branch = [user, assistant, bigUser, bigAssistant];
+  const h = host({ branch, name: "Fix Kitty padding on external monitor" });
+  branch.push({ type: "custom", customType: "auto-session-name", data: { kind: "named", title: "Fix Kitty padding on external monitor", at: now }, id: "c0", parentId: null, timestamp: "" });
+  h.emit("session_start");
+  h.pushBranch({ type: "message", id: "ru", message: { role: "user", content: "r".repeat(8_200) } });
+  h.pushBranch({ type: "message", id: "ra", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "done" }] } });
+  now += 31 * 60_000;
+  h.emit("agent_settled");
+  assert.equal(h.requests.length, 1, "growth after load crosses the threshold at the first settle");
+});
+
+test("a late provider answer after the deadline cannot rename", async (t) => {
+  let deadline;
+  t.mock.method(globalThis, "setTimeout", (fn) => { deadline = fn; return { unref() {} }; });
+  t.mock.method(globalThis, "clearTimeout", () => {});
+  const { h, advance } = await namedSession(t);
+  h.pushBranch(bigUser); h.pushBranch(bigAssistant); advance(31 * 60_000);
+  h.emit("agent_settled"); deadline();
+  h.requests[1].resolve(reply("An aborted drift title")); await turn();
+  assert.deepEqual(h.names, ["Fix Kitty padding on external monitor"]);
+});
+
+test("an image-only user turn does not lend its reply to the previous text user", () => {
+  const exchange = lastExchange([
+    user, assistant,
+    { type: "message", id: "iu", message: { role: "user", content: [{ type: "image", data: "x" }] } },
+    { type: "message", id: "ia", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "saw only an image" }] } },
+  ]);
+  assert.equal(JSON.parse(exchange.text).user, "Fix Kitty left padding");
 });

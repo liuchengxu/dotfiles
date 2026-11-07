@@ -4,11 +4,12 @@ const DEADLINE_MS = 20_000;
 const EXCERPT_LIMIT = 4_000;
 /** New conversation before a drift check may run. */
 const DRIFT_CHARS = 8_000;
-/** A rename never happens more often than this, whatever the drift. */
+/** A rename never happens more often than this; between renames, a check costs
+ * one bounded call per 8k new characters. */
 const DRIFT_MIN_MS = 30 * 60_000;
 
 const RECORD_TYPE = "auto-session-name";
-interface AutoNameRecord { kind: "named" | "renamed"; title: string; at: number }
+interface AutoNameRecord { kind: "named" | "renamed" | "released"; title: string; at: number }
 type Branch = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
 
 function textContent(content: unknown): string {
@@ -41,8 +42,10 @@ export function lastExchange(branch: Branch) {
 		if (entry.type !== "message") continue;
 		const message = entry.message;
 		if (message.role === "user") {
+			// Every user message resets the pairing: an image-only turn must not
+			// lend its reply to the text user before it.
 			const text = textContent(message.content).trim();
-			if (text) pending = { id: entry.id, text: text.slice(0, EXCERPT_LIMIT) };
+			pending = text ? { id: entry.id, text: text.slice(0, EXCERPT_LIMIT) } : undefined;
 		} else if (pending && message.role === "assistant" && message.stopReason === "stop") {
 			const text = textContent(message.content).trim();
 			if (text) last = { userId: pending.id, assistantId: entry.id, text: JSON.stringify({ user: pending.text, assistant: text.slice(0, EXCERPT_LIMIT) }) };
@@ -67,7 +70,7 @@ export function autoNameRecord(branch: Branch): AutoNameRecord | undefined {
 		const entry = branch[i] as { type?: string; customType?: string; data?: unknown };
 		if (entry?.type === "custom" && entry.customType === RECORD_TYPE) {
 			const data = entry.data as AutoNameRecord | undefined;
-			if (data && (data.kind === "named" || data.kind === "renamed") && typeof data.title === "string" && typeof data.at === "number") return data;
+			if (data && (data.kind === "named" || data.kind === "renamed" || data.kind === "released") && typeof data.title === "string" && typeof data.at === "number") return data;
 		}
 	}
 }
@@ -139,12 +142,22 @@ export default function autoSessionName(pi: ExtensionAPI): void {
 
 	async function driftSession(ctx: ExtensionContext): Promise<void> {
 		if (ctx.mode !== "tui" || !ctx.model || !pi.getSessionName()) return;
+		// One nested call at a time: a naming or drift request in flight owns the latch.
+		if (controller) return;
 		const branch = ctx.sessionManager.getBranch();
 		const record = autoNameRecord(branch);
 		// No record: the name is manual or predates records — not ours to change.
 		if (!record) return;
-		// The live name diverged from our record: the user renamed; hands off, forever.
-		if (pi.getSessionName() !== record.title) return;
+		// A released record is an observed manual rename; auto naming stays off for
+		// the session, whatever the name is changed to afterwards.
+		if (record.kind === "released") return;
+		// The live name diverged from our record: a manual rename we had not yet
+		// released from. Mark it once, permanently — string comparison cannot tell
+		// a later rename back to the auto title from a name that is still ours.
+		if (pi.getSessionName() !== record.title) {
+			pi.appendEntry(RECORD_TYPE, { kind: "released", title: record.title, at: Date.now() } satisfies AutoNameRecord);
+			return;
+		}
 		const total = branchChars(branch);
 		if (baseline === undefined) {
 			// First settle after load: drift counts from here, not from before the resume.
@@ -177,17 +190,23 @@ export default function autoSessionName(pi: ExtensionAPI): void {
 			}).result();
 			if (!isCurrent()) return;
 			pi.appendEntry("auto-session-name-usage", { provider: response.provider, model: response.model, usage: response.usage });
-			if (response.stopReason !== "stop") return;
+			if (response.stopReason !== "stop" || request.signal.aborted) return;
 			const raw = textContent(response.content);
 			if (isKeep(raw)) return;
 			const title = cleanTitle(raw);
-			// The live name may have changed while the call was in flight; a manual
+			// The branch may have moved under the call (tree navigation, rollback): the
+			// write re-verifies that the record and the exchange it judged are still the
+			// session's current history, and that the live name is still ours. A manual
 			// rename always wins over a late drift answer.
-			if (!title || title === record.title || pi.getSessionName() !== record.title) return;
+			const now = autoNameRecord(ctx.sessionManager.getBranch());
+			const ids = new Set(ctx.sessionManager.getBranch().map((entry) => entry.id));
+			const sameRecord = now && now.kind === record.kind && now.title === record.title && now.at === record.at;
+			if (!title || title === record.title || !sameRecord || !ids.has(exchange.userId) || !ids.has(exchange.assistantId) || pi.getSessionName() !== record.title) return;
 			pi.setSessionName(title);
 			pi.appendEntry(RECORD_TYPE, { kind: "renamed", title, at: Date.now() } satisfies AutoNameRecord);
 		} catch {
-			// A failed check costs nothing: the baseline moved, the next window starts fresh.
+			// The window is spent either way: the baseline already moved, so the next
+			// check waits for another 8k characters instead of retrying each settle.
 		} finally {
 			clearTimeout(timer);
 			if (controller === request) controller = undefined;
@@ -197,10 +216,21 @@ export default function autoSessionName(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
 		reset();
 		void nameSession(ctx);
+		// A resumed session already carries its name and record: drift counts from
+		// the load-time branch, so pre-resume growth is not silently excused.
+		if (pi.getSessionName()) {
+			const record = autoNameRecord(ctx.sessionManager.getBranch());
+			if (record) baseline = branchChars(ctx.sessionManager.getBranch());
+		}
 	});
 	pi.on("agent_settled", (_event, ctx) => {
 		void nameSession(ctx);
 		void driftSession(ctx);
+	});
+	// Tree navigation changes what the branch holds; drift accounting restarts
+	// on the branch the session now shows, and a move re-reads the record there.
+	pi.on("session_tree", () => {
+		baseline = undefined;
 	});
 	pi.on("session_shutdown", () => { reset(); });
 }
