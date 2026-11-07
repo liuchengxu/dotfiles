@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import { clean, HEARTBEAT_MS, recordKey, scanRecords, writeRecord, type AgentRecord, type AgentRow } from "./lib/live-agent-state.ts";
+import { clean, HEARTBEAT_MS, recordKey, scanRecords, takeRename, writeRecord, type AgentRecord, type AgentRow } from "./lib/live-agent-state.ts";
 
 export default function agentsDashboard(pi: ExtensionAPI) {
   const dir = join(process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"), "live-agents");
@@ -19,6 +19,17 @@ export default function agentsDashboard(pi: ExtensionAPI) {
 
   function publish(ctx = context) {
     if (!record || !ctx) return;
+    // watchdeck renames arrive as request files next to the records; applying
+    // them through pi's own API keeps the session name the single source of
+    // truth (setSessionName is on the ExtensionAPI, not the read-only ctx).
+    // Auto (model-proposed) names yield to one the owner set in the meantime.
+    const requested = takeRename(dir, record.sessionId);
+    const current = ctx.sessionManager.getSessionName();
+    const placeholder = !current || current === `Session ${record.sessionId.slice(-8)}`;
+    if (requested && (!requested.auto || placeholder)) {
+      try { pi.setSessionName(requested.name); }
+      catch { /* setSessionName persists synchronously; a failed rename must not kill the heartbeat. */ }
+    }
     record.name = clean(ctx.sessionManager.getSessionName() || `Session ${record.sessionId.slice(-8)}`);
     record.model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "No model";
     record.tool = [...tools.values()].at(-1) || "";

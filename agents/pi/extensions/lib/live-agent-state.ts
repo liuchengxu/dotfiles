@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Independent implementation inspired by FrederickAlt/pi-agent-dashboard's
@@ -44,6 +44,38 @@ function valid(value: unknown): value is AgentRecord {
 export function processExists(pid: number): boolean {
   try { process.kill(pid, 0); return true; }
   catch (error) { return (error as NodeJS.ErrnoException).code !== "ESRCH"; }
+}
+
+export interface RenameRequest { name: string; auto: boolean; at: number }
+export const RENAME_TTL_MS = 10 * 60_000;
+const RENAME_MAX_BYTES = 4_096;
+
+/**
+ * Claims one rename request written by watchdeck under `dir/renames/` by
+ * renaming it aside first: a concurrent writer or second instance can then
+ * neither lose a newer request nor read the same one. The claim file is
+ * removed whatever happens, so a bad payload never wedges the session.
+ * Auto requests (model-proposed names) expire, so one queued before the owner
+ * names the session themselves is dropped instead of overwriting them.
+ */
+export function takeRename(dir: string, sessionId: string, now = Date.now()): RenameRequest | undefined {
+  if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) return undefined;
+  const file = join(dir, "renames", `${sessionId}.json`);
+  const claim = join(dir, "renames", `.${sessionId}.${process.pid}.${now}.claim`);
+  try { renameSync(file, claim); } catch { return undefined; }
+  let out: RenameRequest | undefined;
+  try {
+    const st = statSync(claim);
+    if (st.isFile() && st.size <= RENAME_MAX_BYTES) {
+      const r = JSON.parse(readFileSync(claim, "utf8")) as { version?: unknown; name?: unknown; auto?: unknown; at?: unknown };
+      const name = typeof r.name === "string" ? clean(r.name).trim().slice(0, 80) : "";
+      const at = Number.isFinite(r.at) ? Number(r.at) : now;
+      if (r.version === 1 && name && (r.auto === undefined || typeof r.auto === "boolean")
+        && (!r.auto || now - at <= RENAME_TTL_MS)) out = { name, auto: r.auto === true, at };
+    }
+  } catch { /* Not a readable request; the claim below still removes it. */ }
+  try { rmSync(claim); } catch { /* Nothing re-reads claims; one survivor is inert. */ }
+  return out;
 }
 
 export function scanRecords(dir: string, now = Date.now(), alive = processExists): AgentRow[] {
