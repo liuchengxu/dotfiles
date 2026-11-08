@@ -8,9 +8,13 @@ import test from "node:test";
 
 const root = process.env.PI_PACKAGE_ROOT ?? dirname(dirname(dirname(realpathSync(execFileSync("which", ["pi"], { encoding: "utf8" }).trim()))));
 const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/lib/jiti.mjs")));
-const jiti = createJiti(import.meta.url, { fsCache: false, alias: { "@earendil-works/pi-coding-agent": join(root, "dist/index.js") } });
+const jiti = createJiti(import.meta.url, { fsCache: false, alias: {
+	"@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
+	"@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
+} });
 const { default: extension, fileControls, IDLE_MS, MIN_TOKENS, DIGEST_KEY, digestLines } = await jiti.import(new URL("../extensions/idle-compaction.ts", import.meta.url).pathname);
 const { SessionManager } = await import(pathToFileURL(join(root, "dist/core/session-manager.js")));
+const { visibleWidth } = await jiti.import(join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"));
 
 function clock(t) {
   let now = 0;
@@ -215,7 +219,7 @@ test("digest omits absent sections, caps long lines, and falls back to leading l
 	const sparse = digestLines("## Goal\nOnly prose.\n## Next Steps\n- Next up", 1);
 	assert.deepEqual(sparse.slice(1), ["Goal Only prose.", "Next Next up"]);
 	const capped = digestLines(`## Goal\n${"x".repeat(90)}`, 1);
-	assert.equal(capped[1].length, 72); assert.ok(capped[1].endsWith("…"));
+	assert.equal(visibleWidth(capped[1]), 72); assert.ok(capped[1].includes("…"));
 	const plain = digestLines("No headings at all.\nSecond line.\nThird line.\nFourth line.", 5);
 	assert.deepEqual(plain.slice(1), ["No headings at all.", "Second line.", "Third line."]);
 });
@@ -237,4 +241,36 @@ test("a compaction we did not start shows no digest", (t) => {
 	const h = host(); h.emit("session_start");
 	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- x", tokensBefore: 9 } });
 	assert.equal(h.widgets.filter((entry) => entry.content !== undefined).length, 0);
+});
+
+test("typing dismisses the digest; a foreign compaction replaces it with nothing", (t) => {
+	const c = clock(t), h = host(); h.emit("session_start"); c.advance(IDLE_MS);
+	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- Finish.", tokensBefore: 1 } });
+	assert.ok(h.widgets.at(-1).content, "digest pinned after our compaction");
+	h.calls[0].onComplete({});
+	h.type();
+	assert.deepEqual(h.widgets.at(-1), { key: DIGEST_KEY, content: undefined }, "a keystroke dismisses it");
+	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- Foreign", tokensBefore: 2 } });
+	assert.equal(h.widgets.filter((entry) => entry.content).length, 1, "only the initial pin ever carried content; a foreign compaction adds none");
+});
+
+test("only the empty-marker None is filtered; real blockers starting with None survive", () => {
+	const lines = digestLines("## Progress\n### Blocked\n- None of the integration tests pass.\n", 1);
+	assert.ok(lines.some((line) => line.startsWith("Block")), "a genuine None-of sentence is a blocker");
+	const empty = digestLines("## Progress\n### Blocked\n- None — waiting on review.\n", 1);
+	assert.ok(!empty.some((line) => line.startsWith("Block")), "the None marker is dropped");
+});
+
+test("wide characters truncate by terminal column, not UTF-16 unit", () => {
+	const lines = digestLines(`## Goal\n${"界".repeat(80)}`, 1);
+	assert.ok(visibleWidth(lines[1]) <= 72, `goal row fits 72 columns, got ${visibleWidth(lines[1])}`);
+});
+
+test("markdown stripping keeps literal content: code spans, paired bold, plus bullets", () => {
+	const lines = digestLines([
+		"## Goal", "- Fix `a*b` and **ship it**", "",
+		"### In Progress", "+ [ ] Ship the thing", "",
+	].join("\n"), 1);
+	assert.ok(lines.includes("Goal Fix a*b and ship it"), JSON.stringify(lines));
+	assert.ok(lines.includes("Now  Ship the thing"), JSON.stringify(lines));
 });

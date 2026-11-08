@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export const IDLE_MS = 45 * 60 * 1000;
@@ -24,8 +25,12 @@ export function digestLines(summary: string, tokensBefore: number): string[] {
 	};
 	const firstItem = (lines: string[] | undefined): string | undefined => {
 		for (const raw of lines ?? []) {
-			const text = raw.trim().replace(/^[-*]\s*(\[[ xX]\]\s*)?/, "").replace(/^\d+[.)]\s*/, "").replace(/[`*]/g, "");
-			if (text && !/^none\b/i.test(text)) return text.length > LINE_CAP - 5 ? text.slice(0, LINE_CAP - 6).trimEnd() + "…" : text;
+			const text = raw.trim().replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, "").replace(/^\d+[.)]\s*/, "")
+				.replace(/`([^`]*)`/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1");
+			// "None" alone is the compaction prompt's empty-section marker; a
+			// sentence like "None of the tests pass" is a real blocker.
+			if (!text || /^none\s*(?:[—–.:-]|$)/i.test(text)) continue;
+			return truncateToWidth(text, LINE_CAP - 5, "…");
 		}
 		return undefined;
 	};
@@ -92,6 +97,7 @@ export default function idleCompaction(pi: ExtensionAPI, controls: Controls = fi
   let generation = 0;
   let unsubscribeInput: (() => void) | undefined;
   let attempt: { generation: number; sessionId: string; leafId: string | null } | undefined;
+  let digestPinned = false;
 
   function cancelTimer() {
     generation++;
@@ -109,7 +115,12 @@ export default function idleCompaction(pi: ExtensionAPI, controls: Controls = fi
   /** The digest dies on the user's next action; it must never outlive the
    * moment it describes or leak into another session. */
   function hideDigest(ctx: ExtensionContext): void {
-    try { if (ctx.mode === "tui") ctx.ui.setWidget(DIGEST_KEY, undefined); } catch { /* A retired context has no UI left. */ }
+    try {
+      if (ctx.mode === "tui" && digestPinned) {
+        ctx.ui.setWidget(DIGEST_KEY, undefined);
+        digestPinned = false;
+      }
+    } catch { /* A retired context has no UI left. */ }
   }
 
   function schedule(ctx: ExtensionContext) {
@@ -157,7 +168,7 @@ export default function idleCompaction(pi: ExtensionAPI, controls: Controls = fi
     attempt = undefined;
     hideDigest(ctx);
     unsubscribeInput?.();
-    unsubscribeInput = ctx.mode === "tui" ? ctx.ui.onTerminalInput(() => { schedule(ctx); }) : undefined;
+    unsubscribeInput = ctx.mode === "tui" ? ctx.ui.onTerminalInput(() => { hideDigest(ctx); schedule(ctx); }) : undefined;
     schedule(ctx);
   });
   pi.on("agent_settled", (_event, ctx) => { schedule(ctx); });
@@ -187,14 +198,14 @@ export default function idleCompaction(pi: ExtensionAPI, controls: Controls = fi
   pi.on("session_compact", (event, ctx) => {
     if (!attempt) {
       cancelTimer();
+      hideDigest(ctx);
       return;
     }
-    // Fired while our attempt is live: the summary reorients the model, the
-    // digest reorients the returning user.
     try {
       const entry = event.compactionEntry;
       if (ctx.mode === "tui" && typeof entry?.summary === "string") {
         ctx.ui.setWidget(DIGEST_KEY, digestLines(entry.summary, entry.tokensBefore), { placement: "aboveEditor" });
+        digestPinned = true;
       }
     } catch { /* A retired context cannot show the digest. */ }
   });
