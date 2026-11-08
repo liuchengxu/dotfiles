@@ -209,9 +209,10 @@ test("digest lines carry the summary's goal, live work, blockers, and next step"
 		"## Goal", "- Ship the footer dock.", "",
 		"## Progress", "### Done", "- merged", "### In Progress", "- [ ] adjudicate the review", "### Blocked", "- None — waiting on nothing.", "",
 		"## Next Steps", "1. Fix `F-01` **awaited children**", "2. Merge.", "",
+		"Overall progress: ~70%",
 	].join("\n");
 	const lines = digestLines(summary, 227_812);
-	assert.equal(lines[0], "◇ Compacted while idle · 227,812 tokens · ctrl+o for the full summary");
+	assert.equal(lines[0], "◇ ~70% done · compacted while idle · 227,812 tokens · ctrl+o full summary");
 	assert.deepEqual(lines.slice(1), ["Goal Ship the footer dock.", "Now  adjudicate the review", "Next Fix F-01 awaited children"]);
 });
 
@@ -273,4 +274,21 @@ test("markdown stripping keeps literal content: code spans, paired bold, plus bu
 	].join("\n"), 1);
 	assert.ok(lines.includes("Goal Fix a*b and ship it"), JSON.stringify(lines));
 	assert.ok(lines.includes("Now  Ship the thing"), JSON.stringify(lines));
+});
+
+test("progress estimate prefers the summarizer's stated line and takes the last valid one", () => {
+	const withStated = digestLines("## Goal\n- x\nOverall progress: ~35%\nOverall progress: ~120%\nOverall progress: ~80%", 1);
+	assert.match(withStated[0], /^◇ ~80% done/);
+});
+
+test("without a stated estimate, the Done share of listed items is used; None markers do not count", () => {
+	const summary = [
+		"## Progress", "### Done", "- a", "- b", "- c", "### In Progress", "- d", "### Blocked", "- None — clear.",
+	].join("\n");
+	assert.match(digestLines(summary, 1)[0], /^◇ ~75% done/, "done share over counted items only");
+});
+
+test("no basis for an estimate leaves the percentage out of the header", () => {
+	const plain = digestLines("No headings at all.\nSecond line.\nThird line.", 5);
+	assert.equal(plain[0], "◇ Compacted while idle · 5 tokens · ctrl+o for the full summary");
 });

@@ -8,7 +8,7 @@ export const IDLE_MS = 45 * 60 * 1000;
 export const MIN_TOKENS = 200_000;
 export const DIGEST_KEY = "idle-compaction-digest";
 const ATTEMPT = "idle-compaction-attempt";
-const INSTRUCTIONS = "Idle compaction: preserve the user's goals, constraints, decisions, unfinished work, and exact references needed to resume safely.";
+const INSTRUCTIONS = "Idle compaction: preserve the user's goals, constraints, decisions, unfinished work, and exact references needed to resume safely. End the summary with a final line of the form 'Overall progress: ~N%' where N is your honest 0-100 estimate of how much of the user's overall goal is now complete.";
 const LINE_CAP = 72;
 
 /** The reorientation digest pinned above the editor after idle compaction:
@@ -44,7 +44,23 @@ export function digestLines(summary: string, tokensBefore: number): string[] {
 		.map(([label, value]) => `${label.padEnd(5)}${value}`);
 	const lines = body.length > 0 ? body : summary.split(/\r?\n/).filter((line) => line.trim()).slice(0, 3)
 		.map((line) => line.replace(/[`*]/g, "").slice(0, LINE_CAP).trimEnd());
-	return [`◇ Compacted while idle · ${tokensBefore.toLocaleString()} tokens · ctrl+o for the full summary`, ...lines];
+	const progress = progressPercent(summary, section);
+	const header = progress === undefined
+		? `◇ Compacted while idle · ${tokensBefore.toLocaleString()} tokens · ctrl+o for the full summary`
+		: `◇ ~${progress}% done · compacted while idle · ${tokensBefore.toLocaleString()} tokens · ctrl+o full summary`;
+	return [header, ...lines];
+}
+
+/** The summarizer's own estimate when present (it read everything); else the
+ * Done share of the summary's list items. Both are impressions, not metrics. */
+function progressPercent(summary: string, section: (heading: string) => string[] | undefined): number | undefined {
+	const stated = [...summary.matchAll(/overall progress[^\d]{0,12}~?\s*(\d{1,3})\s*%/gi)]
+		.map((match) => Number(match[1])).filter((value) => value <= 100);
+	if (stated.length > 0) return stated.at(-1);
+	const items = (heading: string) => (section(heading) ?? []).filter((line) => /^\s*[-*+]\s/.test(line) && !/^\s*[-*+]\s*none\s*(?:[—–.:-]|$)/i.test(line)).length;
+	const done = items("Done");
+	const remaining = items("In Progress") + items("Blocked");
+	return done + remaining > 0 ? Math.round((done / (done + remaining)) * 100) : undefined;
 }
 
 type Controls = {
