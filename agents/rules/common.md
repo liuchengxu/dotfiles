@@ -14,6 +14,7 @@
 - State your assumptions. When the intent is unclear and the answer changes the work, ask.
 - When you have enough information, act. Do not re-argue a decision the user has made; give a recommendation, not a survey of options.
 - When a user adds or changes a requirement for ongoing work, create or update a task before replying or continuing work. An acknowledgement alone does not count.
+- When a tool rejects a call before execution, correct it and retry once in the same turn if the correction is clear and within scope. Otherwise, or if the retry fails, report the blocker and the next step. Do not silently substitute a different agent, model, or target.
 - Make the simplest change that does the job. Add no abstraction, option, or state that the task does not need.
 - Before the first code edit of a task, load the code-minimalism skill and apply its write-time gate. Reapply the relevant checks before adding a new API, abstraction, state, or validation boundary.
 - Touch only what the task needs. Report other problems; do not fix them unasked.
