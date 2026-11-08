@@ -4,8 +4,8 @@ import { randomUUID } from "node:crypto";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-export type DigestTheme = Pick<ExtensionContext["ui"], "theme">["theme"];
-const identityTheme: DigestTheme = { fg: (_name, text) => text } as unknown as DigestTheme;
+export type DigestTheme = Pick<ExtensionContext["ui"]["theme"], "fg">;
+const identityTheme: DigestTheme = { fg: (_name, text) => text };
 
 export const IDLE_MS = 45 * 60 * 1000;
 export const MIN_TOKENS = 200_000;
@@ -38,7 +38,7 @@ export function digestLines(summary: string, tokensBefore: number, theme: Digest
 		}
 		return undefined;
 	};
-	const rows: [glyph: string, label: string, semantic: string, value: string | undefined][] = [
+	const rows: [glyph: string, label: string, semantic: Parameters<DigestTheme["fg"]>[0], value: string | undefined][] = [
 		["●", "Goal", "accent", firstItem(section("Goal"))],
 		["◉", "Now", "warning", firstItem(section("In Progress"))],
 		["⚠", "Block", "error", firstItem(section("Blocked"))],
@@ -49,7 +49,7 @@ export function digestLines(summary: string, tokensBefore: number, theme: Digest
 			theme.fg(semantic, glyph) + theme.fg("dim", ` ${label.padEnd(5)}`) + " " + truncateToWidth(value, LINE_CAP - 8, "…"));
 	const lines = body.length > 0 ? body
 		: [section("Goal"), section("In Progress"), section("Blocked"), section("Next Steps")].some(Boolean)
-			? [] // Sections parsed but nothing actionable: header and bar already say it.
+			? [] // Sections parsed but nothing actionable: the header still orients.
 			: summary.split(/\r?\n/).filter((line) => line.trim()).slice(0, 3)
 				.map((line) => "  " + truncateToWidth(line.replace(/[`*]/g, ""), LINE_CAP - 2, "…"));
 	const progress = progressPercent(summary, section);

@@ -317,3 +317,20 @@ test("formatted None markers are not work, numbered items count, and headers fit
 		assert.ok(visibleWidth(header) <= 72, `header fits: ${visibleWidth(header)} ${JSON.stringify(header)}`);
 	}
 });
+
+test("bar endpoints: 0% is all dim cells, 100% all accent; colors forward semantic names", () => {
+	const zero = digestLines("Overall progress: ~0%", 1);
+	assert.match(zero[1], /^ {2}░{18} ~0%/);
+	const full = digestLines("Overall progress: 100%", 1);
+	assert.match(full[1], /^ {2}█{18} ~100%/);
+	const asked = [];
+	const spy = { fg: (name, text) => { asked.push(name); return text; } };
+	digestLines("## Goal\n- g\n### In Progress\n- n\n### Blocked\n- b\n## Next Steps\n- x", 1, spy);
+	for (const semantic of ["accent", "warning", "error", "dim"]) assert.ok(asked.includes(semantic), `${semantic} forwarded`);
+});
+
+test("sections that parse to only None markers yield the bare header", () => {
+	const lines = digestLines("## Progress\n### Blocked\n- None.", 1);
+	assert.equal(lines.length, 1);
+	assert.match(lines[0], /^◇ idle compaction · 1 tokens ─+ ctrl\+o full summary$/);
+});
