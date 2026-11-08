@@ -13,7 +13,7 @@ const jiti = createJiti(import.meta.url, { alias: {
   "@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
   "@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
-const { default: extension, dockTask } = await jiti.import(new URL("../extensions/bash-background.ts", import.meta.url).pathname);
+const { default: extension, dockTask, bgHintText } = await jiti.import(new URL("../extensions/bash-background.ts", import.meta.url).pathname);
 
 test("a dock label is one line: edge newlines that pass validation are stripped from the description", () => {
   const task = { id: "bg-1", command: "sleep 1", description: "\nRun a short check\n", startedAt: 0, state: "running" };
@@ -101,28 +101,50 @@ function session() {
   const tools = new Map();
   const sent = [];
   const renderers = [];
+  const inputHandlers = [];
+  const notices = [];
   extension({
-    on(event, handler) { handlers.set(event, [...(handlers.get(event) ?? []), handler]); },
+    on(event, handler) {
+      const list = handlers.get(event) ?? [];
+      handlers.set(event, [...list, handler]);
+      return () => handlers.set(event, (handlers.get(event) ?? []).filter((h) => h !== handler));
+    },
     registerTool(tool) { tools.set(tool.name, tool); },
     sendMessage(message, options) { sent.push({ message, options }); },
     registerCommand() {}, registerMessageRenderer() {}, registerShortcut() {},
     registerToolRenderer(factory) { renderers.push(factory); },
   });
-  const emit = (event, payload) => {
+  const emit = (event, payload, ctx = {}) => {
     let result;
-    for (const handler of handlers.get(event) ?? []) result = handler(payload, {}) ?? result;
+    for (const handler of handlers.get(event) ?? []) result = handler(payload, ctx) ?? result;
     return result;
   };
   const call = async (name, input, toolCallId = "call") => {
-    const result = await tools.get(name).execute(toolCallId, input, undefined, undefined, { cwd: tmpdir() });
+    const result = await tools.get(name).execute(toolCallId, input, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
     return result.content[0].text;
   };
   return {
     emit,
     call,
+    tool: (name) => tools.get(name),
     sent,
+    notices,
     renderer(toolName) { return renderers[0](toolName, () => undefined); },
     start() { emit("agent_start", { type: "agent_start" }); },
+    /** Registers the terminal-input listener the way a real TUI session does. */
+    startTui() {
+      emit("session_start", { type: "session_start" }, { mode: "tui", ui: {
+        onTerminalInput(handler) { inputHandlers.push(handler); return () => {}; },
+        notify(message) { notices.push(message); },
+        setStatus() {},
+        theme: { fg: (_token, text) => text },
+      } });
+    },
+    key(data) {
+      let last;
+      for (const handler of inputHandlers) last = handler(data);
+      return last;
+    },
     async background(command) {
       return /bg-\d+/.exec(await this.backgroundText(command))[0];
     },
@@ -445,4 +467,41 @@ test("a background task is one row: the header carries its id, time, and exit", 
     rmSync(release, { force: true });
     s.shutdown();
   }
+});
+
+test("ctrl+b detaches every running foreground call, reports real wall time, and notifies", async () => {
+  const s = session(); s.startTui();
+  const first = s.tool("bash").execute("c1", { command: "sleep 30 && echo one", description: "Run one" }, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
+  const second = s.call("bash", { command: "sleep 30 && echo two", description: "Run two" }, "c2");
+  await sleep(300);
+  const consume = s.key("\x02");
+  assert.equal(consume?.consume, true, "ctrl+b is consumed while calls run");
+  const [raw, text] = await Promise.all([first, second]);
+  assert.match(raw.content[0].text, /moved to the background by keyboard shortcut/);
+  assert.match(text, /moved to the background by keyboard shortcut/);
+  assert.deepEqual(s.notices, ["Moved 2 running commands to the background"]);
+  const wall = raw.structuredContent?.wall_time_seconds;
+  assert.ok(typeof wall === "number" && wall >= 1 && wall < 30, `real elapsed seconds, not the 120s budget (got ${wall})`);
+  for (const id of [raw.structuredContent.output, .../bg-\d+/.exec(text) ? [/bg-\d+/.exec(text)[0]] : []]) {
+    await s.call("bg_kill", { id });
+  }
+  s.shutdown();
+});
+
+test("ctrl+b with nothing running stays cursor-left", () => {
+  const s = session(); s.startTui();
+  assert.equal(s.key("\x02"), undefined);
+  s.shutdown();
+});
+
+test("the tool description carries the budget and the manual key", () => {
+  const s = session();
+  assert.match(s.tool("bash").description, /Commands that run past 120s move to the background automatically/);
+  assert.match(s.tool("bash").description, /Ctrl\+B or Ctrl\+Shift\+B converts the running command by hand/);
+  s.shutdown();
+});
+
+test("the hint text tells tmux users to press twice", () => {
+  assert.equal(bgHintText(false), "Ctrl+B to run in background");
+  assert.equal(bgHintText(true), "Ctrl+B Ctrl+B to run in background");
 });

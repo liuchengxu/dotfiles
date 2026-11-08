@@ -3,10 +3,11 @@
  *
  * Ports from Claude Code's BashTool: the `description` param shown above the
  * command, `run_in_background` (detached spawn, task id, durable log file,
- * completion notification that wakes the agent), in-place auto-background
- * of a foreground command after a budget, Ctrl+B or Ctrl+Shift+B to
- * detach a running call by hand (Ctrl+B stays cursor-left when idle),
- * stall detection for interactive prompts, the
+ * completion notification that wakes the agent), Ctrl+B or Ctrl+Shift+B to
+ * detach every running foreground call by hand (Ctrl+B stays cursor-left
+ * when idle; under tmux the prefix takes the first press, so it is Ctrl+B
+ * twice), the budget as a safety net that auto-backgrounds a call that ran
+ * too long, stall detection for interactive prompts, the
  * bare-`sleep` guard, and bg_status / bg_logs / bg_kill.
  *
  * The label is canonical on the task record (BgTask): every live surface
@@ -66,9 +67,10 @@ const STALL_CHECK_MS = 45_000;
 const STALL_TAIL_BYTES = 2048;
 const KILL_GRACE_MS = 5_000;
 const SLOW_FOREGROUND_SECONDS = 60;
-/** Claude's assistant-mode budget. Overridable for tests. */
-const BUDGET_MS = Number(process.env.PI_BG_BUDGET_MS ?? 5_000);
-const MANUAL_BG_HINT_MS = Number(process.env.PI_BG_HINT_MS ?? 2_000);
+/** Claude Code parity: manual Ctrl+B is the primary path; this budget is
+ * the safety net (Claude's foreground bash times out at 120s). */
+const BUDGET_MS = Number(process.env.PI_BG_BUDGET_MS ?? 120_000);
+const MANUAL_BG_HINT_MS = Number(process.env.PI_BG_HINT_MS ?? 1_000);
 /** Ends every background-start result. Models read "you will be notified" as
  * a cue to poll, or to call pi-subagents' bg_wait, which cannot see these tasks
  * and answers "No active run matched". */
@@ -92,6 +94,10 @@ type SharedRunning = { [runningKey]?: RunningBgTask[] };
  * cut here would clip wide terminals and double-truncate narrow ones. This is the one boundary
  * every producer's label crosses — bash descriptions are control-checked, bg_watch's are not —
  * so terminal escapes and other controls die here, not at the 30th code point as before. */
+/** tmux's default prefix eats the first Ctrl+B (double-press sends it through). */
+export const bgHintText = (tmux: boolean): string =>
+	tmux ? "Ctrl+B Ctrl+B to run in background" : "Ctrl+B to run in background";
+
 export function dockTask(task: BgTask): RunningBgTask {
 	const label = (task.description ?? task.command)
 		.replace(/\x1b\[[0-9:;<=>?]*[ -/]*[@-~]/g, "")
@@ -236,15 +242,17 @@ export default function bashBackground(pi: ExtensionAPI) {
 	const redrawHints = new Map<string, () => void>();
 	let hintTicker: NodeJS.Timeout | undefined;
 	let stopTerminalInput: (() => void) | undefined;
+	let notifyUser: ((message: string) => void) | undefined;
 	pi.on("session_start", (_event, ctx) => {
 		if (ctx.mode !== "tui" || hintTicker) return;
+		notifyUser = (message) => ctx.ui.notify(message);
 		hintTicker = setInterval(() => {
 			for (const redraw of redrawHints.values()) redraw();
 		}, 250);
 		hintTicker.unref();
 		stopTerminalInput?.();
 		stopTerminalInput = ctx.ui.onTerminalInput((data) => {
-			if (!matchesKey(data, "ctrl+b") || !detachNewestForeground()) return undefined;
+			if (!matchesKey(data, "ctrl+b") || !detachAllForeground()) return undefined;
 			return { consume: true };
 		});
 	});
@@ -627,18 +635,25 @@ export default function bashBackground(pi: ExtensionAPI) {
 		return task;
 	}
 
-	function detachNewestForeground(): boolean {
-		const call = [...active.values()].reverse().find((candidate) => candidate.state === "foreground");
-		if (!call) return false;
-		call.requestDetach();
-		return true;
+	/** Tool calls of one assistant message run in parallel, so several
+	 * foreground calls can exist at once; only detaching all of them lets
+	 * the turn continue. */
+	function detachAllForeground(): number {
+		let count = 0;
+		for (const call of active.values()) {
+			if (call.state !== "foreground") continue;
+			call.requestDetach();
+			count++;
+		}
+		if (count > 0) notifyUser?.(`Moved ${count} running command${count === 1 ? "" : "s"} to the background`);
+		return count;
 	}
 
 	// Ctrl+B works only while a foreground call exists, preserving cursor-left
 	// at other times. Ctrl+Shift+B remains as an explicit alternative.
 	pi.registerShortcut("ctrl+shift+b", {
-		description: "Move the running foreground bash command to the background",
-		handler: () => { detachNewestForeground(); },
+		description: "Move all running foreground bash commands to the background",
+		handler: () => { detachAllForeground(); },
 	});
 
 	function isBareSleep(command: string): boolean {
@@ -686,7 +701,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 				return [
 					theme.fg("toolTitle", description.replace(/\s+/g, " ").trim()),
 					...(!detailsCollapsed ? [theme.fg("accent", `  ⎿ $ ${command.split(/\r?\n/).find(line => line.trim())?.trim() ?? ""}`)] : []),
-				...(manualHint ? [theme.fg("dim", "  Ctrl+B to run in background")] : []),
+				...(manualHint ? [theme.fg("dim", `  ${bgHintText(Boolean(process.env.TMUX))}`)] : []),
 				].map(line => truncateToWidth(line, width));
 			},
 			invalidate() {},
@@ -1465,7 +1480,9 @@ export default function bashBackground(pi: ExtensionAPI) {
 					output: `detached ${task.id}`,
 					truncated: false,
 					exit_code: 0,
-					wall_time_seconds: Math.round(BUDGET_MS / 1000),
+					// Real elapsed time: a manual detach at 1s must not read as the
+					// full budget (the slow-call teacher keys off this).
+					wall_time_seconds: Math.max(1, Math.round((Date.now() - call.startedAt) / 1000)),
 				},
 				details: { handoff: `detached ${task.id}` },
 			};
