@@ -10,6 +10,9 @@ const { createJiti } = await import(pathToFileURL(join(root, "node_modules/jiti/
 const jiti = createJiti(import.meta.url, { alias: {
 	"@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
 	"@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
+	"@earendil-works/pi-ai": join(root, "node_modules/@earendil-works/pi-ai/dist/index.js"),
+	"typebox": join(root, "node_modules/typebox/build/index.mjs"),
+	"typebox/value": join(root, "node_modules/typebox/build/value/index.mjs"),
 } });
 const { formatOverlayTaskLine, overlayStatusGlyph, IN_PROGRESS_FRAMES } = await jiti.import(new URL("../extensions/rpiv-todo/view/format.ts", import.meta.url).pathname);
 
@@ -41,4 +44,9 @@ test("the in-progress marker animates through four frames; other statuses stay s
 		const b = overlayStatusGlyph(status, theme, 2);
 		assert.equal(a, b, `${status} does not animate`);
 	}
+});
+
+test("the fork loads through its real entry: every import resolves outside npm", async () => {
+	const { default: entry } = await jiti.import(new URL("../extensions/rpiv-todo/index.ts", import.meta.url).pathname);
+	assert.equal(typeof entry, "function", "index.ts exports the extension entry");
 });
