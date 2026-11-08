@@ -1,0 +1,19 @@
+{
+  "_meta.notes": "Auto-translated draft. Native-speaker review welcome via PR. Unicode box-drawing characters (──) stay untranslated.",
+
+  "status.pending": "pendientes",
+  "status.in_progress": "en curso",
+  "status.completed": "completadas",
+  "status.deleted": "eliminada",
+
+  "overlay.heading": "Tareas",
+  "overlay.more": "más",
+  "overlay.expandHint": "{key} para expandir",
+  "overlay.collapsed": "contraído",
+
+  "command.no_todos": "Sin tareas aún. ¡Pídele al agente que añada algunas!",
+  "command.requires_interactive": "/todos requiere modo interactivo",
+  "command.section.pending": "── Pendientes ──",
+  "command.section.in_progress": "── En curso ──",
+  "command.section.completed": "── Completadas ──"
+}

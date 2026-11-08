@@ -1,0 +1,19 @@
+{
+  "_meta.notes": "Автопереклад. Привітна перевірка носієм мови через PR. Символи юнікоду (──) не перекладаються.",
+
+  "status.pending": "очікування",
+  "status.in_progress": "у роботі",
+  "status.completed": "виконано",
+  "status.deleted": "видалено",
+
+  "overlay.heading": "Завдання",
+  "overlay.more": "ще",
+  "overlay.expandHint": "{key} — розгорнути",
+  "overlay.collapsed": "згорнуто",
+
+  "command.no_todos": "Завдань поки немає. Попросіть агента додати!",
+  "command.requires_interactive": "/todos потребує інтерактивного режиму",
+  "command.section.pending": "── Очікування ──",
+  "command.section.in_progress": "── У роботі ──",
+  "command.section.completed": "── Виконано ──"
+}

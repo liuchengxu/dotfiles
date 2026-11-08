@@ -1,0 +1,75 @@
+{
+	"name": "@juicesharp/rpiv-todo",
+	"version": "2.13.8",
+	"description": "Pi extension. A todo list for the model, rendered as a live overlay that survives /reload and conversation compaction.",
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"rpiv",
+		"todo"
+	],
+	"type": "module",
+	"license": "MIT",
+	"author": "juicesharp",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/juicesharp/rpiv-mono.git",
+		"directory": "packages/rpiv-todo"
+	},
+	"homepage": "https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-todo#readme",
+	"bugs": {
+		"url": "https://github.com/juicesharp/rpiv-mono/issues"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"test": "vitest run"
+	},
+	"files": [
+		"config.ts",
+		"index.ts",
+		"locales/",
+		"todo.ts",
+		"todo-overlay.ts",
+		"LICENSE",
+		"docs/",
+		"!docs/*.png",
+		"!docs/*.jpg",
+		"!docs/*.svg",
+		"README.md",
+		"state/invariants.ts",
+		"state/i18n-bridge.ts",
+		"state/replay.ts",
+		"state/selectors.ts",
+		"state/state-reducer.ts",
+		"state/state.ts",
+		"state/store.ts",
+		"state/task-graph.ts",
+		"tool/response-envelope.ts",
+		"tool/sanitize.ts",
+		"tool/types.ts",
+		"view/format.ts"
+	],
+	"pi": {
+		"image": "https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-todo/docs/cover.png",
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"peerDependencies": {
+		"@juicesharp/rpiv-i18n": "*",
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*",
+		"typebox": "*"
+	},
+	"peerDependenciesMeta": {
+		"@juicesharp/rpiv-i18n": {
+			"optional": true
+		}
+	},
+	"dependencies": {
+		"@juicesharp/rpiv-config": "^2.13.8"
+	}
+}
