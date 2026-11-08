@@ -212,25 +212,26 @@ test("digest lines carry the summary's goal, live work, blockers, and next step"
 		"Overall progress: ~70%",
 	].join("\n");
 	const lines = digestLines(summary, 227_812);
-	assert.equal(lines[0], "◇ ~70% · compacted while idle · 227,812 tokens · ctrl+o full summary");
-	assert.deepEqual(lines.slice(1), ["Goal Ship the footer dock.", "Now  adjudicate the review", "Next Fix F-01 awaited children"]);
+	assert.match(lines[0], /^◇ idle compaction ─+ ctrl\+o full summary$/);
+	assert.match(lines[1], /^ {2}█{13}░{5} ~70% · 227,812 tokens$/);
+	assert.deepEqual(lines.slice(2), ["● Goal  Ship the footer dock.", "◉ Now   adjudicate the review", "▸ Next  Fix F-01 awaited children"]);
 });
 
 test("digest omits absent sections, caps long lines, and falls back to leading lines", () => {
 	const sparse = digestLines("## Goal\nOnly prose.\n## Next Steps\n- Next up", 1);
-	assert.deepEqual(sparse.slice(1), ["Goal Only prose.", "Next Next up"]);
+	assert.deepEqual(sparse.slice(1), ["● Goal  Only prose.", "▸ Next  Next up"]);
 	const capped = digestLines(`## Goal\n${"x".repeat(90)}`, 1);
 	assert.equal(visibleWidth(capped[1]), 72); assert.ok(capped[1].includes("…"));
 	const plain = digestLines("No headings at all.\nSecond line.\nThird line.\nFourth line.", 5);
-	assert.deepEqual(plain.slice(1), ["No headings at all.", "Second line.", "Third line."]);
+	assert.deepEqual(plain.slice(1), ["  No headings at all.", "  Second line.", "  Third line."]);
 });
 
 test("our idle compaction pins the digest; the user's next action or shutdown removes it", (t) => {
 	const c = clock(t), h = host(); h.emit("session_start"); c.advance(IDLE_MS);
 	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- Finish.\n## Next Steps\n1. Merge", tokensBefore: 200_001 } });
 	assert.equal(h.widgets.at(-1).key, DIGEST_KEY);
-	assert.match(h.widgets.at(-1).content[0], /Compacted while idle/);
-	assert.ok(h.widgets.at(-1).content.includes("Next Merge"));
+	assert.match(h.widgets.at(-1).content[0], /idle compaction/);
+	assert.ok(h.widgets.at(-1).content.some((line) => line.includes("Merge")));
 	h.emit("input");
 	assert.deepEqual(h.widgets.at(-1), { key: DIGEST_KEY, content: undefined });
 	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- Again", tokensBefore: 1 } });
@@ -257,9 +258,9 @@ test("typing dismisses the digest; a foreign compaction replaces it with nothing
 
 test("only the empty-marker None is filtered; real blockers starting with None survive", () => {
 	const lines = digestLines("## Progress\n### Blocked\n- None of the integration tests pass.\n", 1);
-	assert.ok(lines.some((line) => line.startsWith("Block")), "a genuine None-of sentence is a blocker");
+	assert.ok(lines.some((line) => line.includes("Block")), "a genuine None-of sentence is a blocker");
 	const empty = digestLines("## Progress\n### Blocked\n- None — waiting on review.\n", 1);
-	assert.ok(!empty.some((line) => line.startsWith("Block")), "the None marker is dropped");
+	assert.ok(!empty.some((line) => line.includes("Block")), "the None marker is dropped");
 });
 
 test("wide characters truncate by terminal column, not UTF-16 unit", () => {
@@ -272,25 +273,25 @@ test("markdown stripping keeps literal content: code spans, paired bold, plus bu
 		"## Goal", "- Fix `a*b` and **ship it**", "",
 		"### In Progress", "+ [ ] Ship the thing", "",
 	].join("\n"), 1);
-	assert.ok(lines.includes("Goal Fix a*b and ship it"), JSON.stringify(lines));
-	assert.ok(lines.includes("Now  Ship the thing"), JSON.stringify(lines));
+	assert.ok(lines.some((line) => line.includes("Fix a*b and ship it")), JSON.stringify(lines));
+	assert.ok(lines.some((line) => line.includes("Ship the thing")), JSON.stringify(lines));
 });
 
 test("progress estimate prefers the summarizer's stated line and takes the last valid one", () => {
 	const withStated = digestLines("## Goal\n- x\nOverall progress: ~35%\nOverall progress: ~120%\nOverall progress: ~80%", 1);
-	assert.match(withStated[0], /^◇ ~80% /);
+	assert.match(withStated[1], /~80% · 1 tokens/);
 });
 
 test("without a stated estimate, the Done share of listed items is used; None markers do not count", () => {
 	const summary = [
 		"## Progress", "### Done", "- a", "- b", "- c", "### In Progress", "- d", "### Blocked", "- None — clear.",
 	].join("\n");
-	assert.match(digestLines(summary, 1)[0], /^◇ ~75% /, "done share over counted items only");
+	assert.match(digestLines(summary, 1)[1], /~75%/, "done share over counted items only");
 });
 
 test("no basis for an estimate leaves the percentage out of the header", () => {
 	const plain = digestLines("No headings at all.\nSecond line.\nThird line.", 5);
-	assert.equal(plain[0], "◇ Compacted while idle · 5 tokens · ctrl+o for the full summary");
+	assert.match(plain[0], /^◇ idle compaction · 5 tokens ─+ ctrl\+o full summary$/);
 });
 
 test("only a standalone progress line counts; prose, negations, and next-line percentages do not", () => {
@@ -302,16 +303,16 @@ test("only a standalone progress line counts; prose, negations, and next-line pe
 	].join("\n"), 1);
 	assert.doesNotMatch(noisy[0], /%/);
 	const standalone = digestLines("Overall progress: 65%", 1);
-	assert.match(standalone[0], /^◇ ~65% /);
+	assert.match(standalone[1], /~65%/);
 });
 
 test("the <=100 filter decides last-wins: 80 then 120 stays 80", () => {
-	assert.match(digestLines("Overall progress: ~80%\nOverall progress: ~120%", 1)[0], /^◇ ~80% /);
+	assert.match(digestLines("Overall progress: ~80%\nOverall progress: ~120%", 1)[1], /~80%/);
 });
 
 test("formatted None markers are not work, numbered items count, and headers fit LINE_CAP", () => {
 	const summary = ["## Progress", "### Done", "- **None** before real work", "- a", "### In Progress", "1. still going", "### Blocked", "- [ ] None."].join("\n");
-	assert.match(digestLines(summary, 1)[0], /^◇ ~50% /, "one done, one numbered remaining");
+	assert.match(digestLines(summary, 1)[1], /~50%/, "one done, one numbered remaining");
 	for (const header of [digestLines("Overall progress: 100%", 1)[0], digestLines("## Progress\n### Done\n- a", 1)[0], digestLines("nothing", 999_999)[0]]) {
 		assert.ok(visibleWidth(header) <= 72, `header fits: ${visibleWidth(header)} ${JSON.stringify(header)}`);
 	}

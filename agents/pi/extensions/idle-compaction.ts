@@ -1,8 +1,11 @@
 import { readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+export type DigestTheme = Pick<ExtensionContext["ui"], "theme">["theme"];
+const identityTheme: DigestTheme = { fg: (_name, text) => text } as unknown as DigestTheme;
 
 export const IDLE_MS = 45 * 60 * 1000;
 export const MIN_TOKENS = 200_000;
@@ -12,10 +15,11 @@ const INSTRUCTIONS = "Idle compaction: preserve the user's goals, constraints, d
 const LINE_CAP = 72;
 
 /** The reorientation digest pinned above the editor after idle compaction:
- * the summary's own Goal/In-Progress/Blocked/Next, one line each, so a user
- * returning to a compacted terminal sees where things stand without a
- * keypress. Full summary stays on the transcript's ctrl+o expansion. */
-export function digestLines(summary: string, tokensBefore: number): string[] {
+ * the summary's own Goal/In-Progress/Blocked/Next, one line each behind a
+ * ruled header and a progress bar, so a user returning to a compacted
+ * terminal sees where things stand without a keypress. Full summary stays on
+ * the transcript's ctrl+o expansion. */
+export function digestLines(summary: string, tokensBefore: number, theme: DigestTheme = identityTheme): string[] {
 	const section = (heading: string): string[] | undefined => {
 		const head = summary.match(new RegExp(`^#{2,3} ${heading}\\s*$`, "m"));
 		if (!head || head.index === undefined) return undefined;
@@ -34,21 +38,31 @@ export function digestLines(summary: string, tokensBefore: number): string[] {
 		}
 		return undefined;
 	};
-	const rows: [label: string, value: string | undefined][] = [
-		["Goal", firstItem(section("Goal"))],
-		["Now", firstItem(section("In Progress"))],
-		["Block", firstItem(section("Blocked"))],
-		["Next", firstItem(section("Next Steps"))],
+	const rows: [glyph: string, label: string, semantic: string, value: string | undefined][] = [
+		["●", "Goal", "accent", firstItem(section("Goal"))],
+		["◉", "Now", "warning", firstItem(section("In Progress"))],
+		["⚠", "Block", "error", firstItem(section("Blocked"))],
+		["▸", "Next", "dim", firstItem(section("Next Steps"))],
 	];
-	const body = rows.filter((row): row is [string, string] => row[1] !== undefined)
-		.map(([label, value]) => `${label.padEnd(5)}${value}`);
-	const lines = body.length > 0 ? body : summary.split(/\r?\n/).filter((line) => line.trim()).slice(0, 3)
-		.map((line) => line.replace(/[`*]/g, "").slice(0, LINE_CAP).trimEnd());
+	const body = rows.filter((row): row is [string, string, string, string] => row[3] !== undefined)
+		.map(([glyph, label, semantic, value]) =>
+			theme.fg(semantic, glyph) + theme.fg("dim", ` ${label.padEnd(5)}`) + " " + truncateToWidth(value, LINE_CAP - 8, "…"));
+	const lines = body.length > 0 ? body
+		: [section("Goal"), section("In Progress"), section("Blocked"), section("Next Steps")].some(Boolean)
+			? [] // Sections parsed but nothing actionable: header and bar already say it.
+			: summary.split(/\r?\n/).filter((line) => line.trim()).slice(0, 3)
+				.map((line) => "  " + truncateToWidth(line.replace(/[`*]/g, ""), LINE_CAP - 2, "…"));
 	const progress = progressPercent(summary, section);
-	const header = progress === undefined
-		? `◇ Compacted while idle · ${tokensBefore.toLocaleString()} tokens · ctrl+o for the full summary`
-		: `◇ ~${progress}% · compacted while idle · ${tokensBefore.toLocaleString()} tokens · ctrl+o full summary`;
-	return [header, ...lines];
+	const tokens = `${tokensBefore.toLocaleString()} tokens`;
+	const tail = "ctrl+o full summary";
+	const head = progress === undefined ? `◇ idle compaction · ${tokens}` : "◇ idle compaction";
+	const rule = "─".repeat(Math.max(3, LINE_CAP - visibleWidth(head) - visibleWidth(tail) - 2));
+	const header = theme.fg("accent", "◇") + head.slice(1) + " " + theme.fg("dim", rule) + " " + theme.fg("dim", tail);
+	if (progress === undefined) return [header, ...lines];
+	const filled = Math.round(progress * 18 / 100);
+	const bar = "  " + theme.fg("accent", "█".repeat(filled)) + theme.fg("dim", "░".repeat(18 - filled))
+		+ theme.fg("accent", ` ~${progress}%`) + theme.fg("dim", ` · ${tokens}`);
+	return [header, bar, ...lines];
 }
 
 /** The summarizer's own estimate when present (it read everything); else the
@@ -225,7 +239,7 @@ export default function idleCompaction(pi: ExtensionAPI, controls: Controls = fi
     try {
       const entry = event.compactionEntry;
       if (ctx.mode === "tui" && typeof entry?.summary === "string") {
-        ctx.ui.setWidget(DIGEST_KEY, digestLines(entry.summary, entry.tokensBefore), { placement: "aboveEditor" });
+        ctx.ui.setWidget(DIGEST_KEY, digestLines(entry.summary, entry.tokensBefore, ctx.ui.theme), { placement: "aboveEditor" });
         digestPinned = true;
       }
     } catch { /* A retired context cannot show the digest. */ }
