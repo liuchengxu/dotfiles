@@ -226,7 +226,32 @@ Pi packages install per machine with `pi install npm:<package>`:
 | `@narumitw/pi-usage` | Quota footer; `footer-model-prefix` styles it. |
 | `@guwidoe/pi-prompt-suggester` | |
 | `pi-away` | |
-| `@juicesharp/rpiv-todo@2.13.8` | The todo tool; `todo-gate` and `rename-todos` need it. |
+| `rpiv-todo` fork | The todo tool; lives in `pi/extensions/rpiv-todo/`, not npm. `todo-gate` and `rename-todos` need it. |
+
+### Idle compaction
+
+The `idle-compaction.ts` extension is opt-in. After loading it, run
+`/idle-compact on`; use `/idle-compact off` to stop future attempts and
+`/idle-compact status` to inspect the setting. The preference is saved in
+`~/.pi/agent/idle-compaction.json` (or the configured Pi agent directory).
+
+It invokes Pi's normal compaction after 45 minutes without terminal input or
+agent work, when estimated context is at least 200,000 tokens. It runs only
+in interactive mode, requires Pi auto-compaction to be enabled, and skips an
+active main-agent run, queued messages, or a nonempty editor. It does not
+track independent shell processes or remote agents. Session/model changes
+invalidate the timer. Reload/resume starts a fresh 45-minute wait.
+
+A persisted attempt receipt prevents retries on unchanged conversation,
+including after failures or reloads. New conversation allows a new attempt.
+Compaction uses Pi's configured summary model and recent-message retention,
+keeps the original transcript, and pins a where-we-are digest above the
+editor (goal, current work, blockers, next step, parsed from the compaction
+summary) until your next action. It costs tokens and can lose detail from
+the working context. This is not a cache-expiry scheduler and does not
+guarantee provider prompt-cache savings. Turning it off can cancel an
+attempt before summarization starts. Once summarization is underway, use
+Pi's normal cancellation control to stop it.
 
 ## Local files
 
