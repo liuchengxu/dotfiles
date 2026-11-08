@@ -98,14 +98,22 @@ type SharedRunning = { [runningKey]?: RunningBgTask[] };
 export const bgHintText = (tmux: boolean): string =>
 	tmux ? "Ctrl+B Ctrl+B to run in background" : "Ctrl+B to run in background";
 
-export function dockTask(task: BgTask): RunningBgTask {
-	const label = (task.description ?? task.command)
+/** The one sanitizer every dock label crosses — the footer rows here and the
+ * subagent-run rows subagent-dock publishes: CSI/OSC/charset/DCS escapes and
+ * other control characters become spaces, runs collapse to one, edges trim.
+ * Terminal escapes must die here, not at a width cut, or they corrupt the row. */
+export function dockLabel(text: string): string {
+	return text
 		.replace(/\x1b\[[0-9:;<=>?]*[ -/]*[@-~]/g, "")
 		.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
 		.replace(/\x1b[()][0-9A-B]/g, "")
 		.replace(/\x1b[P^_][\s\S]*?(?:\x1b\\|\x07)/g, "")
 		.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
 		.replace(/ +/g, " ").trim();
+}
+
+export function dockTask(task: BgTask): RunningBgTask {
+	const label = dockLabel(task.description ?? task.command);
 	return {
 		id: task.id,
 		label,

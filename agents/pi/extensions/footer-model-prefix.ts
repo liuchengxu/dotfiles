@@ -4,6 +4,7 @@ import { estimateTokens, FooterComponent, type ExtensionAPI, type ExtensionConte
 import { rgbColor, sliceByColumn, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { formatUptime, sessionUptimeLabel } from "./session-uptime.ts";
+import { subagentLines, visibleRows } from "./lib/subagent-runs.ts";
 
 // bash-background publishes its running tasks for the dock here; globalThis
 // and the same symbol key as there, because the extensions load as separate
@@ -200,7 +201,8 @@ export default function footerModelPrefix(pi: ExtensionAPI): void {
           : room >= 3 ? truncateToWidth(head, room, "…") + " " + suffix
           : truncateToWidth(head + " " + suffix, width, "...");
       });
-      return [modelLine, lines[1], lines[0], ...(activityLine ? [activityLine] : []), ...(remaining.length ? [remaining.join(" • ")] : []), ...bgLines]
+      const saLines = subagentLines(visibleRows(), width, theme);
+      return [modelLine, lines[1], lines[0], ...(activityLine ? [activityLine] : []), ...(remaining.length ? [remaining.join(" • ")] : []), ...bgLines, ...saLines]
         .map((line) => truncateToWidth(line, width, "..."));
     };
     prototype[patchKey] = true;
