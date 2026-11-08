@@ -11,7 +11,8 @@ const jiti = createJiti(import.meta.url, { alias: {
 	"@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
 	"@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
-const { applyComplete, applyStarted, recordLaunch, subagentLines, visibleRows, LINGER_MS, MAX_ROWS } = await jiti.import(new URL("../extensions/lib/subagent-runs.ts", import.meta.url).pathname);
+const { applyComplete, applyStarted, clearRegistry, prune, recordLaunch, subagentLines, visibleRows, LINGER_MS, MAX_ROWS } = await jiti.import(new URL("../extensions/lib/subagent-runs.ts", import.meta.url).pathname);
+const { stripVTControlCharacters } = await import("node:util");
 
 const theme = { fg: (_token, text) => text };
 const row = (overrides = {}) => ({ id: "r1", agent: "worker", goal: "Probe the todo panel", startedAt: 1_000, state: "running", ...overrides });
@@ -37,10 +38,27 @@ test("a completion lingers with its duration, then folds; failure marks the row"
 	assert.equal(visibleRows(9_000).find((entry) => entry.id === "run-12")?.state, "failed");
 });
 
-test("an awaited-by-workflow completion is an internal step, not a row", () => {
-	applyStarted({ id: "run-13", agent: "worker" });
-	applyComplete({ runId: "run-13", state: "complete", awaitedByWorkflow: true });
-	assert.equal(visibleRows().find((entry) => entry.id === "run-13")?.state, "running", "the internal step never settles the row");
+test("workflow-internal steps never earn a row, and a stopped run is not a success", () => {
+	applyStarted({ id: "run-13", agent: "worker", parentWorkflowRunId: "wf-1" });
+	assert.equal(visibleRows().find((entry) => entry.id === "run-13"), undefined, "an awaited child never appears");
+	applyStarted({ id: "run-14", agent: "worker" });
+	applyComplete({ runId: "run-14", state: "stopped", timestamp: 5_000 });
+	assert.equal(visibleRows(5_000).find((entry) => entry.id === "run-14")?.state, "stopped");
+	applyComplete({ runId: "run-14", state: "complete", timestamp: 20_000 });
+	assert.equal(visibleRows(20_000).find((entry) => entry.id === "run-14")?.state, "stopped", "a replayed completion cannot flip the verdict");
+});
+
+test("prune drops lingered rows and stale launch labels; clear empties the registry", () => {
+	clearRegistry();
+	applyStarted({ id: "run-15", agent: "worker" });
+	applyComplete({ runId: "run-15", state: "complete", timestamp: 1_000 });
+	prune(1_000 + LINGER_MS);
+	assert.equal(visibleRows(1_000 + LINGER_MS).length, 0);
+	recordLaunch("call-stale", "worker", "never launched");
+	prune(Date.now() + 3_600_000);
+	clearRegistry();
+	applyStarted({ id: "run-16", agent: "worker" });
+	assert.equal(visibleRows().length, 1, "a fresh session starts empty");
 });
 
 test("lines carry agent, goal, and elapsed; terminal rows show their verdict", () => {
@@ -60,6 +78,7 @@ test("three rows render and the rest count", () => {
 
 test("a cramped row keeps the time beside a truncated goal", () => {
 	const line = subagentLines([row()], 24, theme, 60_000)[0];
-	assert.ok(line.includes("59s"), `time survives: ${line}`);
-	assert.ok(line.length <= 30, `fits the width: ${JSON.stringify(line)}`);
+	const plain = stripVTControlCharacters(line);
+	assert.ok(plain.includes("59s"), `time survives: ${plain}`);
+	assert.ok(plain.length <= 24, `fits the width: ${JSON.stringify(plain)}`);
 });

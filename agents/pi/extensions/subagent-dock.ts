@@ -1,14 +1,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { applyComplete, applyStarted, recordLaunch, visibleRows } from "./lib/subagent-runs.ts";
+import { applyComplete, applyStarted, clearRegistry, prune, recordLaunch, visibleRows } from "./lib/subagent-runs.ts";
 
 /**
- * Publishes live subagent runs to the footer dock: one row per running
- * subagent (agent, goal, elapsed) and a short ✓/✗ linger after completion,
- * next to the background-task rows footer-model-prefix already draws. The
- * registry and line builder live in lib/subagent-runs.ts; this extension only
- * wires the pi-subagents lifecycle events and the 1s publisher, mirroring
- * bash-background's dock publisher.
- */
+ * Publishes live subagent runs to the footer dock beside the background-task
+ * rows. Event payloads redact task text, so the unredacted goal comes from
+ * the launcher's own subagent tool call (lib/subagent-runs.ts links them by
+ * toolCallId). */
 export default function subagentDock(pi: ExtensionAPI): void {
 	let dockTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -35,6 +32,7 @@ export default function subagentDock(pi: ExtensionAPI): void {
 		// unset status both tick the elapsed times and prune lingered rows.
 		let published = false;
 		dockTimer = setInterval(() => {
+			prune();
 			const rows = visibleRows();
 			if (rows.length > 0 || published) {
 				published = rows.length > 0;
@@ -51,5 +49,6 @@ export default function subagentDock(pi: ExtensionAPI): void {
 	pi.on("session_shutdown", () => {
 		if (dockTimer !== undefined) clearInterval(dockTimer);
 		dockTimer = undefined;
+		clearRegistry();
 	});
 }
