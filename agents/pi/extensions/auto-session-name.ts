@@ -8,8 +8,7 @@ const DRIFT_CHARS = 8_000;
  * one bounded call per 8k new characters. */
 const DRIFT_MIN_MS = 30 * 60_000;
 
-const RECORD_TYPE = "auto-session-name";
-interface AutoNameRecord { kind: "named" | "renamed" | "released"; title: string; at: number }
+export const RECORD_TYPE = "auto-session-name";
 type Branch = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
 
 function textContent(content: unknown): string {
@@ -83,6 +82,8 @@ export function cleanTitle(raw: string): string | undefined {
 }
 
 const isKeep = (raw: string): boolean => raw.trim() === "KEEP";
+export { isKeep };
+export interface AutoNameRecord { kind: "named" | "renamed" | "released"; title: string; at: number }
 
 export default function autoSessionName(pi: ExtensionAPI): void {
 	let generation = 0;
