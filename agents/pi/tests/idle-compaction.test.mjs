@@ -212,7 +212,7 @@ test("digest lines carry the summary's goal, live work, blockers, and next step"
 		"Overall progress: ~70%",
 	].join("\n");
 	const lines = digestLines(summary, 227_812);
-	assert.equal(lines[0], "◇ ~70% done · compacted while idle · 227,812 tokens · ctrl+o full summary");
+	assert.equal(lines[0], "◇ ~70% · compacted while idle · 227,812 tokens · ctrl+o full summary");
 	assert.deepEqual(lines.slice(1), ["Goal Ship the footer dock.", "Now  adjudicate the review", "Next Fix F-01 awaited children"]);
 });
 
@@ -278,17 +278,41 @@ test("markdown stripping keeps literal content: code spans, paired bold, plus bu
 
 test("progress estimate prefers the summarizer's stated line and takes the last valid one", () => {
 	const withStated = digestLines("## Goal\n- x\nOverall progress: ~35%\nOverall progress: ~120%\nOverall progress: ~80%", 1);
-	assert.match(withStated[0], /^◇ ~80% done/);
+	assert.match(withStated[0], /^◇ ~80% /);
 });
 
 test("without a stated estimate, the Done share of listed items is used; None markers do not count", () => {
 	const summary = [
 		"## Progress", "### Done", "- a", "- b", "- c", "### In Progress", "- d", "### Blocked", "- None — clear.",
 	].join("\n");
-	assert.match(digestLines(summary, 1)[0], /^◇ ~75% done/, "done share over counted items only");
+	assert.match(digestLines(summary, 1)[0], /^◇ ~75% /, "done share over counted items only");
 });
 
 test("no basis for an estimate leaves the percentage out of the header", () => {
 	const plain = digestLines("No headings at all.\nSecond line.\nThird line.", 5);
 	assert.equal(plain[0], "◇ Compacted while idle · 5 tokens · ctrl+o for the full summary");
+});
+
+test("only a standalone progress line counts; prose, negations, and next-line percentages do not", () => {
+	const noisy = digestLines([
+		"Previous overall progress: ~90% (obsolete; goal expanded).", "",
+		"## Goal", "- x", "",
+		"Overall progress: unknown", "- 80% coverage required", "",
+		"Overall progress: -20%",
+	].join("\n"), 1);
+	assert.doesNotMatch(noisy[0], /%/);
+	const standalone = digestLines("Overall progress: 65%", 1);
+	assert.match(standalone[0], /^◇ ~65% /);
+});
+
+test("the <=100 filter decides last-wins: 80 then 120 stays 80", () => {
+	assert.match(digestLines("Overall progress: ~80%\nOverall progress: ~120%", 1)[0], /^◇ ~80% /);
+});
+
+test("formatted None markers are not work, numbered items count, and headers fit LINE_CAP", () => {
+	const summary = ["## Progress", "### Done", "- **None** before real work", "- a", "### In Progress", "1. still going", "### Blocked", "- [ ] None."].join("\n");
+	assert.match(digestLines(summary, 1)[0], /^◇ ~50% /, "one done, one numbered remaining");
+	for (const header of [digestLines("Overall progress: 100%", 1)[0], digestLines("## Progress\n### Done\n- a", 1)[0], digestLines("nothing", 999_999)[0]]) {
+		assert.ok(visibleWidth(header) <= 72, `header fits: ${visibleWidth(header)} ${JSON.stringify(header)}`);
+	}
 });
