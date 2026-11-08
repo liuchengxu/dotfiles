@@ -57,7 +57,7 @@ import {
 	type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 import { renderDiff } from "@earendil-works/pi-coding-agent";
-import { Container, matchesKey, Text, truncateToWidth, type Component } from "@earendil-works/pi-tui";
+import { Container, isKeyRelease, matchesKey, Text, truncateToWidth, type Component } from "@earendil-works/pi-tui";
 import { colorChangeSummary, countDiffRuns, formatChangeCounts, renderDetailedDiff } from "./lib/tool-presentation.ts";
 import { worktreePath } from "./worktree-status.ts";
 
@@ -177,7 +177,12 @@ interface ActiveCall {
 	childPid?: number;
 	/** Woken by the budget timer or a detach shortcut; carries why, for the notice. */
 	detachRequested: Promise<"budget" | "user">;
-	requestDetach: () => void;
+	/** requestDetach that already ran returns false, so a second key press
+	 * neither double-counts nor double-notifies. */
+	requestDetach: () => boolean;
+	/** The foreground stall watcher fired; carried into the task so the
+	 * post-detach watcher stays quiet. */
+	stallNotified: boolean;
 	/** The delayed hint is rendered beside this foreground call. */
 	hintRequested: boolean;
 	/** Becomes the task once detached. */
@@ -252,6 +257,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 		hintTicker.unref();
 		stopTerminalInput?.();
 		stopTerminalInput = ctx.ui.onTerminalInput((data) => {
+			if (isKeyRelease(data)) return undefined;
 			if (!matchesKey(data, "ctrl+b") || !detachAllForeground()) return undefined;
 			return { consume: true };
 		});
@@ -321,6 +327,31 @@ export default function bashBackground(pi: ExtensionAPI) {
 	pi.on("agent_settled", () => {
 		agentRunning = false;
 	});
+
+	/** The foreground twin of watchStall: with a 120s budget, a command
+	 * blocked on a tty prompt would otherwise stay silent until long after
+	 * the auto-detach. */
+	function watchForegroundStall(call: ActiveCall): void {
+		const started = call.bytes;
+		const timer = setInterval(() => {
+			if (call.state !== "foreground") {
+				clearInterval(timer);
+				return;
+			}
+			if (call.bytes !== started) {
+				watchForegroundStall(call);
+				clearInterval(timer);
+				return;
+			}
+			const tail = tailBytes(call.logPath, STALL_TAIL_BYTES);
+			if (looksLikePrompt(tail) && !call.stallNotified) {
+				call.stallNotified = true;
+				notifyUser?.(`"${call.description ?? call.command.slice(0, 40)}" appears to be waiting for interactive input (Ctrl+B to background it)`);
+				clearInterval(timer);
+			}
+		}, STALL_CHECK_MS);
+		timer.unref?.();
+	}
 
 	function watchStall(task: BgTask): void {
 		const started = task.bytes;
@@ -619,7 +650,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			state: "running",
 			notified: false,
 			processAlive: true,
-			stallNotified: false,
+			stallNotified: call.stallNotified,
 			killRequested: false,
 		};
 		tasks.set(id, task);
@@ -642,8 +673,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 		let count = 0;
 		for (const call of active.values()) {
 			if (call.state !== "foreground") continue;
-			call.requestDetach();
-			count++;
+			if (call.requestDetach()) count++;
 		}
 		if (count > 0) notifyUser?.(`Moved ${count} running command${count === 1 ? "" : "s"} to the background`);
 		return count;
@@ -653,7 +683,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 	// at other times. Ctrl+Shift+B remains as an explicit alternative.
 	pi.registerShortcut("ctrl+shift+b", {
 		description: "Move all running foreground bash commands to the background",
-		handler: () => { detachAllForeground(); },
+		handler: () => detachAllForeground(),
 	});
 
 	function isBareSleep(command: string): boolean {
@@ -1398,6 +1428,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 				innerPromise: Promise.resolve({ exitCode: 0 }),
 				execStarted: false,
 				childPid: undefined,
+				stallNotified: false,
 				controller: new AbortController(),
 				detachRequested: new Promise<"budget" | "user">((resolve) => {
 					callRequestDetachers.set(toolCallId, resolve);
@@ -1406,8 +1437,14 @@ export default function bashBackground(pi: ExtensionAPI) {
 				hintRequested: false,
 			};
 			let budgetTimer: NodeJS.Timeout | undefined;
-			const requestDetach = () => {
-				callRequestDetachers.get(toolCallId)?.("user");
+			const requestDetach = (): boolean => {
+				// Delete before resolving: the flag makes a second press or a
+				// release event count nothing, and only a live request notifies.
+				const resolve = callRequestDetachers.get(toolCallId);
+				if (!resolve) return false;
+				callRequestDetachers.delete(toolCallId);
+				resolve("user");
+				return true;
 			};
 			call.requestDetach = requestDetach;
 
@@ -1417,6 +1454,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			});
 
 			active.set(toolCallId, call);
+			watchForegroundStall(call);
 			const hintTimer = setTimeout(() => {
 				if (call.state === "foreground") call.hintRequested = true;
 			}, MANUAL_BG_HINT_MS);
@@ -1480,9 +1518,8 @@ export default function bashBackground(pi: ExtensionAPI) {
 					output: `detached ${task.id}`,
 					truncated: false,
 					exit_code: 0,
-					// Real elapsed time: a manual detach at 1s must not read as the
-					// full budget (the slow-call teacher keys off this).
-					wall_time_seconds: Math.max(1, Math.round((Date.now() - call.startedAt) / 1000)),
+					// Elapsed time; the slow-call teacher reads it.
+					wall_time_seconds: Math.round((Date.now() - call.startedAt) / 1000),
 				},
 				details: { handoff: `detached ${task.id}` },
 			};
@@ -1994,8 +2031,9 @@ export default function bashBackground(pi: ExtensionAPI) {
 		};
 	});
 
-	// The teacher for slow foreground calls that complete without a detach
-	// (a budget long enough that the call finished under it, but slowly).
+	// The teacher for slow foreground calls: a call that finished on its own
+	// after real elapsed time (the budget auto-detach at 120s also earns
+	// this, truthfully — it really blocked the conversation that long).
 	pi.on("tool_result", (event) => {
 		if (event.toolName !== "bash" || event.isError) return;
 		const structured = event.structuredContent as

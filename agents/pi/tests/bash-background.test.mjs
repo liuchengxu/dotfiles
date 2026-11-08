@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -103,6 +103,7 @@ function session() {
   const renderers = [];
   const inputHandlers = [];
   const notices = [];
+  const shortcuts = new Map();
   extension({
     on(event, handler) {
       const list = handlers.get(event) ?? [];
@@ -111,7 +112,8 @@ function session() {
     },
     registerTool(tool) { tools.set(tool.name, tool); },
     sendMessage(message, options) { sent.push({ message, options }); },
-    registerCommand() {}, registerMessageRenderer() {}, registerShortcut() {},
+    registerCommand() {}, registerMessageRenderer() {},
+    registerShortcut(id, def) { shortcuts.set(id, def); },
     registerToolRenderer(factory) { renderers.push(factory); },
   });
   const emit = (event, payload, ctx = {}) => {
@@ -144,6 +146,11 @@ function session() {
       let last;
       for (const handler of inputHandlers) last = handler(data);
       return last;
+    },
+    shortcut(id) {
+      const def = shortcuts.get(id);
+      assert.ok(def, `shortcut ${id} registered`);
+      return def.handler();
     },
     async background(command) {
       return /bg-\d+/.exec(await this.backgroundText(command))[0];
@@ -469,23 +476,66 @@ test("a background task is one row: the header carries its id, time, and exit", 
   }
 });
 
-test("ctrl+b detaches every running foreground call, reports real wall time, and notifies", async () => {
+test("ctrl+b detaches every running foreground call, reports real wall time, and notifies", async (t) => {
   const s = session(); s.startTui();
-  const first = s.tool("bash").execute("c1", { command: "sleep 30 && echo one", description: "Run one" }, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
-  const second = s.call("bash", { command: "sleep 30 && echo two", description: "Run two" }, "c2");
-  await sleep(300);
-  const consume = s.key("\x02");
-  assert.equal(consume?.consume, true, "ctrl+b is consumed while calls run");
-  const [raw, text] = await Promise.all([first, second]);
-  assert.match(raw.content[0].text, /moved to the background by keyboard shortcut/);
-  assert.match(text, /moved to the background by keyboard shortcut/);
-  assert.deepEqual(s.notices, ["Moved 2 running commands to the background"]);
-  const wall = raw.structuredContent?.wall_time_seconds;
-  assert.ok(typeof wall === "number" && wall >= 1 && wall < 30, `real elapsed seconds, not the 120s budget (got ${wall})`);
-  for (const id of [raw.structuredContent.output, .../bg-\d+/.exec(text) ? [/bg-\d+/.exec(text)[0]] : []]) {
-    await s.call("bg_kill", { id });
+  let first, second;
+  try {
+    first = s.tool("bash").execute("c1", { command: "sleep 30 && echo one", description: "Run one" }, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
+    second = s.call("bash", { command: "sleep 30 && echo two", description: "Run two" }, "c2");
+    await sleep(300);
+    assert.equal(s.key("\x02")?.consume, true, "ctrl+b is consumed while calls run");
+    assert.equal(s.key("\x02"), undefined, "a second press finds nothing left to detach");
+    const [raw, text] = await Promise.all([first, second]);
+    assert.match(raw.content[0].text, /moved to the background by keyboard shortcut/);
+    assert.match(text, /moved to the background by keyboard shortcut/);
+    assert.deepEqual(s.notices, ["Moved 2 running commands to the background"], "one notice; the repeat press added none");
+    const wall = raw.structuredContent?.wall_time_seconds;
+    assert.ok(typeof wall === "number" && wall >= 0 && wall < 30, `real elapsed seconds, not the 120s budget (got ${wall})`);
+    const ids = [String(raw.structuredContent.output).match(/bg-\d+/)?.[0], text.match(/bg-\d+/)?.[0]];
+    assert.ok(ids.every(Boolean), "both results carry a task id");
+    for (const id of ids) {
+      const killed = await s.call("bg_kill", { id });
+      assert.match(killed, /SIGTERM|already|killed/, `task ${id} is dead, not leaked`);
+    }
+  } finally {
+    s.shutdown();
   }
-  s.shutdown();
+});
+
+test("ctrl+shift+b goes through the registered shortcut", async () => {
+  const s = session(); s.startTui();
+  try {
+    const done = s.tool("bash").execute("c1", { command: "sleep 30 && echo one", description: "Run one" }, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
+    await sleep(300);
+    assert.equal(s.shortcut("ctrl+shift+b"), 1, "the shortcut detaches the one running call");
+    assert.match((await done).content[0].text, /moved to the background by keyboard shortcut/);
+    assert.deepEqual(s.notices, ["Moved 1 running command to the background"]);
+    await s.call("bg_kill", { id: "bg-1" });
+  } finally {
+    s.shutdown();
+  }
+});
+
+test("the budget auto-detaches a slow foreground command in a fresh process", async () => {
+  if (process.env.PI_BG_BUDGET_MS !== "2000") {
+    const env = { ...process.env, PI_BG_BUDGET_MS: "2000" };
+    delete env.NODE_TEST_CONTEXT;
+    const child = spawnSync(process.execPath, ["--test", "--test-name-pattern=budget auto-detaches", "tests/bash-background.test.mjs"], {
+      cwd: process.cwd(), env, encoding: "utf8", timeout: 60_000,
+    });
+    assert.equal(child.status, 0, `child test run failed: ${child.stdout}\n${child.stderr}`);
+    assert.match(`${child.stdout}${child.stderr}`, /pass 1/, "exactly the budget test ran and passed");
+    return;
+  }
+  const s = session();
+  try {
+    const done = s.tool("bash").execute("c1", { command: "sleep 10 && echo slow", description: "Run slow" }, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
+    const result = await done;
+    assert.match(result.content[0].text, /ran past 2s and was moved to the background/);
+    await s.call("bg_kill", { id: String(result.structuredContent.output).match(/bg-\d+/)?.[0] });
+  } finally {
+    s.shutdown();
+  }
 });
 
 test("ctrl+b with nothing running stays cursor-left", () => {
