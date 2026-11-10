@@ -217,13 +217,42 @@ test("digest lines carry the summary's goal, live work, blockers, and next step"
 	assert.deepEqual(lines.slice(2), ["● Goal  Ship the footer dock.", "◉ Now   adjudicate the review", "▸ Next  Fix F-01 awaited children"]);
 });
 
-test("digest omits absent sections, caps long lines, and falls back to leading lines", () => {
+test("digest omits absent sections, wraps long lines instead of ellipsizing, and falls back to leading lines", () => {
 	const sparse = digestLines("## Goal\nOnly prose.\n## Next Steps\n- Next up", 1);
 	assert.deepEqual(sparse.slice(1), ["● Goal  Only prose.", "▸ Next  Next up"]);
-	const capped = digestLines(`## Goal\n${"x".repeat(90)}`, 1);
-	assert.equal(visibleWidth(capped[1]), 72); assert.ok(capped[1].includes("…"));
+	const wrapped = digestLines(`## Goal\n${"word ".repeat(18).trim()}`, 1);
+	assert.equal(visibleWidth(wrapped[1]), 72, "the first row fills the digest width");
+	assert.ok(!wrapped[1].includes("…"), "no ellipsis: the row wraps");
+	assert.match(wrapped[2], /^ {8}word/, "the overflow continues on an aligned second row");
 	const plain = digestLines("No headings at all.\nSecond line.\nThird line.\nFourth line.", 5);
 	assert.deepEqual(plain.slice(1), ["  No headings at all.", "  Second line.", "  Third line."]);
+});
+
+test("a written Recap is pinned verbatim in place of the section rows", () => {
+	const summary = [
+		"## Goal", "- Ship the digest.", "",
+		"## Recap", "The user wants a readable digest after idle compaction.", "Rows were truncated with an ellipsis; nobody read them.", "Next: wrap instead of cut, and pin the summarizer's own recap.", "",
+		"Overall progress: ~60%",
+	].join("\n");
+	const lines = digestLines(summary, 227_812);
+	assert.match(lines[0], /^◇ idle compaction ─+ ctrl\+o full summary$/);
+	assert.match(lines[1], /~60%/);
+	assert.deepEqual(lines.slice(2), [
+		"  The user wants a readable digest after idle compaction.",
+		"  Rows were truncated with an ellipsis; nobody read them.",
+		"  Next: wrap instead of cut, and pin the summarizer's own recap.",
+	], "recap lines replace the Goal/Now/Block/Next rows");
+	assert.ok(!lines.join("\n").includes("● Goal"), "no mechanical rows beside a written recap");
+});
+
+test("a Recap line longer than the digest wraps; an unbreakable token is cut without a mark", () => {
+	const long = ["word ".repeat(30).trim()];
+	const lines = digestLines(["## Recap", ...long, "", "Overall progress: ~10%"].join("\n"), 1);
+	assert.ok(lines.slice(1).every(l => visibleWidth(l) <= 72));
+	assert.ok(!lines.join("\n").includes("…"));
+	assert.equal(lines.filter(l => l.startsWith("  word")).length >= 2, true, "the long line folds onto multiple rows");
+	const unbreakable = digestLines(["## Recap", "a".repeat(90)].join("\n"), 1);
+	assert.ok(unbreakable.slice(1).every(l => visibleWidth(l) <= 72 && !l.includes("…")));
 });
 
 test("our idle compaction pins the digest; the user's next action or shutdown removes it", (t) => {

@@ -11,14 +11,15 @@ export const IDLE_MS = 45 * 60 * 1000;
 export const MIN_TOKENS = 200_000;
 export const DIGEST_KEY = "idle-compaction-digest";
 const ATTEMPT = "idle-compaction-attempt";
-const INSTRUCTIONS = "Idle compaction: preserve the user's goals, constraints, decisions, unfinished work, and exact references needed to resume safely. End the summary with a final line of the form 'Overall progress: ~N%' where N is your honest 0-100 estimate of how much of the user's overall goal is now complete, reassessed against the current goal rather than carried forward from an earlier summary.";
+const INSTRUCTIONS = "Idle compaction: preserve the user's goals, constraints, decisions, unfinished work, and exact references needed to resume safely. Then add a '## Recap' section: 3-5 short plain-language lines (at most 70 columns each, no markdown emphasis or bullets) capturing the core points for someone returning — what the user wants, where things stand, any blocker, the next step. End the summary with a final line of the form 'Overall progress: ~N%' where N is your honest 0-100 estimate of how much of the user's overall goal is now complete, reassessed against the current goal rather than carried forward from an earlier summary.";
 const LINE_CAP = 72;
 
-/** The reorientation digest pinned above the editor after idle compaction:
- * the summary's own Goal/In-Progress/Blocked/Next, one line each behind a
- * ruled header and a progress bar, so a user returning to a compacted
- * terminal sees where things stand without a keypress. Full summary stays on
- * the transcript's ctrl+o expansion. */
+/** The reorientation digest pinned above the editor after idle compaction.
+ * The summarizer's own '## Recap' — 3-5 plain lines written as a summary — is
+ * pinned verbatim, wrapped rather than ellipsized, because written prose reads
+ * better than mechanically extracted list items. Summaries without a Recap
+ * (older compactions) fall back to one row per section, now wrapped too. Full
+ * summary stays on the transcript's ctrl+o expansion. */
 export function digestLines(summary: string, tokensBefore: number, theme: DigestTheme = identityTheme): string[] {
 	const section = (heading: string): string[] | undefined => {
 		const head = summary.match(new RegExp(`^#{2,3} ${heading}\\s*$`, "m"));
@@ -27,26 +28,48 @@ export function digestLines(summary: string, tokensBefore: number, theme: Digest
 		const next = rest.match(/^#{2,3} /m);
 		return (next && next.index !== undefined ? rest.slice(0, next.index) : rest).split(/\r?\n/);
 	};
+	const clean = (raw: string): string => raw.trim().replace(/^[-*+]\s*(?:\[[ xX]\]\s*)?/, "").replace(/^\d+[.)]\s*/, "")
+		.replace(/`([^`]*)`/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1");
+	// Wrap, never ellipsize: a line that outgrows the digest folds to the next
+	// row; an unbreakable token is cut hard, without a trailing mark.
+	const wrap = (text: string, width: number): string[] => {
+		const out: string[] = [];
+		let line = "";
+		for (const word of clean(text).split(/\s+/).filter(Boolean)) {
+			if (!line) line = word;
+			else if (visibleWidth(line) + 1 + visibleWidth(word) <= width) line += " " + word;
+			else { out.push(line); line = word; }
+		}
+		if (line) out.push(line);
+		return (out.length ? out : [""]).map(l => truncateToWidth(l, width, ""));
+	};
 	const firstItem = (lines: string[] | undefined): string | undefined => {
 		for (const raw of lines ?? []) {
-			const text = raw.trim().replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, "").replace(/^\d+[.)]\s*/, "")
-				.replace(/`([^`]*)`/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1");
+			const text = clean(raw);
 			// "None" alone is the compaction prompt's empty-section marker; a
 			// sentence like "None of the tests pass" is a real blocker.
 			if (!text || /^none\s*(?:[—–.:-]|$)/i.test(text)) continue;
-			return truncateToWidth(text, LINE_CAP - 5, "…");
+			return text;
 		}
 		return undefined;
 	};
-	const rows: [glyph: string, label: string, semantic: Parameters<DigestTheme["fg"]>[0], value: string | undefined][] = [
-		["●", "Goal", "accent", firstItem(section("Goal"))],
-		["◉", "Now", "warning", firstItem(section("In Progress"))],
-		["⚠", "Block", "error", firstItem(section("Blocked"))],
-		["▸", "Next", "dim", firstItem(section("Next Steps"))],
-	];
-	const body = rows.filter((row): row is [string, string, string, string] => row[3] !== undefined)
-		.map(([glyph, label, semantic, value]) =>
-			theme.fg(semantic, glyph) + theme.fg("dim", ` ${label.padEnd(5)}`) + " " + truncateToWidth(value, LINE_CAP - 8, "…"));
+	const recap = (section("Recap") ?? []).map(clean).filter(l => l && !/^overall progress:/i.test(l));
+	let body: string[];
+	if (recap.length > 0) {
+		body = recap.slice(0, 5).flatMap(line => wrap(line, LINE_CAP - 2).map(l => "  " + l));
+	} else {
+		const rows: [glyph: string, label: string, semantic: Parameters<DigestTheme["fg"]>[0], value: string | undefined][] = [
+			["●", "Goal", "accent", firstItem(section("Goal"))],
+			["◉", "Now", "warning", firstItem(section("In Progress"))],
+			["⚠", "Block", "error", firstItem(section("Blocked"))],
+			["▸", "Next", "dim", firstItem(section("Next Steps"))],
+		];
+		body = rows.filter((row): row is [string, string, string, string] => row[3] !== undefined)
+			.flatMap(([glyph, label, semantic, value]) => wrap(value, LINE_CAP - 8).slice(0, 2).map((line, i) => {
+				if (i === 0) return theme.fg(semantic, glyph) + theme.fg("dim", ` ${label.padEnd(5)}`) + " " + line;
+				return " ".repeat(8) + line;
+			}));
+	}
 	const lines = body.length > 0 ? body
 		: [section("Goal"), section("In Progress"), section("Blocked"), section("Next Steps")].some(Boolean)
 			? [] // Sections parsed but nothing actionable: the header still orients.
