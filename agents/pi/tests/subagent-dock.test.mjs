@@ -11,7 +11,7 @@ const jiti = createJiti(import.meta.url, { alias: {
 	"@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
 	"@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
-const { applyComplete, applyStarted, clearRegistry, prune, recordLaunch, subagentLines, visibleRows, LINGER_MS, MAX_ROWS } = await jiti.import(new URL("../extensions/lib/subagent-runs.ts", import.meta.url).pathname);
+const { applyComplete, applyStarted, clearRegistry, prune, recordLaunch, subagentLines, visibleRows, workflowLabel, LINGER_MS, MAX_ROWS } = await jiti.import(new URL("../extensions/lib/subagent-runs.ts", import.meta.url).pathname);
 const { stripVTControlCharacters } = await import("node:util");
 
 const theme = { fg: (_token, text) => text };
@@ -81,4 +81,43 @@ test("a cramped row keeps the time beside a truncated goal", () => {
 	const plain = stripVTControlCharacters(line);
 	assert.ok(plain.includes("59s"), `time survives: ${plain}`);
 	assert.ok(plain.length <= 24, `fits the width: ${JSON.stringify(plain)}`);
+});
+
+test("a workflow row shows its phases, not its own name twice", () => {
+	recordLaunch("call-wf", "workflow", workflowLabel("workflows/review-fanout.mjs"));
+	applyStarted({ id: "run-20", agent: "workflow", toolCallId: "call-wf",
+		workflowGraph: { phases: [{ title: "Scout" }, { title: "Review" }] } });
+	assert.equal(visibleRows(1_000).find((entry) => entry.id === "run-20")?.goal, "Scout → Review");
+});
+
+test("a workflow with no phases falls back to the script name, then the step count", () => {
+	clearRegistry();
+	recordLaunch("call-wf-2", "workflow", workflowLabel("/tmp/fanout.mjs"));
+	applyStarted({ id: "run-21", agent: "workflow", toolCallId: "call-wf-2" });
+	assert.equal(visibleRows(1_000).find((entry) => entry.id === "run-21")?.goal, "fanout");
+	applyStarted({ id: "run-22", agent: "workflow", chainStepCount: 3 });
+	assert.equal(visibleRows(1_000).find((entry) => entry.id === "run-22")?.goal, "3 steps");
+	applyStarted({ id: "run-23", agent: "workflow" });
+	assert.equal(visibleRows(1_000).find((entry) => entry.id === "run-23")?.goal, "unlabelled",
+		"an unnamed workflow never repeats its agent column");
+});
+
+test("workflowLabel names what the caller typed", () => {
+	assert.equal(workflowLabel(true), "", "an inline script has no name to show");
+	assert.equal(workflowLabel("workflows/council.js"), "council");
+	assert.equal(workflowLabel("/abs/path/fanout.mjs"), "fanout");
+	assert.equal(workflowLabel(undefined), "");
+});
+
+test("an inline workflow with no phases shows its agent chain", () => {
+	clearRegistry();
+	applyStarted({ id: "run-25", agent: "workflow", agents: ["scout", "reviewer"], chain: ["scout", "reviewer"] });
+	assert.equal(visibleRows(1_000).find((entry) => entry.id === "run-25")?.goal, "scout→reviewer");
+});
+
+test("long phase lists count what they omit", () => {
+	clearRegistry();
+	applyStarted({ id: "run-24", agent: "workflow",
+		workflowGraph: { phases: [{ title: "Scout" }, { title: "Draft" }, { title: "Review" }, { title: "Verify" }, { title: "Post" }] } });
+	assert.equal(visibleRows(1_000).find((entry) => entry.id === "run-24")?.goal, "Scout → Draft → Review +2");
 });

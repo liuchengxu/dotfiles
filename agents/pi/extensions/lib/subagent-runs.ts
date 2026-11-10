@@ -41,7 +41,47 @@ export function recordLaunch(toolCallId: string, agent: string, goal: string): v
 	registry().launches.set(toolCallId, { agent, goal: dockLabel(firstLine ?? agent), recordedAt: Date.now() });
 }
 
-export function applyStarted(event: { id?: string; agent?: string; toolCallId?: string; agents?: string[]; chain?: string[]; parentWorkflowRunId?: unknown }): void {
+/** A workflow launch carries a script, not a task: name the script. An inline
+ * script has no name to show, so it returns "" and the row falls back to what
+ * the started event knows. */
+export function workflowLabel(workflow: unknown): string {
+	if (typeof workflow !== "string" || !workflow || workflow === "true") return "";
+	const base = workflow.split("/").pop() ?? workflow;
+	return dockLabel(base.replace(/\.(?:mjs|cjs|js|ts)$/i, ""));
+}
+
+interface StartedEvent {
+	id?: string;
+	agent?: string;
+	toolCallId?: string;
+	agents?: string[];
+	chain?: string[];
+	chainStepCount?: number;
+	workflowGraph?: { phases?: Array<{ title?: string }> };
+	parentWorkflowRunId?: unknown;
+}
+
+/** What the row says the run is doing. A workflow's own name says nothing, so
+ * the phase titles lead; a launch label, the agent chain and the step count
+ * follow in that order. */
+function startedGoal(event: StartedEvent, launchGoal: string | undefined, agent: string): string {
+	const titles = (event.workflowGraph?.phases ?? [])
+		.map((phase) => dockLabel(phase.title ?? ""))
+		.filter(Boolean);
+	if (titles.length > 0) {
+		const shown = titles.slice(0, 3).join(" → ");
+		return titles.length > 3 ? `${shown} +${titles.length - 3}` : shown;
+	}
+	if (launchGoal) return launchGoal;
+	const chain = event.chain?.length ? event.chain.join("→") : (event.agents ?? []).join("+");
+	if (chain && chain !== agent) return chain;
+	const steps = event.chainStepCount ?? event.agents?.length ?? 0;
+	if (steps > 1) return `${steps} steps`;
+	// Nothing names the run, and repeating the agent column would say nothing.
+	return agent === "workflow" ? "unlabelled" : agent;
+}
+
+export function applyStarted(event: StartedEvent): void {
 	const id = typeof event.id === "string" && event.id ? event.id : undefined;
 	if (!id) return;
 	// A child spawned by a workflow is an internal step: its completion is
@@ -51,11 +91,10 @@ export function applyStarted(event: { id?: string; agent?: string; toolCallId?: 
 	const current = registry();
 	const launch = event.toolCallId ? current.launches.get(event.toolCallId) : undefined;
 	const agent = launch?.agent ?? (typeof event.agent === "string" && event.agent ? event.agent : "agent");
-	const chain = event.chain?.length ? event.chain.join("→") : (event.agents ?? []).join("+");
 	current.rows.set(id, {
 		id,
 		agent,
-		goal: launch?.goal || dockLabel(chain || agent),
+		goal: startedGoal(event, launch?.goal, agent),
 		startedAt: Date.now(),
 		state: "running",
 	});

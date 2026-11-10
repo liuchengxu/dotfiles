@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { applyComplete, applyStarted, clearRegistry, prune, recordLaunch, visibleRows } from "./lib/subagent-runs.ts";
+import { applyComplete, applyStarted, clearRegistry, prune, recordLaunch, visibleRows, workflowLabel } from "./lib/subagent-runs.ts";
 
 /**
  * Publishes live subagent runs to the footer dock beside the background-task
@@ -11,7 +11,14 @@ export default function subagentDock(pi: ExtensionAPI): void {
 
 	pi.on("tool_execution_start", (event) => {
 		if (event.toolName !== "subagent" || event.parentToolCallId) return;
-		const args = event.args as { agent?: unknown; task?: unknown } | undefined;
+		const args = event.args as { agent?: unknown; task?: unknown; workflow?: unknown } | undefined;
+		// A workflow call names a script instead of a task; without this the row
+		// would fall back to the agent column twice ("workflow ◆ workflow").
+		if (args?.workflow === true || typeof args?.workflow === "string") {
+			const label = workflowLabel(args.workflow);
+			if (label) recordLaunch(event.toolCallId, "workflow", label);
+			return;
+		}
 		if (typeof args?.task !== "string") return;
 		const agent = typeof args.agent === "string" && args.agent ? args.agent : "worker";
 		recordLaunch(event.toolCallId, agent, args.task);
