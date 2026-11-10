@@ -16,10 +16,12 @@ const LINE_CAP = 72;
 
 /** The reorientation digest pinned above the editor after idle compaction.
  * The summarizer's own '## Recap' — 3-5 plain lines written as a summary — is
- * pinned verbatim, wrapped rather than ellipsized, because written prose reads
- * better than mechanically extracted list items. Summaries without a Recap
- * (older compactions) fall back to one row per section, now wrapped too. Full
- * summary stays on the transcript's ctrl+o expansion. */
+ * pinned, normalized (bullets and emphasis stripped) and wrapped rather than
+ * ellipsized, because written prose reads better than mechanically extracted
+ * list items. Rendered rows carry a budget with a visible omission marker, so
+ * the digest can never grow unbounded or lose text silently. Summaries without
+ * a Recap (older compactions) fall back to one row per section, wrapped the
+ * same way. Full summary stays on the transcript's ctrl+o expansion. */
 export function digestLines(summary: string, tokensBefore: number, theme: DigestTheme = identityTheme): string[] {
 	const section = (heading: string): string[] | undefined => {
 		const head = summary.match(new RegExp(`^#{2,3} ${heading}\\s*$`, "m"));
@@ -30,12 +32,14 @@ export function digestLines(summary: string, tokensBefore: number, theme: Digest
 	};
 	const clean = (raw: string): string => raw.trim().replace(/^[-*+]\s*(?:\[[ xX]\]\s*)?/, "").replace(/^\d+[.)]\s*/, "")
 		.replace(/`([^`]*)`/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1");
-	// Wrap, never ellipsize: a line that outgrows the digest folds to the next
-	// row; an unbreakable token is cut hard, without a trailing mark.
+	// Wrap cleaned text; normalization happens once, at the call site —
+	// wrapping must not strip a second time ("- -flag" would lose "-flag").
+	// A line that outgrows the digest folds to the next row; an unbreakable
+	// token is cut hard, without a trailing mark.
 	const wrap = (text: string, width: number): string[] => {
 		const out: string[] = [];
 		let line = "";
-		for (const word of clean(text).split(/\s+/).filter(Boolean)) {
+		for (const word of text.split(/\s+/).filter(Boolean)) {
 			if (!line) line = word;
 			else if (visibleWidth(line) + 1 + visibleWidth(word) <= width) line += " " + word;
 			else { out.push(line); line = word; }
@@ -54,9 +58,15 @@ export function digestLines(summary: string, tokensBefore: number, theme: Digest
 		return undefined;
 	};
 	const recap = (section("Recap") ?? []).map(clean).filter(l => l && !/^overall progress:/i.test(l));
+	// The prompt asks for five short lines, but a prompt is not enforcement:
+	// the rendered rows carry the budget, and an overflow leaves a marker.
+	const RECAP_ROW_BUDGET = 7;
 	let body: string[];
 	if (recap.length > 0) {
-		body = recap.slice(0, 5).flatMap(line => wrap(line, LINE_CAP - 2).map(l => "  " + l));
+		const rows = recap.slice(0, 5).flatMap(line => wrap(line, LINE_CAP - 2).map(l => "  " + l));
+		body = rows.length > RECAP_ROW_BUDGET
+			? [...rows.slice(0, RECAP_ROW_BUDGET - 1), theme.fg("dim", `  … ${rows.length - RECAP_ROW_BUDGET + 1} more row${rows.length - RECAP_ROW_BUDGET === 0 ? "" : "s"} in the full summary`)]
+			: rows;
 	} else {
 		const rows: [glyph: string, label: string, semantic: Parameters<DigestTheme["fg"]>[0], value: string | undefined][] = [
 			["●", "Goal", "accent", firstItem(section("Goal"))],
@@ -65,10 +75,16 @@ export function digestLines(summary: string, tokensBefore: number, theme: Digest
 			["▸", "Next", "dim", firstItem(section("Next Steps"))],
 		];
 		body = rows.filter((row): row is [string, string, string, string] => row[3] !== undefined)
-			.flatMap(([glyph, label, semantic, value]) => wrap(value, LINE_CAP - 8).slice(0, 2).map((line, i) => {
+			.flatMap(([glyph, label, semantic, value]) => {
+				const wrapped = wrap(value, LINE_CAP - 8);
+			// Two rows per section; overflow is marked, never lost silently.
+			const shown = wrapped.length > 2 ? [...wrapped.slice(0, 2)] : wrapped;
+			if (wrapped.length > 2) shown[1] = truncateToWidth(shown[1], LINE_CAP - 9, "…");
+			return shown.map((line, i) => {
 				if (i === 0) return theme.fg(semantic, glyph) + theme.fg("dim", ` ${label.padEnd(5)}`) + " " + line;
 				return " ".repeat(8) + line;
-			}));
+			});
+		});
 	}
 	const lines = body.length > 0 ? body
 		: [section("Goal"), section("In Progress"), section("Blocked"), section("Next Steps")].some(Boolean)

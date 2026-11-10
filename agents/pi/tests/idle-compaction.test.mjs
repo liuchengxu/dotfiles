@@ -245,6 +245,27 @@ test("a written Recap is pinned verbatim in place of the section rows", () => {
 	assert.ok(!lines.join("\n").includes("● Goal"), "no mechanical rows beside a written recap");
 });
 
+test("a recap beyond the row budget leaves a visible omission marker", () => {
+	const long = ["word ".repeat(30).trim(), "second ".repeat(30).trim(), "third ".repeat(30).trim()];
+	const lines = digestLines(["## Recap", ...long, ""].join("\n"), 1);
+	const rows = lines.slice(1).map(l => l.replace(/\x1b\[[0-9;]*m/g, ""));
+	assert.ok(rows.length <= 7, `the digest carries at most 7 recap rows, got ${rows.length}`);
+	assert.match(rows.at(-1), /… \d+ more rows? in the full summary/);
+});
+
+test("a fallback section item overflowing two rows is marked, not silently cut", () => {
+	const summary = ["## Goal", "- " + "word ".repeat(30).trim() + " and the critical final clause"].join("\n");
+	const lines = digestLines(summary, 1);
+	const goalRows = lines.slice(1).filter(l => l.includes("word") || l.includes("clause"));
+	assert.equal(goalRows.length, 2, "a section item shows at most two rows");
+	assert.match(goalRows[1].replace(/\x1b\[[0-9;]*m/g, ""), /…$/, "the second row ends with a visible omission marker");
+});
+
+test("cleaning happens once: a flag-like item keeps its leading dash", () => {
+	const lines = digestLines("## Next Steps\n- -flag-style option still parses", 1);
+	assert.ok(lines.some(l => l.includes("-flag-style")), JSON.stringify(lines));
+});
+
 test("a Recap line longer than the digest wraps; an unbreakable token is cut without a mark", () => {
 	const long = ["word ".repeat(30).trim()];
 	const lines = digestLines(["## Recap", ...long, "", "Overall progress: ~10%"].join("\n"), 1);
