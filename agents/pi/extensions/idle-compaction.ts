@@ -59,13 +59,13 @@ export function digestLines(summary: string, tokensBefore: number, theme: Digest
 	};
 	const recap = (section("Recap") ?? []).map(clean).filter(l => l && !/^overall progress:/i.test(l));
 	// The prompt asks for five short lines, but a prompt is not enforcement:
-	// the rendered rows carry the budget, and an overflow leaves a marker.
+	// only the rendered-row budget is, and any overflow leaves a marker.
 	const RECAP_ROW_BUDGET = 7;
 	let body: string[];
 	if (recap.length > 0) {
-		const rows = recap.slice(0, 5).flatMap(line => wrap(line, LINE_CAP - 2).map(l => "  " + l));
+		const rows = recap.flatMap(line => wrap(line, LINE_CAP - 2).map(l => "  " + l));
 		body = rows.length > RECAP_ROW_BUDGET
-			? [...rows.slice(0, RECAP_ROW_BUDGET - 1), theme.fg("dim", `  … ${rows.length - RECAP_ROW_BUDGET + 1} more row${rows.length - RECAP_ROW_BUDGET === 0 ? "" : "s"} in the full summary`)]
+			? [...rows.slice(0, RECAP_ROW_BUDGET - 1), theme.fg("dim", `  … ${rows.length - RECAP_ROW_BUDGET + 1} more rows in the full summary`)]
 			: rows;
 	} else {
 		const rows: [glyph: string, label: string, semantic: Parameters<DigestTheme["fg"]>[0], value: string | undefined][] = [
@@ -77,12 +77,14 @@ export function digestLines(summary: string, tokensBefore: number, theme: Digest
 		body = rows.filter((row): row is [string, string, string, string] => row[3] !== undefined)
 			.flatMap(([glyph, label, semantic, value]) => {
 				const wrapped = wrap(value, LINE_CAP - 8);
-			// Two rows per section; overflow is marked, never lost silently.
-			const shown = wrapped.length > 2 ? [...wrapped.slice(0, 2)] : wrapped;
-			if (wrapped.length > 2) shown[1] = truncateToWidth(shown[1], LINE_CAP - 9, "…");
-			return shown.map((line, i) => {
-				if (i === 0) return theme.fg(semantic, glyph) + theme.fg("dim", ` ${label.padEnd(5)}`) + " " + line;
-				return " ".repeat(8) + line;
+				// Two rows per section; overflow is marked, never lost silently. The
+				// marker is appended by hand: truncateToWidth ellipsizes only a row
+				// that is itself long, and the omitted tail can sit behind a short one.
+				const shown = wrapped.slice(0, 2);
+				if (wrapped.length > 2) shown[1] = truncateToWidth(shown[1], LINE_CAP - 9, "") + "…";
+				return shown.map((line, i) => {
+					if (i === 0) return theme.fg(semantic, glyph) + theme.fg("dim", ` ${label.padEnd(5)}`) + " " + line;
+					return " ".repeat(8) + line;
 			});
 		});
 	}

@@ -228,7 +228,7 @@ test("digest omits absent sections, wraps long lines instead of ellipsizing, and
 	assert.deepEqual(plain.slice(1), ["  No headings at all.", "  Second line.", "  Third line."]);
 });
 
-test("a written Recap is pinned verbatim in place of the section rows", () => {
+test("a written Recap is pinned, normalized, in place of the section rows", () => {
 	const summary = [
 		"## Goal", "- Ship the digest.", "",
 		"## Recap", "The user wants a readable digest after idle compaction.", "Rows were truncated with an ellipsis; nobody read them.", "Next: wrap instead of cut, and pin the summarizer's own recap.", "",
@@ -245,12 +245,25 @@ test("a written Recap is pinned verbatim in place of the section rows", () => {
 	assert.ok(!lines.join("\n").includes("● Goal"), "no mechanical rows beside a written recap");
 });
 
-test("a recap beyond the row budget leaves a visible omission marker", () => {
-	const long = ["word ".repeat(30).trim(), "second ".repeat(30).trim(), "third ".repeat(30).trim()];
-	const lines = digestLines(["## Recap", ...long, ""].join("\n"), 1);
+test("a recap beyond the row budget leaves a visible omission marker with an exact count", () => {
+	const line = "word ".repeat(30).trim(); // wraps to three rows
+	const digest = (n) => digestLines(["## Recap", ...Array(n).fill(line), ""].join("\n"), 1)
+		.slice(1).map(l => l.replace(/\x1b\[[0-9;]*m/g, ""));
+	const at7 = digest(2).filter(l => l.trim());
+	assert.equal(at7.length, 6, "six content rows at the budget boundary, no marker");
+	assert.ok(!at7.at(-1).includes("more rows"));
+	const at8 = digest(3).filter(l => l.trim());
+	assert.equal(at8.length, 7, "six content rows plus the marker");
+	assert.match(at8.at(-1), /… 3 more rows in the full summary/);
+	const at9 = digest(4).filter(l => l.trim());
+	assert.match(at9.at(-1), /… 6 more rows in the full summary/);
+});
+
+test("six short recap lines all render: no input-line slice before the budget", () => {
+	const lines = digestLines(["## Recap", "one.", "two.", "three.", "four.", "five.", "six.", ""].join("\n"), 1);
 	const rows = lines.slice(1).map(l => l.replace(/\x1b\[[0-9;]*m/g, ""));
-	assert.ok(rows.length <= 7, `the digest carries at most 7 recap rows, got ${rows.length}`);
-	assert.match(rows.at(-1), /… \d+ more rows? in the full summary/);
+	assert.equal(rows.length, 6);
+	assert.match(rows.at(-1), /six\.$/);
 });
 
 test("a fallback section item overflowing two rows is marked, not silently cut", () => {
@@ -258,12 +271,23 @@ test("a fallback section item overflowing two rows is marked, not silently cut",
 	const lines = digestLines(summary, 1);
 	const goalRows = lines.slice(1).filter(l => l.includes("word") || l.includes("clause"));
 	assert.equal(goalRows.length, 2, "a section item shows at most two rows");
-	assert.match(goalRows[1].replace(/\x1b\[[0-9;]*m/g, ""), /…$/, "the second row ends with a visible omission marker");
+	const marked = goalRows[1].replace(/\x1b\[[0-9;]*m/g, "");
+	assert.match(marked, /…$/, "the second row ends with a visible omission marker");
+	assert.ok(visibleWidth(marked) <= 72, `the marked row fits the digest width, got ${visibleWidth(marked)}`);
+});
+
+test("a short second row still carries the overflow marker", () => {
+	const summary = ["## Goal", "- " + "a".repeat(64) + " b " + "c".repeat(64)].join("\n");
+	const lines = digestLines(summary, 1);
+	const second = lines[2].replace(/\x1b\[[0-9;]*m/g, "");
+	assert.match(second, /^ {8}b…$/, "the omitted tail behind a short row is still marked");
 });
 
 test("cleaning happens once: a flag-like item keeps its leading dash", () => {
 	const lines = digestLines("## Next Steps\n- -flag-style option still parses", 1);
 	assert.ok(lines.some(l => l.includes("-flag-style")), JSON.stringify(lines));
+	const recap = digestLines("## Recap\n- -flag-style option still parses", 1);
+	assert.ok(recap.some(l => l.includes("-flag-style")), JSON.stringify(recap));
 });
 
 test("a Recap line longer than the digest wraps; an unbreakable token is cut without a mark", () => {
