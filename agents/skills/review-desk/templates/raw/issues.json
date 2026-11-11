@@ -1,0 +1,107 @@
+[
+  {
+    "number": 664,
+    "title": "Config loader accepts unknown keys",
+    "state": "OPEN",
+    "url": "https://github.com/example/widget/issues/664",
+    "labels": [
+      {
+        "name": "audit"
+      },
+      {
+        "name": "minor"
+      }
+    ],
+    "body": "**Finding:** Unknown keys are ignored, so a typo silently keeps the default.\n\n**Recommendation:** Fix it."
+  },
+  {
+    "number": 888,
+    "title": "No upper bound on retry backoff",
+    "state": "OPEN",
+    "url": "https://github.com/example/widget/issues/888",
+    "labels": [
+      {
+        "name": "audit"
+      },
+      {
+        "name": "moderate"
+      }
+    ],
+    "body": "**Finding:** Backoff doubles without a cap, so a long outage delays recovery by hours.\n\n**Recommendation:** Fix it."
+  },
+  {
+    "number": 894,
+    "title": "Retry counts cancelled requests",
+    "state": "OPEN",
+    "url": "https://github.com/example/widget/issues/894",
+    "labels": [
+      {
+        "name": "audit"
+      },
+      {
+        "name": "minor"
+      }
+    ],
+    "body": "**Finding:** A cancelled request consumes an attempt, so a user cancel can exhaust retries.\n\n**Recommendation:** Fix it."
+  },
+  {
+    "number": 900,
+    "title": "Cache key ignores the API version",
+    "state": "OPEN",
+    "url": "https://github.com/example/widget/issues/900",
+    "labels": [
+      {
+        "name": "audit"
+      },
+      {
+        "name": "moderate"
+      }
+    ],
+    "body": "**Finding:** Two API versions share one cache entry, so a client can read a stale shape.\n\n**Recommendation:** Fix it."
+  },
+  {
+    "number": 901,
+    "title": "Error message leaks the request URL",
+    "state": "OPEN",
+    "url": "https://github.com/example/widget/issues/901",
+    "labels": [
+      {
+        "name": "audit"
+      },
+      {
+        "name": "minor"
+      }
+    ],
+    "body": "**Finding:** The URL can carry a token in its query string.\n\n**Recommendation:** Fix it."
+  },
+  {
+    "number": 902,
+    "title": "Trailing bytes accepted after the payload",
+    "state": "OPEN",
+    "url": "https://github.com/example/widget/issues/902",
+    "labels": [
+      {
+        "name": "audit"
+      },
+      {
+        "name": "minor"
+      }
+    ],
+    "body": "**Finding:** The parser stops at the first object and ignores the rest.\n\n**Recommendation:** Fix it."
+  },
+  {
+    "number": 909,
+    "title": "Metrics label has unbounded cardinality",
+    "state": "OPEN",
+    "url": "https://github.com/example/widget/issues/909",
+    "labels": [
+      {
+        "name": "audit"
+      },
+      {
+        "name": "minor"
+      }
+    ],
+    "body": "**Finding:** The label carries the full path, so each widget id creates a series.\n\n**Recommendation:** Fix it."
+  }
+]

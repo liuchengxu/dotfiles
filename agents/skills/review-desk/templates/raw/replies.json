@@ -1,0 +1,132 @@
+{
+  "101": {
+    "ask": "Why is the retry limit 5 and not configurable?",
+    "kind": "code",
+    "decision": "fixed",
+    "draft": "Done in the latest push.",
+    "claims": [
+      {
+        "text": "The change is on the pinned commit.",
+        "evidence": "src/fetch.rs:101"
+      }
+    ]
+  },
+  "102": {
+    "ask": "This sleeps while holding the cache lock.",
+    "kind": "code",
+    "decision": "fixed",
+    "draft": "Done in the latest push.",
+    "claims": [
+      {
+        "text": "The change is on the pinned commit.",
+        "evidence": "src/fetch.rs:102"
+      }
+    ]
+  },
+  "103": {
+    "ask": "The README still says requests are never retried.",
+    "kind": "code",
+    "decision": "fixed",
+    "draft": "Done in the latest push.",
+    "claims": [
+      {
+        "text": "The change is on the pinned commit.",
+        "evidence": "src/fetch.rs:103"
+      }
+    ]
+  },
+  "104": {
+    "ask": "Please name the unit in `backoff`.",
+    "kind": "code",
+    "decision": "fixed",
+    "draft": "Done in the latest push.",
+    "claims": [
+      {
+        "text": "The change is on the pinned commit.",
+        "evidence": "src/fetch.rs:104"
+      }
+    ]
+  },
+  "105": {
+    "ask": "Missing changelog entry for the retry change.",
+    "kind": "code",
+    "decision": "fixed",
+    "draft": "Done in the latest push.",
+    "claims": [
+      {
+        "text": "The change is on the pinned commit.",
+        "evidence": "src/fetch.rs:105"
+      }
+    ]
+  },
+  "106": {
+    "ask": "Does a 404 get retried?",
+    "kind": "code",
+    "decision": "fixed",
+    "draft": "Done in the latest push.",
+    "claims": [
+      {
+        "text": "The change is on the pinned commit.",
+        "evidence": "src/fetch.rs:106"
+      }
+    ]
+  },
+  "107": {
+    "ask": "This test sleeps for real time.",
+    "kind": "code",
+    "decision": "fixed",
+    "draft": "Done in the latest push.",
+    "claims": [
+      {
+        "text": "The change is on the pinned commit.",
+        "evidence": "src/fetch.rs:107"
+      }
+    ]
+  },
+  "108": {
+    "ask": "Jitter bound",
+    "kind": "code",
+    "decision": "explain",
+    "draft": "Yes. Jitter is at most half the current backoff, so the delay never exceeds 1.5x.",
+    "claims": [
+      {
+        "text": "Jitter is drawn from [0, backoff / 2].",
+        "evidence": "src/fetch.rs:92"
+      },
+      {
+        "text": "A test checks the upper bound.",
+        "evidence": "tests/fetch.rs:48"
+      }
+    ]
+  },
+  "109": {
+    "ask": "Old key name in the example config",
+    "kind": "doc",
+    "decision": "fixed",
+    "draft": "Renamed to `retry_limit` in the example.",
+    "claims": [
+      {
+        "text": "The example uses `retry_limit`.",
+        "evidence": "docs/config.md:30"
+      },
+      {
+        "text": "No other page uses the old key.",
+        "evidence": "rg retries docs/"
+      }
+    ]
+  },
+  "111": {
+    "ask": "Stale line links",
+    "kind": "doc",
+    "decision": "fixed",
+    "draftedAt": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "draft": "Fixed both links.",
+    "claims": [
+      {
+        "text": "Both links point at the current range.",
+        "evidence": "docs/config.md:44",
+        "status": "verified"
+      }
+    ]
+  }
+}

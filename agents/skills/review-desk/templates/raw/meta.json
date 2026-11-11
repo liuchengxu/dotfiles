@@ -1,0 +1,8 @@
+{
+  "repo": "example/widget",
+  "pr": 42,
+  "pinnedSha": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+  "branchHeadSha": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+  "milestone": "Example audit (2026-01-15)",
+  "generated": "2026-01-20"
+}

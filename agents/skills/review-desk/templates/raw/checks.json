@@ -1,0 +1,61 @@
+{
+  "order": [
+    894,
+    900,
+    901,
+    902,
+    664,
+    888,
+    909
+  ],
+  "items": {
+    "894": {
+      "proposed": {
+        "verdict": "fixed",
+        "reason": "Cancellation returns before the attempt counter moves."
+      },
+      "checks": [
+        {
+          "text": "Cancel returns before the counter increments",
+          "evidence": "src/fetch.rs:118 @ 51515151"
+        },
+        {
+          "text": "A test cancels mid-retry and asserts the count",
+          "evidence": "tests/fetch.rs:80 @ 51515151"
+        },
+        {
+          "text": "No other path increments the counter",
+          "evidence": "src/fetch.rs:101 @ 51515151"
+        }
+      ]
+    },
+    "900": {
+      "proposed": {
+        "verdict": "fixed",
+        "reason": "The cache key now includes the version."
+      },
+      "checks": [
+        {
+          "text": "The key includes the API version",
+          "evidence": "src/cache.rs:22 @ 52525252"
+        },
+        {
+          "text": "A test reads two versions and gets two entries",
+          "evidence": "tests/cache.rs:15 @ 52525252"
+        }
+      ]
+    },
+    "901": {
+      "proposed": {
+        "verdict": "partial",
+        "reason": "The query string is dropped, but the path can still carry an id."
+      },
+      "checks": [
+        {
+          "text": "Display drops the query string",
+          "evidence": "src/error.rs:40 @ 51515151"
+        }
+      ]
+    }
+  }
+}

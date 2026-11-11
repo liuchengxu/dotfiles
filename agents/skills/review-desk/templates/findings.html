@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Audit findings desk</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* The same inbox, a different item kind: one row per finding issue, one
+     verdict per finding, one closing comment. */
+  body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+  .topbar{display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--line);background:#fff}
+  .topbar h1{font-size:15px}
+  .topbar .crumb{font-size:12px;color:var(--muted)}
+  .topbar .sp{flex:1}
+  .inbox{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr) 460px;gap:1px;background:var(--line)}
+  .pane{background:var(--bg);min-height:0;display:flex;flex-direction:column}
+  .pane.draft-pane{background:#fff}
+  .q-head{padding:12px 14px 8px;border-bottom:1px solid var(--line);background:#f0f2f5}
+  .q-head h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .tabs{display:flex;gap:2px;flex-wrap:wrap;margin-top:7px}
+  .tab{font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--ink-2)}
+  .tab[aria-selected="true"]{background:#fff;border-color:var(--line);font-weight:600;color:var(--ink)}
+  .tab b{margin-left:4px;color:var(--muted);font-weight:600}
+  .tab[aria-selected="true"] b{color:var(--accent)}
+  .queue{flex:1;min-height:0;overflow:auto;padding:6px 8px 14px}
+  .q{display:grid;grid-template-columns:3px 1fr;width:100%;padding:0;border:0;background:transparent;border-radius:8px;text-align:left}
+  .q + .q{margin-top:2px}
+  .q .edge{background:transparent;border-radius:3px}
+  .q .body{padding:8px 9px;border-radius:0 8px 8px 0}
+  .q:hover .body{background:#fff}
+  .q[aria-current="true"] .body{background:#fff;box-shadow:0 1px 3px #1b24300f}
+  .q[aria-current="true"] .edge{background:var(--accent)}
+  .q-title{display:block;font-size:13px;font-weight:600;line-height:1.35}
+  .q-meta{display:flex;align-items:center;gap:5px;margin-top:3px;font:11px var(--mono);color:var(--muted)}
+  .q-flags{display:flex;align-items:center;gap:4px;margin-top:5px;flex-wrap:wrap}
+  .q-flags .chip{font-size:10.5px;padding:1px 7px}
+  .sev{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:1px 5px}
+  .sev.moderate{background:#fdeee0;color:#8a4b00}
+  .sev.minor{background:#eef1f5;color:#4b5666}
+  .sev.high,.sev.critical{background:var(--stop-soft);color:var(--stop)}
+  .scroll{flex:1;min-height:0;overflow:auto}
+  .finding-body{max-width:860px;margin:0 auto;padding:22px 26px 30px}
+  .finding-body h2{font-size:19px;line-height:1.35;margin:6px 0 8px}
+  .finding-text{font-size:14.5px;line-height:1.65;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+  .cand{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;background:#fff}
+  .cand .row{gap:6px}
+  .cand h3{font-size:13.5px}
+  .cand .meta{font:11px var(--mono);color:var(--muted);margin-top:3px}
+  .checks{margin-top:8px}
+  .check{border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-top:6px;background:#fff}
+  .check.ok{border-color:#b6dcc6;background:#f8fcf9}
+  .check.wrong{border-color:#e3b4b7;background:#fdf7f7}
+  .check p{margin:0 0 4px;font-size:13px}
+  .check .ev{font:11px var(--mono);color:var(--muted)}
+  .seg{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+  .seg button{font-size:11px;padding:3px 8px}
+  .seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .seg button[data-v="wrong"][aria-pressed="true"]{background:var(--stop);border-color:var(--stop)}
+  .verdict{display:flex;gap:3px;flex-wrap:wrap}
+  .verdict button{font-size:11.5px;padding:5px 9px;border-radius:6px;background:#f4f6f9;border:1px solid transparent}
+  .verdict button[aria-pressed="true"]{background:#fff;border-color:var(--accent);color:var(--accent);font-weight:600}
+  .draft-card{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px 16px 0}
+  .draft-scroll{flex:1;min-height:0;overflow:auto;padding-top:10px;display:flex;flex-direction:column;gap:10px}
+  .field-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  #comment{min-height:150px;font-size:14px;line-height:1.6}
+  .blockers{padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.5}
+  .blockers.ok{background:var(--ok-soft);color:var(--ok)}
+  .blockers.no{background:var(--warn-soft);color:var(--warn)}
+  .blockers ul{margin:3px 0 0;padding-left:16px}
+  .actions{display:flex;align-items:center;gap:6px;padding:10px 0;border-top:1px solid var(--line);background:#fff;flex-wrap:wrap}
+  .receipt{margin-bottom:4px;padding:7px 9px;border-radius:7px;background:#eef2fb;color:#33406b;font-size:11.5px}
+  .keys-hint{padding:6px 16px;border-top:1px solid var(--line-2);font-size:11px;color:var(--muted);background:#fbfcfd}
+  @media(max-width:1250px){.inbox{grid-template-columns:300px minmax(0,1fr)}.draft-pane{grid-column:1/-1}body{height:auto;overflow:auto}}
+  @media(max-width:820px){.inbox{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="banner">
+  <strong>Offline</strong>
+  <span>Checks are proposals · nothing here closes an issue</span>
+</div>
+
+<div class="topbar">
+  <div>
+    <h1>Audit findings</h1>
+    <span class="crumb" id="crumb"></span>
+  </div>
+  <span class="sp"></span>
+  <span class="meter small muted" id="progress"></span>
+  <button class="quiet" id="expjson">Export state</button>
+  <button class="quiet" id="impjson">Import state</button>
+  <input type="file" id="impfile" accept="application/json,.json" hidden>
+</div>
+
+<main class="inbox">
+  <section class="pane">
+    <div class="q-head">
+      <div class="row between"><h2>Findings</h2><span class="tiny muted" id="qcount"></span></div>
+      <div class="tabs" id="tabs" role="tablist"></div>
+    </div>
+    <div class="queue" id="queue"></div>
+  </section>
+
+  <section class="pane">
+    <div class="scroll" id="detail" aria-live="polite"></div>
+  </section>
+
+  <section class="pane draft-pane">
+    <div class="draft-card">
+      <div class="row between">
+        <h2 style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Closing comment</h2>
+        <span class="chip ghost" id="statechip">New</span>
+      </div>
+      <div class="draft-scroll">
+        <div id="proposal" class="tiny" style="display:none;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:#fbfcfd"></div>
+        <div>
+          <div class="field-label" style="margin-bottom:5px">Verdict — does the candidate PR close this finding?</div>
+          <div class="verdict" id="verdict" role="group" aria-label="Verdict"></div>
+        </div>
+        <div>
+          <label class="field-label" for="comment">Comment posted when closing</label>
+          <textarea id="comment" style="margin-top:5px" aria-label="Closing comment"></textarea>
+        </div>
+        <div class="blockers no" id="blockers"></div>
+      </div>
+      <div class="receipt" id="receipt" hidden></div>
+      <div class="actions">
+        <button class="primary" id="approve">Approve</button>
+        <button class="quiet" id="copycomment">Copy comment</button>
+        <button class="quiet" id="closed">Mark closed</button>
+        <button class="quiet" id="open">Issue ↗</button>
+      </div>
+      <div class="keys-hint"><kbd>j</kbd> <kbd>k</kbd> move · <kbd>a</kbd> approve · <kbd>c</kbd> copy comment</div>
+    </div>
+  </section>
+</main>
+
+<script src="data-findings.js"></script>
+<script src="core.js"></script>
+<script>
+'use strict';
+const { esc, md, copy, digest } = CORE;
+const F = window.FINDINGS;
+const KEY = `review-findings:${F.milestone}`;
+document.getElementById('crumb').textContent = F.milestone;
+
+const STAGES = [
+  { key: 'new', label: 'New', cls: 'ghost' },
+  { key: 'drafted', label: 'Verdict drafted', cls: 'open' },
+  { key: 'ready', label: 'Ready to close', cls: 'approved' },
+  { key: 'closed', label: 'Closed', cls: 'posted' },
+  { key: 'none', label: 'No action', cls: 'answered' },
+];
+const ORDER = Object.fromEntries(STAGES.map((s, i) => [s.key, i]));
+const VERDICTS = [
+  ['fixed', 'Fixed by the PR'],
+  ['partial', 'Partly fixed'],
+  ['not-fixed', 'Not fixed'],
+  ['deferred', 'Deferred'],
+  ['not-applicable', 'Not applicable'],
+];
+const CLOSABLE = new Set(['fixed', 'deferred', 'not-applicable']);
+
+let saved = {}, rev = 0;
+try {
+  const raw = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (raw && raw.items) { saved = raw.items; rev = Number(raw.rev) || 0; }
+  else if (raw) { saved = raw; }
+} catch (e) { saved = {}; }
+
+const state = {};
+for (const item of F.items) {
+  const def = {
+    verdict: item.verdict, comment: item.comment, review: 'todo', approval: null,
+    checks: Object.fromEntries(item.checks.map((c) => [c.id, 'open'])),
+    closedAt: null,
+  };
+  const sv = saved[item.id] || {};
+  state[item.id] = Object.assign({}, def, sv);
+  /* Merge checks by id: a check added to the data after the last save must
+     start unverified, or it escapes the gate as `undefined`. def.checks is
+     read before the merge copies sv over it. */
+  state[item.id].checks = Object.assign({}, def.checks, sv.checks || {});
+}
+
+function persist() {
+  rev += 1;
+  try { localStorage.setItem(KEY, JSON.stringify({ rev, items: state })); }
+  catch (e) { document.getElementById('blockers').textContent = 'Local saving failed; export before closing.'; }
+}
+
+const item = (id) => F.items.find((x) => x.id === id) || F.items[0];
+/* Only "verified" passes. A check the data added after the last save, or one a
+   prompt marked with a word this desk does not know, counts as unchecked. */
+const checkStatus = (it, c) => state[it.id].checks[c.id];
+const unchecked = (it) => it.checks.filter((c) => checkStatus(it, c) !== 'verified');
+const checkOpen = (it) => unchecked(it).filter((c) => checkStatus(it, c) !== 'wrong').length;
+const checkWrong = (it) => unchecked(it).filter((c) => checkStatus(it, c) === 'wrong').length;
+
+/* One gate, one vocabulary: a finding closes only when a human recorded a
+   verdict that allows closing and checked every claim the verdict rests on. */
+/* What the human approved, at the moment of approving. A later change to the
+   verdict, the comment, the checks or the candidate heads makes it stale. */
+const pinOf = (it) => it.candidates.map((c) => c.head).join(',');
+const evidenceOf = (it) => digest(it.checks.map((c) => `${c.id}:${state[it.id].checks[c.id]}`).join('|'));
+const approvalOf = (it) => ({
+  body: digest(`${state[it.id].verdict}|${state[it.id].comment.trim()}`),
+  evidence: evidenceOf(it),
+  pin: pinOf(it),
+});
+function sameApproval(it) {
+  const a = state[it.id].approval;
+  if (!a) return false;
+  const now = approvalOf(it);
+  return a.body === now.body && a.evidence === now.evidence && a.pin === now.pin;
+}
+
+function blockers(it) {
+  const s = state[it.id];
+  const out = [];
+  if (!s.verdict) out.push('No verdict recorded');
+  else if (!CLOSABLE.has(s.verdict)) out.push(`Verdict "${label(s.verdict)}" cannot close the issue`);
+  if (s.verdict === 'fixed' && !it.candidates.length) out.push('No candidate PR to fix it');
+  if (s.verdict === 'fixed' && it.candidates.length && it.candidates.every((c) => c.isDraft))
+    out.push('Every candidate is a draft; a draft cannot carry "Fixed"');
+  if (!it.checks.length) out.push('No checks drafted: the finding has not been analysed');
+  if (checkOpen(it)) out.push(`${checkOpen(it)} check${checkOpen(it) > 1 ? 's' : ''} unverified`);
+  if (checkWrong(it)) out.push(`${checkWrong(it)} check${checkWrong(it) > 1 ? 's' : ''} contradicted by the code`);
+  if (!s.comment.trim()) out.push('No closing comment');
+  return out;
+}
+const eligible = (it) => blockers(it).length === 0;
+const label = (v) => (VERDICTS.find(([k]) => k === v) || [null, v])[1];
+
+function stage(it) {
+  const s = state[it.id];
+  if (s.review === 'closed') return STAGES[3];
+  if (s.review === 'approved' && eligible(it) && sameApproval(it)) return STAGES[2];
+  if (!it.candidates.length && !s.verdict && !s.comment) return STAGES[4];
+  if (s.verdict || s.comment || it.checks.some((c) => checkStatus(it, c) !== 'open')) return STAGES[1];
+  return STAGES[0];
+}
+
+
+let filter = 'all';
+let current = F.items[0].id;
+const $ = (id) => document.getElementById(id);
+
+function matches(it) {
+  if (filter === 'all') return true;
+  if (filter === 'no-pr') return it.candidates.length === 0;
+  return stage(it).key === filter;
+}
+
+function ordered(list) {
+  return [...list].sort((a, b) => ORDER[stage(a).key] - ORDER[stage(b).key]
+    || a.number - b.number);
+}
+
+function renderTabs() {
+  const counts = { all: F.items.length, 'no-pr': 0 };
+  for (const s of STAGES) counts[s.key] = 0;
+  for (const it of F.items) { counts[stage(it).key] += 1; if (!it.candidates.length) counts['no-pr'] += 1; }
+  const tabs = [['all', 'All'], ['new', 'New'], ['drafted', 'Verdict drafted'], ['ready', 'Ready'],
+                ['closed', 'Closed'], ['no-pr', 'No PR']];
+  $('tabs').innerHTML = tabs.map(([k, l]) =>
+    `<button class="tab" role="tab" data-f="${k}" aria-selected="${filter === k}">${l}<b>${counts[k]}</b></button>`).join('');
+}
+
+function renderQueue() {
+  const list = ordered(F.items.filter(matches));
+  $('qcount').textContent = `${list.length} shown`;
+  $('queue').innerHTML = list.map((it) => {
+    const s = stage(it);
+    const prs = it.candidates.length
+      ? `<span class="chip">${it.candidates.length} draft PR${it.candidates.length > 1 ? 's' : ''}</span>`
+      : '<span class="chip danger">No PR</span>';
+    return `<button class="q" data-id="${it.id}" aria-current="${it.id === current}">
+      <span class="edge"></span>
+      <span class="body">
+        <span class="q-title">${esc(it.title)}</span>
+        <span class="q-meta">#${it.number}<span class="sev ${esc(it.severity)}">${esc(it.severity)}</span></span>
+        <span class="q-flags">${prs}<span class="chip ${s.cls}">${s.label}</span></span>
+      </span></button>`;
+  }).join('') || '<p class="empty">Nothing in this filter.</p>';
+}
+
+function renderDetail() {
+  const it = item(current);
+  const s = state[it.id];
+  const cands = it.candidates.map((c) => `
+    <div class="cand">
+      <div class="row">
+        <span class="chip ${c.isDraft ? 'discuss' : 'answered'}">${c.isDraft ? 'Draft PR' : 'PR'}</span>
+        <h3><a href="${c.url}" target="_blank" rel="noopener noreferrer">#${c.pr} ${esc(c.title)}</a></h3>
+      </div>
+      <div class="meta">head ${c.head.slice(0, 8)} · ${c.files} files · closes ${c.closes.map((n) => '#' + n).join(', ')}</div>
+      ${c.closes.length > 1 ? `<div class="tiny muted" style="margin-top:4px">This PR also claims ${c.closes.filter((n) => n !== it.number).map((n) => '#' + n).join(', ')}.</div>` : ''}
+    </div>`).join('') || `<div class="cand"><div class="row"><span class="chip danger">No candidate PR</span></div>
+      <p class="small muted">Nothing on the branch claims to close this finding. Record a verdict of
+      <em>Deferred</em> or <em>Not applicable</em>, or keep it open until a PR exists.</p></div>`;
+  const checks = it.checks.map((c) => {
+    const v = s.checks[c.id];
+    return `<div class="check ${v === 'wrong' ? 'wrong' : v === 'verified' ? 'ok' : ''}">
+      <p>${esc(c.text)}</p>
+      <div class="ev">${esc(c.evidence)}</div>
+      <div class="seg" role="group" aria-label="Check: ${esc(c.text)}">
+        <button data-check="${c.id}" data-v="verified" aria-pressed="${v === 'verified'}">Checked</button>
+        <button data-check="${c.id}" data-v="open" aria-pressed="${v === 'open'}">Unverified</button>
+        <button data-check="${c.id}" data-v="wrong" aria-pressed="${v === 'wrong'}">Contradicted</button>
+      </div></div>`;
+  }).join('');
+  $('detail').innerHTML = `<div class="finding-body">
+    <div class="row wrap" style="gap:6px">
+      <span class="chip ${stage(it).cls}">${stage(it).label}</span>
+      <span class="sev ${esc(it.severity)}">${esc(it.severity)}</span>
+      ${it.labels.map((l) => `<span class="chip">${esc(l)}</span>`).join('')}
+      <span class="tiny muted mono">#${it.number}</span>
+    </div>
+    <h2>${esc(it.title)}</h2>
+    <div class="tiny muted"><a href="${it.url}" target="_blank" rel="noopener noreferrer">Issue #${it.number} ↗</a>
+      · milestone ${esc(F.milestone)}</div>
+    <div class="finding-text">${md(it.finding)}</div>
+    <h3 style="margin:16px 0 4px">Candidate work</h3>
+    ${cands}
+    <h3 style="margin:16px 0 4px">What the verdict rests on</h3>
+    ${it.checks.length ? checks : (it.candidates.length
+      ? `<p class="small">Not analysed yet: no checks drafted against ${esc(it.candidates[0].head.slice(0, 8))}. The desk cannot say whether this PR covers the finding until the diff is read.</p>`
+      : '<p class="small muted">No checks yet: there is no candidate change to verify.</p>')}
+  </div>`;
+}
+
+function renderDraft() {
+  const it = item(current);
+  const s = state[it.id];
+  const st = stage(it);
+  $('statechip').className = 'chip ' + st.cls;
+  $('statechip').textContent = st.label;
+  const prop = it.proposed;
+  const propBox = $('proposal');
+  if (prop && prop.verdict) {
+    propBox.style.display = '';
+    propBox.innerHTML = `<strong>Agent proposes ${esc(label(prop.verdict))}</strong> — ${esc(prop.reason || '')}`
+      + `<div class="muted" style="margin-top:2px">A proposal from the checks below, not a verdict. Mark the checks, then record yours.</div>`;
+  } else { propBox.style.display = 'none'; }
+  $('verdict').innerHTML = VERDICTS.map(([k, l]) =>
+    `<button data-verdict="${k}" aria-pressed="${s.verdict === k}">${l}</button>`).join('');
+  $('comment').value = s.comment;
+  $('comment').readOnly = s.review === 'closed';
+  $('approve').disabled = !((st.key === 'new' || st.key === 'drafted') && eligible(it));
+  $('closed').disabled = st.key !== 'ready';
+  $('copycomment').disabled = !s.comment.trim();
+  const b = blockers(it);
+  const box = $('blockers');
+  box.className = 'blockers ' + (b.length ? 'no' : 'ok');
+  box.innerHTML = b.length
+    ? `<strong>Cannot close yet</strong><ul>${b.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
+    : '<strong>Ready.</strong> Copy the command, run it, then mark the issue closed.';
+  const receipt = $('receipt');
+  if (s.closedAt) {
+    receipt.hidden = false;
+    receipt.innerHTML = `<strong>Closed</strong> ${new Date(s.closedAt).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+      + ` · verdict ${esc(label(s.verdict))}`;
+  } else { receipt.hidden = true; }
+  const ready = F.items.filter((x) => stage(x).key === 'ready').length;
+  const closed = F.items.filter((x) => stage(x).key === 'closed').length;
+  $('progress').textContent = `${ready} ready · ${closed} closed · ${F.items.length} findings shown`;
+}
+
+function render() { renderTabs(); renderQueue(); renderDetail(); renderDraft(); }
+
+function move(step) {
+  const list = ordered(F.items.filter(matches));
+  if (!list.length) return;
+  const i = list.findIndex((x) => x.id === current);
+  current = list[(i + step + list.length) % list.length].id;
+  render();
+}
+
+$('tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('.tab');
+  if (!b) return;
+  filter = b.dataset.f; render(); move(0);
+});
+
+$('queue').addEventListener('click', (e) => {
+  const b = e.target.closest('.q');
+  if (b) { current = b.dataset.id; render(); }
+});
+
+$('detail').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-check]');
+  if (!b) return;
+  const s = state[current];
+  if (s.review === 'closed') return;
+  s.checks[b.dataset.check] = b.dataset.v;
+  s.approval = null;
+  if (s.review === 'approved') s.review = 'todo';
+  persist(); render();
+});
+
+$('verdict').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-verdict]');
+  if (!b) return;
+  const s = state[current];
+  if (s.review === 'closed') return;
+  s.verdict = b.dataset.verdict;
+  s.approval = null;
+  if (s.review === 'approved') s.review = 'todo';
+  persist(); render();
+});
+
+$('comment').addEventListener('input', (e) => {
+  const s = state[current];
+  if (s.review === 'closed') return;
+  s.approval = null;
+  s.comment = e.target.value;
+  if (s.review === 'approved') s.review = 'todo';
+  persist(); renderDraft(); renderQueue();
+});
+
+$('approve').onclick = () => {
+  const it = item(current);
+  if (!eligible(it)) return;
+  state[current].review = 'approved';
+  state[current].approval = approvalOf(it);
+  persist(); render();
+};
+$('closed').onclick = () => {
+  if (stage(item(current)).key !== 'ready') return;
+  const s = state[current];
+  s.review = 'closed'; s.closedAt = new Date().toISOString();
+  persist(); render(); move(1);
+};
+$('copycomment').onclick = (e) => copy(state[current].comment, e.target);
+$('open').onclick = () => window.open(item(current).url, '_blank', 'noopener');
+
+$('expjson').onclick = () => {
+  const url = URL.createObjectURL(new Blob([JSON.stringify({
+    schema: 1, kind: 'finding', repo: F.repo, milestone: F.milestone, rev,
+    heads: F.items.map((it) => it.number + ':' + pinOf(it)).join('|'),
+    exportedAt: new Date().toISOString(),
+    items: F.items.map((it) => Object.assign({ id: it.id, number: it.number }, state[it.id])),
+  }, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = 'findings-state.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 800);
+};
+
+/* Import is the only way state crosses runs. Refuse another desk, another
+   milestone, or an older revision; never delete a finding the file omits. */
+function importState(file) {
+  if (!file || file.kind !== 'finding') return 'Wrong desk: this is not a findings state file.';
+  if (file.repo !== F.repo) return `Wrong repository: ${file.repo}.`;
+  if (file.milestone !== F.milestone) return 'Wrong milestone.';
+  if (!Number.isInteger(file.rev)) return 'No revision in the file; export from a desk, not by hand.';
+  if (file.rev < rev) return `Older than this desk (rev ${file.rev} < ${rev}); export first.`;
+  const heads = F.items.map((it) => it.number + ':' + pinOf(it)).join('|');
+  if (file.heads && file.heads !== heads) return 'Another candidate set: the PR heads moved since that export.';
+  for (const row of file.items || []) {
+    const s = state[row.id];
+    if (!s) continue;
+    if (row.verdict !== undefined) s.verdict = row.verdict;
+    if (typeof row.comment === 'string') s.comment = row.comment;
+    if (row.review) s.review = row.review;
+    if (row.closedAt) s.closedAt = row.closedAt;
+    s.approval = row.approval || null;
+    s.checks = Object.assign({}, s.checks, row.checks || {});
+  }
+  rev = Number(file.rev) || rev;
+  persist(); render();
+  return '';
+}
+$('impjson').onclick = () => $('impfile').click();
+$('impfile').onchange = (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed = null;
+    try { parsed = JSON.parse(String(reader.result)); } catch (err) { parsed = null; }
+    const err = importState(parsed);
+    if (err) { const box = $('blockers'); box.className = 'blockers no'; box.textContent = err; }
+  };
+  reader.readAsText(f);
+  e.target.value = '';
+};
+
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'textarea' || tag === 'input') { if (e.key === 'Escape') e.target.blur(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'j') { e.preventDefault(); move(1); }
+  else if (k === 'k') { e.preventDefault(); move(-1); }
+  else if (k === 'a') { e.preventDefault(); $('approve').click(); }
+  else if (k === 'c') { e.preventDefault(); $('copycomment').click(); }
+});
+
+render();
+/* Exposed for the headless tests only. */
+window.FINDINGS_UI = { state, stage, blockers, eligible, item, importState,
+  get rev() { return rev; } };
+</script>
+</body>
+</html>

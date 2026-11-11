@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Review inbox</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* The conversation and reply share one scroll area; the queue stays visible. */
+  body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+  .topbar{display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--line);background:#fff}
+  .topbar h1{font-size:15px;letter-spacing:.01em}
+  .topbar .crumb{font-size:12px;color:var(--muted)}
+  .topbar .sp{flex:1}
+  .meter{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .meter .track{width:120px;height:5px;border-radius:3px;background:#e6eaf1;overflow:hidden;display:flex}
+  .meter .track i{display:block;height:100%}
+  .btn-sm{font-size:12px;padding:5px 9px}
+
+  .inbox{flex:1;min-height:0;display:grid;grid-template-columns:320px minmax(0,1fr);gap:1px;background:var(--line)}
+  .pane{background:var(--bg);min-height:0;display:flex;flex-direction:column}
+  .pane.queue-pane{background:#f0f2f5}
+  .pane.detail-pane{display:block;overflow:auto}
+  .pane.draft-pane{background:#fff;border-top:1px solid var(--line)}
+
+  /* Queue */
+  .q-head{padding:12px 14px 8px;border-bottom:1px solid var(--line);background:#f0f2f5}
+  .q-head .row{margin-bottom:8px}
+  .q-head h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .tabs{display:flex;gap:2px;flex-wrap:wrap}
+  .tab{font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--ink-2)}
+  .tab:hover{background:#e5e9f0}
+  .tab[aria-selected="true"]{background:#fff;border-color:var(--line);font-weight:600;color:var(--ink);box-shadow:0 1px 2px #0000000a}
+  .tab b{font-weight:600;color:var(--muted);margin-left:4px}
+  .tab[aria-selected="true"] b{color:var(--accent)}
+  .queue{flex:1;min-height:0;overflow:auto;padding:6px 8px 14px}
+  .q{display:grid;grid-template-columns:3px 1fr;gap:0;width:100%;padding:0;border:0;background:transparent;border-radius:8px;text-align:left;overflow:hidden}
+  .q + .q{margin-top:2px}
+  .q .edge{background:transparent;border-radius:3px}
+  .q .body{padding:8px 9px;border-radius:0 8px 8px 0}
+  .q:hover .body{background:#fff}
+  .q[aria-current="true"] .body{background:#fff;box-shadow:0 1px 3px #1b24300f}
+  .q[aria-current="true"] .edge{background:var(--accent)}
+  .q-title{display:block;font-size:13px;font-weight:600;line-height:1.35}
+  .q-meta{display:flex;align-items:center;gap:5px;margin-top:3px;font:11px var(--mono);color:var(--muted)}
+  .q-meta .ava{width:13px;height:13px}
+  .q-meta .path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .q-flags{display:flex;align-items:center;gap:4px;margin-top:5px}
+  .q-flags .chip{font-size:10.5px;padding:1px 7px}
+  .q-flag.alert{display:inline-flex;align-items:center;font:10.5px system-ui;font-weight:600;color:var(--warn);background:var(--warn-soft);border-radius:99px;padding:1px 6px}
+
+  /* Thread */
+  .thread-body{max-width:820px;margin:0 auto;padding:22px 28px 30px}
+  .th-head h2{font-size:19px;margin:6px 0 6px;line-height:1.35}
+  .thread-body .cmt{border-top:1px solid var(--line-2);padding:14px 0}
+  .thread-body .cmt:first-of-type{border-top:0}
+  .thread-body .prose{font-size:14.5px;line-height:1.65}
+  .thread-body .cmt.orig .prose{color:var(--ink)}
+  .thread-foot{display:flex;align-items:center;gap:8px;padding:8px 20px;border-top:1px solid var(--line);background:#fbfcfd;font-size:11.5px;color:var(--muted)}
+  .thread-foot .arrow{margin-left:auto;color:var(--accent);font-weight:600}
+
+  /* Reply */
+  .draft-card{max-width:820px;margin:0 auto;display:flex;flex-direction:column;padding:14px 28px 0}
+  .draft-card > .row:first-child{padding-bottom:10px;border-bottom:1px solid var(--line-2)}
+  .draft-scroll{padding:12px 0 0;display:flex;flex-direction:column;gap:10px}
+  .field-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .seg-dispo{display:flex;gap:3px;flex-wrap:wrap}
+  .seg-dispo button{font-size:11.5px;padding:4px 8px;border-radius:6px;background:#f4f6f9;border:1px solid transparent;color:var(--ink-2)}
+  .seg-dispo button:hover{background:#e9edf3}
+  .seg-dispo button[aria-pressed="true"]{background:#fff;border-color:var(--accent);color:var(--accent);font-weight:600}
+  #draftbox{min-height:170px;font-size:14px;line-height:1.65;border-color:#c2ccdb}
+  #draftbox:focus{border-color:var(--accent);box-shadow:0 0 0 3px #eaf0fe}
+  .claims-wrap{border:1px solid var(--line);border-radius:8px;background:#fbfcfd}
+  .claims-wrap summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:8px 10px;font-size:12.5px;color:var(--ink-2)}
+  .claims-wrap summary::-webkit-details-marker{display:none}
+  .claims-wrap summary::before{content:"▸";color:var(--muted);font-size:10px}
+  .claims-wrap[open] summary::before{content:"▾"}
+  .claims-wrap summary b{margin-left:auto;font-size:11px;color:var(--warn);font-weight:600}
+  .claims-wrap summary b.ok{color:var(--ok)}
+  .claims-wrap .claims{padding:0 10px 10px}
+  .blockers{padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.5}
+  .blockers.ok{background:var(--ok-soft);color:var(--ok)}
+  .blockers.no{background:var(--warn-soft);color:var(--warn)}
+  .blockers ul{margin:3px 0 0;padding-left:16px}
+  .receipt{margin:0 0 2px;padding:7px 9px;border-radius:7px;background:#eef2fb;color:#33406b;font-size:11.5px}
+  .receipt strong{color:#1f2b52}
+  .draft-actions{display:flex;align-items:center;gap:6px;padding:10px 0;border-top:1px solid var(--line);background:#fff}
+  .draft-actions .primary{min-width:104px}
+  .notes-wrap{border-top:1px solid var(--line-2);padding:8px 0 12px}
+  .notes-wrap summary{font-size:11.5px;color:var(--muted);cursor:pointer}
+  .notes-wrap textarea{margin-top:6px;min-height:54px;font-size:13px}
+  .keys-hint{padding:6px 16px;border-top:1px solid var(--line-2);font-size:11px;color:var(--muted);background:#fbfcfd}
+
+  @media(max-width:1250px){.inbox{grid-template-columns:280px minmax(0,1fr)}}
+  @media(max-width:820px){body{height:auto;overflow:auto}.inbox{grid-template-columns:1fr}.pane.detail-pane{overflow:visible}.queue{max-height:42vh}.thread-body,.draft-card{padding:18px}.draft-actions{flex-wrap:wrap}}
+  @media print{body{height:auto;overflow:visible}.topbar,.tabs,.draft-actions,.keys-hint{display:none}.inbox{display:block}.pane.detail-pane{overflow:visible}}
+</style>
+</head>
+<body>
+<div class="banner">
+  <strong>Offline</strong>
+  <span>Drafts are proposals · nothing here posts to GitHub · pinned at <span class="mono pin"></span></span>
+</div>
+
+<div class="topbar">
+  <div>
+    <h1>Review replies</h1>
+    <span class="crumb" id="crumb"></span>
+  </div>
+  <span class="sp"></span>
+  <div class="meter" title="Approval progress">
+    <span id="progress">0 approved</span>
+    <span class="track" aria-hidden="true"><i id="bar-approved" style="background:#28a066"></i><i id="bar-posted" style="background:#6b74b8"></i></span>
+  </div>
+  <button class="quiet btn-sm" id="expjson">Export JSON</button>
+  <button class="quiet btn-sm" id="expmd">Approved replies</button>
+  <button class="quiet btn-sm" id="reset">Reset</button>
+</div>
+
+<main class="inbox">
+  <section class="pane queue-pane">
+    <div class="q-head">
+      <div class="row between"><h2>Queue</h2><span class="tiny muted" id="qcount"></span></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Filter queue"></div>
+    </div>
+    <div class="queue" id="queue"></div>
+  </section>
+
+  <section class="pane detail-pane" id="detail-scroll">
+    <div id="thread" aria-live="polite"></div>
+    <div class="thread-foot">
+      <span>Reviewed at <span class="mono pin"></span> · replies post into this thread only</span>
+      <span class="arrow">Write the reply ↓</span>
+    </div>
+
+    <section class="pane draft-pane">
+    <div class="draft-card">
+      <div class="row between">
+        <h2 style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Your reply</h2>
+        <span class="chip ghost" id="statechip">Not reviewed</span>
+      </div>
+      <div class="draft-scroll">
+        <div>
+          <div class="field-label" style="margin-bottom:5px">Disposition</div>
+          <div class="seg-dispo" id="dispo" role="group" aria-label="Disposition"></div>
+        </div>
+        <div>
+          <label class="field-label" for="draftbox">Draft</label>
+          <textarea id="draftbox" spellcheck="true" style="margin-top:5px" aria-label="Reply draft"></textarea>
+        </div>
+        <details class="claims-wrap" id="claims-wrap">
+          <summary>Claims in this reply <b id="claimbadge">—</b></summary>
+          <div id="claims"></div>
+        </details>
+        <div class="blockers no" id="blockers"></div>
+      </div>
+      <div class="receipt" id="receipt" hidden></div>
+      <div class="draft-actions">
+        <button class="primary" id="approve">Approve</button>
+        <button class="quiet" id="copy">Copy</button>
+        <button id="posted">Mark sent</button>
+        <button class="quiet" id="followup" hidden>Write follow-up</button>
+        <button class="quiet" id="discuss" title="Close without a reply">Close</button>
+        <button class="quiet" id="open">GitHub ↗</button>
+      </div>
+      <details class="notes-wrap">
+        <summary>Private notes — never posted, never exported with replies</summary>
+        <textarea id="notes"></textarea>
+      </details>
+      <div class="keys-hint"><kbd>j</kbd> <kbd>k</kbd> move · <kbd>a</kbd> approve · <kbd>x</kbd> close · <kbd>c</kbd> copy · <kbd>e</kbd> edit</div>
+    </div>
+    </section>
+  </section>
+</main>
+
+<script src="core.js"></script>
+<script src="data.js"></script>
+<script src="shared.js"></script>
+<script>
+'use strict';
+const { R, state, esc, md, save, thread, isStale, blockers, duplicates, claimOpen,
+        copy, shortPath, exportJSON, exportMD, resetAll, setDraft,
+        setClaim, claimsBlock, avatarHTML, stage, STAGES, STAGE_ORDER, eligible } = UI;
+
+const $ = (id) => document.getElementById(id);
+document.querySelectorAll('.pin').forEach((e) => { e.textContent = R.pinnedSha.slice(0, 8); });
+$('crumb').textContent = `${UI.REPO} · PR #${R.pr} · ${R.threads.length} threads`;
+const DISPO = [['fixed', 'Fixed'], ['wont-fix', "Won't fix"], ['explain', 'Explain'],
+               ['needs-discussion', 'Discuss'], ['no-reply', 'No reply']];
+const TABS = [['all', 'All']].concat(STAGES.map((x) => [x.key, x.label]));
+
+let current = R.threads[0].id;
+let filter = 'all';
+
+const matches = (t) => filter === 'all' || stage(t).key === filter;
+
+function tabCounts() {
+  const c = { all: R.threads.length };
+  for (const x of STAGES) c[x.key] = 0;
+  for (const t of R.threads) c[stage(t).key] += 1;
+  return c;
+}
+
+/* Open work first, then finished threads, newest within each stage. */
+function ordered(list) {
+  return [...list].sort((a, b) =>
+    STAGE_ORDER[stage(a).key] - STAGE_ORDER[stage(b).key]
+    || String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+
+function renderTabs() {
+  const c = tabCounts();
+  $('tabs').innerHTML = TABS.map(([key, label]) => `
+    <button class="tab" role="tab" data-f="${key}" aria-selected="${filter === key}">
+      ${label}<b>${c[key]}</b></button>`).join('');
+}
+
+function renderQueue() {
+  const items = ordered(R.threads.filter(matches));
+  $('qcount').textContent = `${items.length} shown`;
+  $('queue').innerHTML = items.length ? items.map((t) => {
+    const st = stage(t);
+    // Only a drafted reply can be blocked; an empty thread is simply unanswered.
+    const open = blockers(t).filter((x) => x !== 'No draft text');
+    const flag = open.length && st.key !== 'answered' && st.key !== 'posted'
+      ? '<span class="q-flag alert">Needs a check</span>' : '';
+    return `<button class="q" data-id="${t.id}" aria-current="${t.id === current}">
+      <span class="edge"></span>
+      <span class="body">
+        <span class="q-title">${esc(t.ask)}</span>
+        <span class="q-meta">${avatarHTML(t.reviewer, t.reviewerAvatar)}
+          <span class="path">${esc(shortPath(t.path))}${t.line ? ':' + t.line : ''}</span>
+        </span>
+        <span class="q-flags">
+          <span class="chip ${st.cls}">${st.label}</span>${flag}
+        </span>
+      </span>
+    </button>`;
+  }).join('') : '<p class="empty">Nothing in this stage.</p>';
+}
+
+function renderThread() {
+  const t = thread(current);
+  $('thread').innerHTML = `<div class="thread-body">${UI.threadHTML(t, { draftHere: false })}</div>`;
+  $('detail-scroll').scrollTop = 0;
+}
+
+function renderDraft() {
+  const t = thread(current);
+  const s = state[t.id];
+  $('draftbox').value = s.draft;
+  $('notes').value = s.notes;
+  $('dispo').innerHTML = DISPO.map(([v, label]) => `
+    <button data-dispo="${v}" aria-pressed="${s.disposition === v}">${label}</button>`).join('');
+  const st = stage(t);
+  $('statechip').className = 'chip ' + st.cls;
+  $('statechip').textContent = st.label;
+  // Transitions are guarded per stage; a Sent reply is a record, not a draft.
+  const sent = st.key === 'sent';
+  $('approve').disabled = !((st.key === 'new' || st.key === 'drafted') && eligible(t));
+  $('approve').textContent = st.key === 'ready' ? 'Approved' : 'Approve';
+  $('posted').disabled = st.key !== 'ready';
+  $('followup').hidden = !sent;
+  $('discuss').hidden = sent;
+  $('copy').disabled = !s.draft.trim();
+  $('draftbox').readOnly = sent;
+  $('discuss').textContent = st.key === 'closed' ? 'Reopen' : 'Close';
+  const receipt = $('receipt');
+  if (s.sentBody) {
+    receipt.hidden = false;
+    receipt.innerHTML = `<strong>${sent ? 'Sent' : 'Earlier reply sent'}</strong> `
+      + `${new Date(s.sentAt || Date.now()).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+      + ` · ${s.sentBody.length} chars kept as the record`;
+  } else {
+    receipt.hidden = true;
+  }
+  $('claims').innerHTML = claimsBlock(t);
+  const open = claimOpen(t);
+  const badge = $('claimbadge');
+  badge.textContent = open ? `${open} unverified` : 'all checked';
+  badge.className = open ? '' : 'ok';
+  const b = blockers(t);
+  const box = $('blockers');
+  box.className = 'blockers ' + (b.length ? 'no' : 'ok');
+  box.innerHTML = b.length
+    ? `<strong>Cannot post yet</strong><ul>${b.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
+    : '<strong>Ready.</strong> Copy the reply and paste it in the thread.';
+  const c = UI.counts();
+  $('progress').textContent = `${c.approved} ready · ${c.posted} sent`;
+  const total = R.threads.length;
+  $('bar-approved').style.width = `${(c.approved / total) * 100}%`;
+  $('bar-posted').style.width = `${(c.posted / total) * 100}%`;
+}
+
+function render() { renderTabs(); renderQueue(); renderThread(); renderDraft(); }
+
+function move(step) {
+  const items = ordered(R.threads.filter(matches));
+  if (!items.length) return;
+  const i = items.findIndex((t) => t.id === current);
+  current = items[(i + step + items.length) % items.length].id;
+  render();
+}
+
+$('tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('.tab');
+  if (!b) return;
+  filter = b.dataset.f;
+  render();
+  move(0);
+});
+
+$('queue').addEventListener('click', (e) => {
+  const b = e.target.closest('.q');
+  if (b) { current = Number(b.dataset.id); render(); }
+});
+
+$('draftbox').addEventListener('input', (e) => {
+  setDraft(current, e.target.value);
+  renderQueue(); renderDraft();
+});
+$('notes').addEventListener('input', (e) => { state[current].notes = e.target.value; save(); });
+
+$('dispo').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-dispo]');
+  if (!b) return;
+  state[current].disposition = b.dataset.dispo;
+  save(); renderDraft();
+});
+
+$('claims').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-claim]');
+  if (!b) return;
+  setClaim(current, b.dataset.claim, b.dataset.v);
+  renderDraft();
+});
+
+$('approve').onclick = () => {
+  if (!UI.approve(current)) { $('blockers').scrollIntoView({ block: 'center' }); return; }
+  render(); move(1);
+};
+/* Close is a decision; Reopen undoes it. A Sent reply is a record, so closing it
+   is not offered — use Mark sent or Write follow-up instead. */
+$('discuss').onclick = () => {
+  const t = thread(current);
+  const cur = state[t.id];
+  const key = stage(t).key;
+  if (key === 'sent') return;
+  if (key === 'closed') { cur.review = 'todo'; cur.reopened = true; }
+  else { cur.review = 'closed'; cur.reopened = false; }
+  save(); render();
+};
+$('posted').onclick = () => { if (UI.markSent(current)) { render(); move(1); } };
+$('followup').onclick = () => { if (UI.followUp(current)) render(); };
+$('copy').onclick = async (e) => { await copy(state[current].draft, e.target); };
+$('open').onclick = () => window.open(thread(current).url, '_blank', 'noopener');
+$('expjson').onclick = exportJSON;
+$('expmd').onclick = exportMD;
+$('reset').onclick = () => { if (confirm('Discard local edits and review states?')) { resetAll(); current = R.threads[0].id; render(); } };
+
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'textarea' || tag === 'input' || tag === 'select') {
+    if (e.key === 'Escape') e.target.blur();
+    return;
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'j') { e.preventDefault(); move(1); }
+  else if (k === 'k') { e.preventDefault(); move(-1); }
+  else if (k === 'a') { e.preventDefault(); $('approve').click(); }
+  else if (k === 'x') { e.preventDefault(); $('discuss').click(); }
+  else if (k === 'e') { e.preventDefault(); $('draftbox').focus(); }
+  else if (k === 'c') { e.preventDefault(); $('copy').click(); }
+});
+
+render();
+</script>
+</body>
+</html>

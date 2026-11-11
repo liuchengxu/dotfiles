@@ -1,0 +1,85 @@
+[
+  {
+    "number": 51,
+    "title": "Do not count cancelled requests as attempts",
+    "isDraft": true,
+    "state": "OPEN",
+    "headRefOid": "5151515151515151515151515151515151515151",
+    "url": "https://github.com/example/widget/pull/51",
+    "body": "Closes #894 Closes #901",
+    "files": [
+      {
+        "path": "src/f0.rs",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "src/f1.rs",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "src/f2.rs",
+        "additions": 1,
+        "deletions": 1
+      }
+    ]
+  },
+  {
+    "number": 52,
+    "title": "Key the cache by API version",
+    "isDraft": true,
+    "state": "OPEN",
+    "headRefOid": "5252525252525252525252525252525252525252",
+    "url": "https://github.com/example/widget/pull/52",
+    "body": "Closes #900",
+    "files": [
+      {
+        "path": "src/f0.rs",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "src/f1.rs",
+        "additions": 1,
+        "deletions": 1
+      }
+    ]
+  },
+  {
+    "number": 53,
+    "title": "Strict config and payload parsing",
+    "isDraft": true,
+    "state": "OPEN",
+    "headRefOid": "5353535353535353535353535353535353535353",
+    "url": "https://github.com/example/widget/pull/53",
+    "body": "Closes #902 Closes #664",
+    "files": [
+      {
+        "path": "src/f0.rs",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "src/f1.rs",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "src/f2.rs",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "src/f3.rs",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "src/f4.rs",
+        "additions": 1,
+        "deletions": 1
+      }
+    ]
+  }
+]
