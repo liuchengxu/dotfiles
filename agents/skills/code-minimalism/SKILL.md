@@ -3,15 +3,16 @@ name: code-minimalism
 description: >
   Write and review code so every addition is necessary, singular, and
   structurally safe. Use when writing new code, reviewing a diff, or
-  running a KISS/necessity pass. Five questions catch most problems:
+  running a KISS/necessity pass. Six questions catch most problems:
   does a requirement force this, does an existing API already do it, can
-  the guarantee move earlier, is this the simplest form, and does each
-  test prove one distinct thing.
+  the guarantee move earlier, where is the error caught earliest, does
+  each test prove one distinct thing, and does a test prove the behavior
+  or only the mechanism.
 ---
 
 # Code minimalism
 
-## Before writing
+## Write-time gate
 
 A review can undo a bad detail cheaply, but a bad first choice — a new API,
 propagated state, a test coupled to an unnecessary mechanism — costs turns and
@@ -40,7 +41,8 @@ Every line of code is a maintenance liability. Add code only when a
 requirement forces it, and prefer mechanisms that make mistakes
 structurally impossible over mechanisms that catch them later.
 
-Five dimensions, each with one question to ask.
+Six dimensions, each with one question to ask. The examples are Rust; apply
+the same checks with the equivalents of the language at hand.
 
 ## 1. Necessity — "What requirement forces this?"
 
@@ -72,8 +74,6 @@ audit the existing one. But the old path does not disappear — it becomes
 a trap for the next contributor.
 
 Checklist:
-- **New method on an existing type.** Grep for the behavior. If an
-  existing method does it imperfectly, extend that method.
 - **New sanitization/formatting layer.** Check whether `From` impls,
   `Display`, or constructors already sanitize. Fixing Display at the
   source is always cheaper than wrapping every consumer.
@@ -136,9 +136,6 @@ Checklist:
   is fixed? Delete it; the type system guarantees it.
 - Does this test enumerate N cases where 2–3 cover the distinct paths?
   Reduce to the minimum set that exercises each code path.
-- Is this test verifying a library's internal error structure (which
-  hyper variant reqwest produces)? Remove those assertions; keep only
-  what tests *our* behavior on top of the library.
 
 ## 6. Behavior vs. mechanism — "Does this test prove the behavior is
 needed, or that this mechanism is necessary?"
@@ -160,13 +157,6 @@ Checklist:
 - Before judging a design necessary or unnecessary, inventory who owns
   each input and what callers independently choose. A parameter with
   one value across all callers is not an independent choice.
-- When the local trace is complete but the external contract is
-  unresolved, present a conditional question ("if no external consumer
-  exists, this can be removed") rather than a terminal "unknown" or an
-  unconditional deletion claim.
-- A defense-in-depth check is not the security boundary. Do not close
-  a finding by citing a redundant host check when the real boundary is
-  elsewhere (e.g., a contract or a guest circuit).
 
 ## Worked example
 
@@ -177,6 +167,6 @@ From a retry-classification patch (vault-provers PR #911):
 | `sanitized_summary()` method (~50 lines) | Single mechanism + construction-time: `From` impls already sanitized; fixing `HeliosClient` Display was one attribute change |
 | `get_json_with_send_retries` (new method) | Single mechanism: extending existing `get_json` restored behavior for all callers |
 | `FetchBlockError` variant | Necessity: no construction path produced it after the change |
-| Six sub-category diagnostics in summary | Simplicity: status code was the only signal needed |
+| Six sub-category diagnostics in summary | Necessity: status code was the only signal needed |
 | 10-status × 2-method integration test | Distinct test value: unit test covered the table; integration only needs the wiring |
 | Assertions on reqwest's internal error types | Earliest detection boundary: testing library internals is fragile |

@@ -1,7 +1,7 @@
 ---
 name: writing-issues-and-prs
 description: >
-  Draft or revise GitHub issues, PR bodies, and review replies from established facts. Does not authorize posting, triage tickets, or perform technical review.
+  Draft or revise GitHub issues, PR bodies, and review replies from established facts — "write the PR description", "open an issue for this", "reply to this review comment". Does not authorize posting, triage tickets, or perform technical review.
 ---
 
 # Writing Issues and PRs

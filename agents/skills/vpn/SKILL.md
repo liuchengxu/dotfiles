@@ -7,13 +7,11 @@ allowed-tools: Bash
 
 # VPN Control (vpnctl)
 
-`scripts/vpnctl` drives the local Clash Verge/mihomo instance over its unix
-socket: measure node latency, switch the active node, and rewrite the
-Claude/Anthropic routing rules. It is also symlinked to `~/.local/bin/vpnctl`
-for terminal use; this skill is the canonical home. Run it via Bash with the
-absolute path `~/.claude/skills/vpn/scripts/vpnctl` (or just `vpnctl`, which
-resolves through PATH). Pick the subcommand that matches the user's intent and
-report the result.
+`vpnctl` drives the local Clash Verge/mihomo instance over its unix socket:
+measure node latency, switch the active node, and rewrite the
+Claude/Anthropic routing rules. `~/.local/bin/vpnctl` links to
+`scripts/vpnctl` in this skill. Pick the subcommand that matches the user's
+intent and report the result.
 
 ## Intent → command
 
@@ -63,24 +61,11 @@ e.g. `--blocked 'HK|香港|🇭🇰|SG|新加坡|🇸🇬'`.
 - If a command errors with "mihomo socket not found", Clash Verge isn't running
   — tell the user to start it rather than retrying.
 
-## Deadlock note (when Claude itself is down)
+## When Claude itself is down
 
-This skill runs inside Claude Code, which talks to Anthropic. If the Claude node
-is fully blocked, Claude Code can't function and this skill is unusable — you
-won't be reachable to run it. The escape hatch is the bare CLI: the user runs
-`vpnctl claude-best` (or `vpnctl claude-check`) directly in their terminal,
-which depends only on the local mihomo socket, not on Anthropic. That is why the
-`~/.local/bin/vpnctl` symlink exists. Surface this to the user if they hit a
-total Claude outage.
+If the Claude node is blocked, this skill cannot run. When Claude routing
+looks fragile, tell the user that `vpnctl claude-best` and `vpnctl claude-check`
+work from their own terminal: they need only the local mihomo socket.
 
 Run `vpnctl <cmd> --help` if you need exact flags; the CLI documents each
 subcommand with examples.
-
-## Completion checklist
-
-Use evidence to complete this checklist. Mark an item N/A only with a reason. An unresolved applicable item is a delivery gap.
-
-- [ ] Before running vpnctl, confirmed the routing problem, read-only or mutating intent, region constraints, and need for the selected command were clear.
-- [ ] Used the command that matches the request and diagnosed vague failures before any configuration change.
-- [ ] After a mutation, reported the selected node, latency, and any backup path from command output, and distinguished connectivity-tested results from untested ones.
-- [ ] Reported command errors, blocked regions, or unverified connectivity without treating latency alone as successful Claude access.

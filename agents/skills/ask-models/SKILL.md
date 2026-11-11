@@ -34,6 +34,10 @@ the id was not recognized, say so; never substitute another model.
   copied folder, never the working checkout. Reviewers get full tools, so they
   can build, run tests, and read dependencies; a copy keeps their edits and
   build output away from your work.
+- A copy does not protect the host. For an untrusted checkout, as
+  `adversarial-review` defines it, run reviewers only in a disposable
+  environment without secrets or network; otherwise report the review as not
+  run.
 - For a blind review, make a fresh repository that holds only the reviewed base
   and head commits, and supply the PR text as it was at review time, so no
   later fix or comment leaks in.
@@ -67,7 +71,7 @@ cd <copy> && claude -p --no-session-persistence --model <alias> \
 after it, the prompt is read as a tool name.
 
 - `< /dev/null` is required: without it, Pi waits on stdin and never answers.
-- Reviewers get full tools: Pi has no `--tools` flag, and Claude's allowed
+- Neither run is read-only: Pi has no `--tools` flag, and Claude's allowed
   tools include the shell.
 - An empty output file means the model failed. Check its log, and rerun it or
   report it as failed.
