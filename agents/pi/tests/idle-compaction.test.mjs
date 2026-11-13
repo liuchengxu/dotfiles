@@ -204,207 +204,105 @@ test("attempt receipt survives real SessionManager reopen without deleting messa
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("digest lines carry the summary's goal, live work, blockers, and next step", () => {
-	const summary = [
-		"## Goal", "- Ship the footer dock.", "",
-		"## Progress", "### Done", "- merged", "### In Progress", "- [ ] adjudicate the review", "### Blocked", "- None — waiting on nothing.", "",
-		"## Next Steps", "1. Fix `F-01` **awaited children**", "2. Merge.", "",
-		"Overall progress: ~70%",
-	].join("\n");
-	const lines = digestLines(summary, 227_812);
-	assert.match(lines[0], /^◇ idle compaction ─+ ctrl\+o full summary$/);
-	assert.match(lines[1], /^ {2}█{13}░{5} ~70% · 227,812 tokens$/);
-	assert.deepEqual(lines.slice(2), ["● Goal  Ship the footer dock.", "◉ Now   adjudicate the review", "▸ Next  Fix F-01 awaited children"]);
+test("digest labels pre-compaction tokens and omits estimated task progress", () => {
+  const lines = digestLines("## Recap\nReady for review.\nOverall progress: ~15%", 504_792, 120);
+  assert.match(lines[0], /504,792 tokens before compaction/);
+  assert.match(lines[0], /ctrl\+o full summary/);
+  assert.deepEqual(lines.slice(1), ["  Ready for review."]);
+  assert.doesNotMatch(lines.join("\n"), /15%|█|░|Overall progress/);
 });
 
-test("digest omits absent sections, wraps long lines instead of ellipsizing, and falls back to leading lines", () => {
-	const sparse = digestLines("## Goal\nOnly prose.\n## Next Steps\n- Next up", 1);
-	assert.deepEqual(sparse.slice(1), ["● Goal  Only prose.", "▸ Next  Next up"]);
-	const wrapped = digestLines(`## Goal\n${"word ".repeat(18).trim()}`, 1);
-	assert.equal(visibleWidth(wrapped[1]), 72, "the first row fills the digest width");
-	assert.ok(!wrapped[1].includes("…"), "no ellipsis: the row wraps");
-	assert.match(wrapped[2], /^ {8}word/, "the overflow continues on an aligned second row");
-	const plain = digestLines("No headings at all.\nSecond line.\nThird line.\nFourth line.", 5);
-	assert.deepEqual(plain.slice(1), ["  No headings at all.", "  Second line.", "  Third line."]);
+test("recap flows across available width rather than preserving short input lines", () => {
+  const summary = "## Recap\n" + Array(8).fill("The next step is to inspect candidate build results.").join("\n");
+  const wide = digestLines(summary, 1, 140);
+  const narrow = digestLines(summary, 1, 50);
+  assert.ok(visibleWidth(wide[1]) > 72);
+  assert.ok(narrow.length > wide.length);
+  assert.equal(wide.slice(1).join(" ").replace(/\s+/g, " ").trim(),
+    narrow.slice(1).join(" ").replace(/\s+/g, " ").trim());
+  for (const [width, lines] of [[140, wide], [50, narrow]]) {
+    assert.ok(lines.every(line => visibleWidth(line) <= width));
+  }
 });
 
-test("a written Recap is pinned, normalized, in place of the section rows", () => {
-	const summary = [
-		"## Goal", "- Ship the digest.", "",
-		"## Recap", "The user wants a readable digest after idle compaction.", "Rows were truncated with an ellipsis; nobody read them.", "Next: wrap instead of cut, and pin the summarizer's own recap.", "",
-		"Overall progress: ~60%",
-	].join("\n");
-	const lines = digestLines(summary, 227_812);
-	assert.match(lines[0], /^◇ idle compaction ─+ ctrl\+o full summary$/);
-	assert.match(lines[1], /~60%/);
-	assert.deepEqual(lines.slice(2), [
-		"  The user wants a readable digest after idle compaction.",
-		"  Rows were truncated with an ellipsis; nobody read them.",
-		"  Next: wrap instead of cut, and pin the summarizer's own recap.",
-	], "recap lines replace the Goal/Now/Block/Next rows");
-	assert.ok(!lines.join("\n").includes("● Goal"), "no mechanical rows beside a written recap");
+test("displayed recap has an enforced 80-word limit with a visible omission mark", () => {
+  for (const heading of ["## Recap\n", "## Goal\n", ""]) {
+    const lines = digestLines(heading + Array.from({ length: 100 }, (_, i) => "word" + i).join(" "), 1, 120);
+    const body = lines.slice(1).join(" ").trim();
+    assert.equal(body.split(/\s+/).length, 80);
+    assert.match(body, /…$/);
+    assert.doesNotMatch(body, /word99/);
+  }
+  const exact = digestLines("## Recap\n" + Array(80).fill("word").join(" "), 1, 120);
+  assert.doesNotMatch(exact.slice(1).join(" "), /…/);
 });
 
-test("a recap beyond the row budget leaves a visible omission marker with an exact count", () => {
-	const line = "word ".repeat(30).trim(); // wraps to three rows
-	const digest = (n) => digestLines(["## Recap", ...Array(n).fill(line), ""].join("\n"), 1)
-		.slice(1).map(l => l.replace(/\x1b\[[0-9;]*m/g, ""));
-	const at7 = digest(2).filter(l => l.trim());
-	assert.equal(at7.length, 6, "six content rows at the budget boundary, no marker");
-	assert.ok(!at7.at(-1).includes("more rows"));
-	const at8 = digest(3).filter(l => l.trim());
-	assert.equal(at8.length, 7, "six content rows plus the marker");
-	assert.match(at8.at(-1), /… 3 more rows in the full summary/);
-	const at9 = digest(4).filter(l => l.trim());
-	assert.match(at9.at(-1), /… 6 more rows in the full summary/);
+test("recap ends before split-turn scaffolding and strips markdown once", () => {
+  const lines = digestLines("## Recap\n- Fix `a*b` and **ship it**.\n- -flag-style option stays.\n--\n*Turn Context (split turn):**\nPrivate continuation text", 1, 120);
+  assert.deepEqual(lines.slice(1), ["  Fix a*b and ship it. -flag-style option stays."]);
 });
 
-test("six short recap lines all render: no input-line slice before the budget", () => {
-	const lines = digestLines(["## Recap", "one.", "two.", "three.", "four.", "five.", "six.", ""].join("\n"), 1);
-	const rows = lines.slice(1).map(l => l.replace(/\x1b\[[0-9;]*m/g, ""));
-	assert.equal(rows.length, 6);
-	assert.match(rows.at(-1), /six\.$/);
+test("legacy sections retain goal, current work, blocker, and next step", () => {
+  const summary = "## Goal\n- Ship it.\n### Done\n- Built.\n### In Progress\n- Review.\n### Blocked\n- None of the tests pass.\n## Next Steps\n1. Fix tests.";
+  const text = digestLines(summary, 1, 160).slice(1).join(" ");
+  assert.match(text, /Goal: Ship it\. Now: Review\. Block: None of the tests pass\. Next: Fix tests\./);
+  assert.doesNotMatch(text, /Built/);
+  assert.equal(digestLines("### Blocked\n- None.", 1, 120).length, 1);
 });
 
-test("a fallback section item overflowing two rows is marked, not silently cut", () => {
-	const summary = ["## Goal", "- " + "word ".repeat(30).trim() + " and the critical final clause"].join("\n");
-	const lines = digestLines(summary, 1);
-	const goalRows = lines.slice(1).filter(l => l.includes("word") || l.includes("clause"));
-	assert.equal(goalRows.length, 2, "a section item shows at most two rows");
-	const marked = goalRows[1].replace(/\x1b\[[0-9;]*m/g, "");
-	assert.match(marked, /…$/, "the second row ends with a visible omission marker");
-	assert.ok(visibleWidth(marked) <= 72, `the marked row fits the digest width, got ${visibleWidth(marked)}`);
+test("plain legacy summaries reflow without losing the fourth line", () => {
+  const lines = digestLines("First line.\nSecond line.\nThird line.\nFourth line.", 1, 120);
+  assert.deepEqual(lines.slice(1), ["  First line. Second line. Third line. Fourth line."]);
 });
 
-test("a short second row still carries the overflow marker", () => {
-	const summary = ["## Goal", "- " + "a".repeat(64) + " b " + "c".repeat(64)].join("\n");
-	const lines = digestLines(summary, 1);
-	const second = lines[2].replace(/\x1b\[[0-9;]*m/g, "");
-	assert.match(second, /^ {8}b…$/, "the omitted tail behind a short row is still marked");
+test("wide characters and long tokens fit without silently losing content", () => {
+  for (const text of ["界".repeat(80), "a".repeat(90)]) {
+    const lines = digestLines("## Recap\n" + text, 1, 40);
+    assert.ok(lines.every(line => visibleWidth(line) <= 40));
+    assert.equal(lines.slice(1).map(line => line.trim()).join(""), text);
+  }
+  for (const width of [1, 2, 8, 30]) {
+    assert.ok(digestLines("## Recap\nHello world.", 1, width).every(line => visibleWidth(line) <= width));
+  }
 });
 
-test("cleaning happens once: a flag-like item keeps its leading dash", () => {
-	const lines = digestLines("## Next Steps\n- -flag-style option still parses", 1);
-	assert.ok(lines.some(l => l.includes("-flag-style")), JSON.stringify(lines));
-	const recap = digestLines("## Recap\n- -flag-style option still parses", 1);
-	assert.ok(recap.some(l => l.includes("-flag-style")), JSON.stringify(recap));
+test("idle compaction requests a bounded recap, not a goal-completion estimate", (t) => {
+  const c = clock(t), h = host(); h.emit("session_start"); c.advance(IDLE_MS);
+  assert.match(h.calls[0].customInstructions, /at most 80 words/);
+  assert.doesNotMatch(h.calls[0].customInstructions, /Overall progress|70 columns/);
 });
 
-test("a Recap line longer than the digest wraps; an unbreakable token is cut without a mark", () => {
-	const long = ["word ".repeat(30).trim()];
-	const lines = digestLines(["## Recap", ...long, "", "Overall progress: ~10%"].join("\n"), 1);
-	assert.ok(lines.slice(1).every(l => visibleWidth(l) <= 72));
-	assert.ok(!lines.join("\n").includes("…"));
-	assert.equal(lines.filter(l => l.startsWith("  word")).length >= 2, true, "the long line folds onto multiple rows");
-	const unbreakable = digestLines(["## Recap", "a".repeat(90)].join("\n"), 1);
-	assert.ok(unbreakable.slice(1).every(l => visibleWidth(l) <= 72 && !l.includes("…")));
+test("our digest widget reflows on resize and disappears on the next action", (t) => {
+  const c = clock(t), h = host(); h.emit("session_start"); c.advance(IDLE_MS);
+  h.emit("session_compact", { compactionEntry: { summary: "## Recap\n" + "Inspect candidate results. ".repeat(15), tokensBefore: 200_001 } });
+  const widget = h.widgets.at(-1);
+  assert.equal(widget.key, DIGEST_KEY);
+  assert.equal(typeof widget.content, "function");
+  const component = widget.content({}, { fg: (_name, text) => text });
+  const wide = component.render(140), narrow = component.render(50);
+  assert.ok(visibleWidth(wide[1]) > 72);
+  assert.ok(narrow.length > wide.length);
+  assert.doesNotThrow(() => component.invalidate());
+  h.emit("input");
+  assert.deepEqual(h.widgets.at(-1), { key: DIGEST_KEY, content: undefined });
+  h.emit("session_shutdown");
 });
 
-test("our idle compaction pins the digest; the user's next action or shutdown removes it", (t) => {
-	const c = clock(t), h = host(); h.emit("session_start"); c.advance(IDLE_MS);
-	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- Finish.\n## Next Steps\n1. Merge", tokensBefore: 200_001 } });
-	assert.equal(h.widgets.at(-1).key, DIGEST_KEY);
-	assert.match(h.widgets.at(-1).content[0], /idle compaction/);
-	assert.ok(h.widgets.at(-1).content.some((line) => line.includes("Merge")));
-	h.emit("input");
-	assert.deepEqual(h.widgets.at(-1), { key: DIGEST_KEY, content: undefined });
-	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- Again", tokensBefore: 1 } });
-	h.emit("session_shutdown");
-	assert.deepEqual(h.widgets.at(-1), { key: DIGEST_KEY, content: undefined });
+test("a compaction we did not start shows no digest", () => {
+  const h = host(); h.emit("session_start");
+  h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- x", tokensBefore: 9 } });
+  assert.equal(h.widgets.filter(entry => entry.content !== undefined).length, 0);
+  h.emit("session_shutdown");
 });
 
-test("a compaction we did not start shows no digest", (t) => {
-	const h = host(); h.emit("session_start");
-	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- x", tokensBefore: 9 } });
-	assert.equal(h.widgets.filter((entry) => entry.content !== undefined).length, 0);
-});
-
-test("typing dismisses the digest; a foreign compaction replaces it with nothing", (t) => {
-	const c = clock(t), h = host(); h.emit("session_start"); c.advance(IDLE_MS);
-	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- Finish.", tokensBefore: 1 } });
-	assert.ok(h.widgets.at(-1).content, "digest pinned after our compaction");
-	h.calls[0].onComplete({});
-	h.type();
-	assert.deepEqual(h.widgets.at(-1), { key: DIGEST_KEY, content: undefined }, "a keystroke dismisses it");
-	h.emit("session_compact", { compactionEntry: { summary: "## Goal\n- Foreign", tokensBefore: 2 } });
-	assert.equal(h.widgets.filter((entry) => entry.content).length, 1, "only the initial pin ever carried content; a foreign compaction adds none");
-});
-
-test("only the empty-marker None is filtered; real blockers starting with None survive", () => {
-	const lines = digestLines("## Progress\n### Blocked\n- None of the integration tests pass.\n", 1);
-	assert.ok(lines.some((line) => line.includes("Block")), "a genuine None-of sentence is a blocker");
-	const empty = digestLines("## Progress\n### Blocked\n- None — waiting on review.\n", 1);
-	assert.ok(!empty.some((line) => line.includes("Block")), "the None marker is dropped");
-});
-
-test("wide characters truncate by terminal column, not UTF-16 unit", () => {
-	const lines = digestLines(`## Goal\n${"界".repeat(80)}`, 1);
-	assert.ok(visibleWidth(lines[1]) <= 72, `goal row fits 72 columns, got ${visibleWidth(lines[1])}`);
-});
-
-test("markdown stripping keeps literal content: code spans, paired bold, plus bullets", () => {
-	const lines = digestLines([
-		"## Goal", "- Fix `a*b` and **ship it**", "",
-		"### In Progress", "+ [ ] Ship the thing", "",
-	].join("\n"), 1);
-	assert.ok(lines.some((line) => line.includes("Fix a*b and ship it")), JSON.stringify(lines));
-	assert.ok(lines.some((line) => line.includes("Ship the thing")), JSON.stringify(lines));
-});
-
-test("progress estimate prefers the summarizer's stated line and takes the last valid one", () => {
-	const withStated = digestLines("## Goal\n- x\nOverall progress: ~35%\nOverall progress: ~120%\nOverall progress: ~80%", 1);
-	assert.match(withStated[1], /~80% · 1 tokens/);
-});
-
-test("without a stated estimate, the Done share of listed items is used; None markers do not count", () => {
-	const summary = [
-		"## Progress", "### Done", "- a", "- b", "- c", "### In Progress", "- d", "### Blocked", "- None — clear.",
-	].join("\n");
-	assert.match(digestLines(summary, 1)[1], /~75%/, "done share over counted items only");
-});
-
-test("no basis for an estimate leaves the percentage out of the header", () => {
-	const plain = digestLines("No headings at all.\nSecond line.\nThird line.", 5);
-	assert.match(plain[0], /^◇ idle compaction · 5 tokens ─+ ctrl\+o full summary$/);
-});
-
-test("only a standalone progress line counts; prose, negations, and next-line percentages do not", () => {
-	const noisy = digestLines([
-		"Previous overall progress: ~90% (obsolete; goal expanded).", "",
-		"## Goal", "- x", "",
-		"Overall progress: unknown", "- 80% coverage required", "",
-		"Overall progress: -20%",
-	].join("\n"), 1);
-	assert.doesNotMatch(noisy[0], /%/);
-	const standalone = digestLines("Overall progress: 65%", 1);
-	assert.match(standalone[1], /~65%/);
-});
-
-test("the <=100 filter decides last-wins: 80 then 120 stays 80", () => {
-	assert.match(digestLines("Overall progress: ~80%\nOverall progress: ~120%", 1)[1], /~80%/);
-});
-
-test("formatted None markers are not work, numbered items count, and headers fit LINE_CAP", () => {
-	const summary = ["## Progress", "### Done", "- **None** before real work", "- a", "### In Progress", "1. still going", "### Blocked", "- [ ] None."].join("\n");
-	assert.match(digestLines(summary, 1)[1], /~50%/, "one done, one numbered remaining");
-	for (const header of [digestLines("Overall progress: 100%", 1)[0], digestLines("## Progress\n### Done\n- a", 1)[0], digestLines("nothing", 999_999)[0]]) {
-		assert.ok(visibleWidth(header) <= 72, `header fits: ${visibleWidth(header)} ${JSON.stringify(header)}`);
-	}
-});
-
-test("bar endpoints: 0% is all dim cells, 100% all accent; colors forward semantic names", () => {
-	const zero = digestLines("Overall progress: ~0%", 1);
-	assert.match(zero[1], /^ {2}░{18} ~0%/);
-	const full = digestLines("Overall progress: 100%", 1);
-	assert.match(full[1], /^ {2}█{18} ~100%/);
-	const asked = [];
-	const spy = { fg: (name, text) => { asked.push(name); return text; } };
-	digestLines("## Goal\n- g\n### In Progress\n- n\n### Blocked\n- b\n## Next Steps\n- x", 1, spy);
-	for (const semantic of ["accent", "warning", "error", "dim"]) assert.ok(asked.includes(semantic), `${semantic} forwarded`);
-});
-
-test("sections that parse to only None markers yield the bare header", () => {
-	const lines = digestLines("## Progress\n### Blocked\n- None.", 1);
-	assert.equal(lines.length, 1);
-	assert.match(lines[0], /^◇ idle compaction · 1 tokens ─+ ctrl\+o full summary$/);
+test("typing dismisses the digest; a foreign compaction does not repin it", (t) => {
+  const c = clock(t), h = host(); h.emit("session_start"); c.advance(IDLE_MS);
+  h.emit("session_compact", { compactionEntry: { summary: "## Recap\nFinish.", tokensBefore: 1 } });
+  assert.ok(h.widgets.at(-1).content);
+  h.calls[0].onComplete({});
+  h.type();
+  assert.deepEqual(h.widgets.at(-1), { key: DIGEST_KEY, content: undefined });
+  h.emit("session_compact", { compactionEntry: { summary: "## Recap\nForeign", tokensBefore: 2 } });
+  assert.equal(h.widgets.filter(entry => entry.content).length, 1);
+  h.emit("session_shutdown");
 });

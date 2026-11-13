@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export type DigestTheme = Pick<ExtensionContext["ui"]["theme"], "fg">;
@@ -11,116 +11,40 @@ export const IDLE_MS = 45 * 60 * 1000;
 export const MIN_TOKENS = 200_000;
 export const DIGEST_KEY = "idle-compaction-digest";
 const ATTEMPT = "idle-compaction-attempt";
-const INSTRUCTIONS = "Idle compaction: preserve the user's goals, constraints, decisions, unfinished work, and exact references needed to resume safely. Then add a '## Recap' section: 3-5 short plain-language lines (at most 70 columns each, no markdown emphasis or bullets) capturing the core points for someone returning — what the user wants, where things stand, any blocker, the next step. End the summary with a final line of the form 'Overall progress: ~N%' where N is your honest 0-100 estimate of how much of the user's overall goal is now complete, reassessed against the current goal rather than carried forward from an earlier summary.";
-const LINE_CAP = 72;
+const RECAP_WORD_LIMIT = 80;
+const INSTRUCTIONS = `Idle compaction: preserve the user's goals, constraints, decisions, unfinished work, and exact references needed to resume safely. Then add a final '## Recap' section: one plain-language paragraph of at most ${RECAP_WORD_LIMIT} words, without markdown emphasis, bullets, or manual line breaks. Explain what the user wants, where things stand, any blocker, and the next step. Do not estimate task-completion percentages. The word limit applies only to the recap, not the full compaction summary.`;
 
-/** The reorientation digest pinned above the editor after idle compaction.
- * The summarizer's own '## Recap' — 3-5 plain lines written as a summary — is
- * pinned, normalized (bullets and emphasis stripped) and wrapped rather than
- * ellipsized, because written prose reads better than mechanically extracted
- * list items. Rendered rows carry a budget with a visible omission marker, so
- * the digest can never grow unbounded or lose text silently. Summaries without
- * a Recap (older compactions) fall back to one row per section, wrapped the
- * same way. Full summary stays on the transcript's ctrl+o expansion. */
-export function digestLines(summary: string, tokensBefore: number, theme: DigestTheme = identityTheme): string[] {
-	const section = (heading: string): string[] | undefined => {
-		const head = summary.match(new RegExp(`^#{2,3} ${heading}\\s*$`, "m"));
-		if (!head || head.index === undefined) return undefined;
-		const rest = summary.slice(head.index + head[0].length);
-		const next = rest.match(/^#{2,3} /m);
-		return (next && next.index !== undefined ? rest.slice(0, next.index) : rest).split(/\r?\n/);
-	};
-	const clean = (raw: string): string => raw.trim().replace(/^[-*+]\s*(?:\[[ xX]\]\s*)?/, "").replace(/^\d+[.)]\s*/, "")
-		.replace(/`([^`]*)`/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1");
-	// Wrap cleaned text; normalization happens once, at the call site —
-	// wrapping must not strip a second time ("- -flag" would lose "-flag").
-	// A line that outgrows the digest folds to the next row; an unbreakable
-	// token is cut hard, without a trailing mark.
-	const wrap = (text: string, width: number): string[] => {
-		const out: string[] = [];
-		let line = "";
-		for (const word of text.split(/\s+/).filter(Boolean)) {
-			if (!line) line = word;
-			else if (visibleWidth(line) + 1 + visibleWidth(word) <= width) line += " " + word;
-			else { out.push(line); line = word; }
-		}
-		if (line) out.push(line);
-		return (out.length ? out : [""]).map(l => truncateToWidth(l, width, ""));
-	};
-	const firstItem = (lines: string[] | undefined): string | undefined => {
-		for (const raw of lines ?? []) {
-			const text = clean(raw);
-			// "None" alone is the compaction prompt's empty-section marker; a
-			// sentence like "None of the tests pass" is a real blocker.
-			if (!text || /^none\s*(?:[—–.:-]|$)/i.test(text)) continue;
-			return text;
-		}
-		return undefined;
-	};
-	const recap = (section("Recap") ?? []).map(clean).filter(l => l && !/^overall progress:/i.test(l));
-	// The prompt asks for five short lines, but a prompt is not enforcement:
-	// only the rendered-row budget is, and any overflow leaves a marker.
-	const RECAP_ROW_BUDGET = 7;
-	let body: string[];
-	if (recap.length > 0) {
-		const rows = recap.flatMap(line => wrap(line, LINE_CAP - 2).map(l => "  " + l));
-		body = rows.length > RECAP_ROW_BUDGET
-			? [...rows.slice(0, RECAP_ROW_BUDGET - 1), theme.fg("dim", `  … ${rows.length - RECAP_ROW_BUDGET + 1} more rows in the full summary`)]
-			: rows;
-	} else {
-		const rows: [glyph: string, label: string, semantic: Parameters<DigestTheme["fg"]>[0], value: string | undefined][] = [
-			["●", "Goal", "accent", firstItem(section("Goal"))],
-			["◉", "Now", "warning", firstItem(section("In Progress"))],
-			["⚠", "Block", "error", firstItem(section("Blocked"))],
-			["▸", "Next", "dim", firstItem(section("Next Steps"))],
-		];
-		body = rows.filter((row): row is [string, string, string, string] => row[3] !== undefined)
-			.flatMap(([glyph, label, semantic, value]) => {
-				const wrapped = wrap(value, LINE_CAP - 8);
-				// Two rows per section; overflow is marked, never lost silently. The
-				// marker is appended by hand: truncateToWidth ellipsizes only a row
-				// that is itself long, and the omitted tail can sit behind a short one.
-				const shown = wrapped.slice(0, 2);
-				if (wrapped.length > 2) shown[1] = truncateToWidth(shown[1], LINE_CAP - 9, "") + "…";
-				return shown.map((line, i) => {
-					if (i === 0) return theme.fg(semantic, glyph) + theme.fg("dim", ` ${label.padEnd(5)}`) + " " + line;
-					return " ".repeat(8) + line;
-			});
-		});
-	}
-	const lines = body.length > 0 ? body
-		: [section("Goal"), section("In Progress"), section("Blocked"), section("Next Steps")].some(Boolean)
-			? [] // Sections parsed but nothing actionable: the header still orients.
-			: summary.split(/\r?\n/).filter((line) => line.trim()).slice(0, 3)
-				.map((line) => "  " + truncateToWidth(line.replace(/[`*]/g, ""), LINE_CAP - 2, "…"));
-	const progress = progressPercent(summary, section);
-	const tokens = `${tokensBefore.toLocaleString()} tokens`;
-	const tail = "ctrl+o full summary";
-	const head = progress === undefined ? `◇ idle compaction · ${tokens}` : "◇ idle compaction";
-	const rule = "─".repeat(Math.max(3, LINE_CAP - visibleWidth(head) - visibleWidth(tail) - 2));
-	const header = theme.fg("accent", "◇") + head.slice(1) + " " + theme.fg("dim", rule) + " " + theme.fg("dim", tail);
-	if (progress === undefined) return [header, ...lines];
-	const filled = Math.round(progress * 18 / 100);
-	const bar = "  " + theme.fg("accent", "█".repeat(filled)) + theme.fg("dim", "░".repeat(18 - filled))
-		+ theme.fg("accent", ` ~${progress}%`) + theme.fg("dim", ` · ${tokens}`);
-	return [header, bar, ...lines];
-}
-
-/** The summarizer's own estimate when present (it read everything); else the
- * Done share of the summary's list items. Both are impressions, not metrics. */
-function progressPercent(summary: string, section: (heading: string) => string[] | undefined): number | undefined {
-	// A complete standalone line only: prose mentions, negated values, and
-	// percentages on a following line must not read as the summarizer's own.
-	const stated = [...summary.matchAll(/^overall progress:[ \t]*~?[ \t]*(\d{1,3})[ \t]*%[ \t]*$/gim)]
-		.map((match) => Number(match[1])).filter((value) => value <= 100);
-	if (stated.length > 0) return stated.at(-1);
-	const items = (heading: string) => (section(heading) ?? []).filter((line) => {
-		const text = line.replace(/[`*]/g, "");
-		return /^\s*(?:[-*+]|\d+[.)])\s/.test(text) && !/^\s*(?:[-*+]|\d+[.)])\s*none\s*(?:[—–.:-]|$)/i.test(text);
-	}).length;
-	const done = items("Done");
-	const remaining = items("In Progress") + items("Blocked");
-	return done + remaining > 0 ? Math.round((done / (done + remaining)) * 100) : undefined;
+/** A word-bounded display digest; the complete compaction summary stays in the transcript. */
+export function digestLines(summary: string, tokensBefore: number, width: number, theme: DigestTheme = identityTheme): string[] {
+  const section = (heading: string): string[] | undefined => {
+    const head = summary.match(new RegExp(`^#{2,3} ${heading}\\s*$`, "m"));
+    if (!head || head.index === undefined) return undefined;
+    const rest = summary.slice(head.index + head[0].length);
+    const next = rest.match(/^#{1,6} |^\s*(?:-{2,}|\*{3,}|_{3,})\s*$/m);
+    return (next && next.index !== undefined ? rest.slice(0, next.index) : rest).split(/\r?\n/);
+  };
+  const clean = (raw: string): string => raw.trim().replace(/^[-*+]\s*(?:\[[ xX]\]\s*)?/, "").replace(/^\d+[.)]\s*/, "")
+    .replace(/`([^`]*)`/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1");
+  const content = (lines: string[]): string[] => lines.map(clean).filter(line => line && !/^overall progress:/i.test(line));
+  const recap = content(section("Recap") ?? []);
+  const sections = [["Goal", "Goal"], ["In Progress", "Now"], ["Blocked", "Block"], ["Next Steps", "Next"]];
+  let text = recap.join(" ");
+  if (!text) {
+    text = sections.flatMap(([heading, label]) => {
+      const item = content(section(heading) ?? []).find(line => !/^none\s*(?:[—–.:-]|$)/i.test(line));
+      return item ? [`${label}: ${item}`] : [];
+    }).join(" ");
+    if (!text && !sections.some(([heading]) => section(heading))) text = content(summary.split(/\r?\n/)).join(" ");
+  }
+  const words = text.split(/\s+/).filter(Boolean);
+  text = words.slice(0, RECAP_WORD_LIMIT).join(" ") + (words.length > RECAP_WORD_LIMIT ? "…" : "");
+  const head = `◇ idle compaction · ${tokensBefore.toLocaleString()} tokens before compaction`;
+  const tail = "ctrl+o full summary";
+  const rule = "─".repeat(Math.max(1, width - visibleWidth(head) - visibleWidth(tail) - 2));
+  const header = theme.fg("accent", "◇") + head.slice(1) + " " + theme.fg("dim", rule + " " + tail);
+  const indent = width > 2 ? "  " : "";
+  const body = text ? wrapTextWithAnsi(text, Math.max(1, width - indent.length)).map(line => indent + line) : [];
+  return [header, ...body].map(line => truncateToWidth(line, width, "…"));
 }
 
 type Controls = {
@@ -280,7 +204,10 @@ export default function idleCompaction(pi: ExtensionAPI, controls: Controls = fi
     try {
       const entry = event.compactionEntry;
       if (ctx.mode === "tui" && typeof entry?.summary === "string") {
-        ctx.ui.setWidget(DIGEST_KEY, digestLines(entry.summary, entry.tokensBefore, ctx.ui.theme), { placement: "aboveEditor" });
+        ctx.ui.setWidget(DIGEST_KEY, (_tui, theme) => ({
+          render: (width) => digestLines(entry.summary, entry.tokensBefore, width, theme),
+          invalidate() {},
+        }), { placement: "aboveEditor" });
         digestPinned = true;
       }
     } catch { /* A retired context cannot show the digest. */ }
