@@ -15,6 +15,7 @@ const jiti = createJiti(import.meta.url, { fsCache: false, alias: {
 const { default: extension, fileControls, IDLE_MS, MIN_TOKENS, DIGEST_KEY, digestLines } = await jiti.import(new URL("../extensions/idle-compaction.ts", import.meta.url).pathname);
 const { SessionManager } = await import(pathToFileURL(join(root, "dist/core/session-manager.js")));
 const { visibleWidth } = await jiti.import(join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"));
+const { computeFileLists } = await import(pathToFileURL(join(root, "dist/core/compaction/utils.js")));
 
 function clock(t) {
   let now = 0;
@@ -64,7 +65,8 @@ function host(options = {}) {
     emit: (event, data = {}) => handlers.get(event)?.(data, ctx),
     type: () => terminalInput?.("x"),
     get unsubscribed() { return unsubscribed; },
-    hook: (call = calls.at(-1)) => handlers.get("session_before_compact")({ customInstructions: call.customInstructions }, ctx),
+    hook: (call = calls.at(-1), fileOps = { read: new Set(), written: new Set(), edited: new Set() }) =>
+      handlers.get("session_before_compact")({ customInstructions: call.customInstructions, preparation: { fileOps } }, ctx),
   };
 }
 
@@ -86,6 +88,13 @@ test("disabled, headless, busy, pending, draft, small, unknown and non-finite co
     assert.equal(h.calls.length, 0, JSON.stringify(option)); h.emit("session_shutdown");
   }
   const h = host(); h.ctx.model = undefined; h.emit("session_start"); c.advance(IDLE_MS); assert.equal(h.calls.length, 0);
+});
+
+test("an idle summary carries no file lists", (t) => {
+  const c = clock(t), h = host(); h.emit("session_start"); c.advance(IDLE_MS);
+  const fileOps = { read: new Set(["/read.ts"]), written: new Set(["/written.ts"]), edited: new Set(["/edited.ts"]) };
+  assert.equal(h.hook(h.calls.at(-1), fileOps), undefined);
+  assert.deepEqual(computeFileLists(fileOps), { readFiles: [], modifiedFiles: [] }, "Pi appends nothing to the summary");
 });
 
 test("typing restarts idle delay without consuming input or changing editor", (t) => {
@@ -240,6 +249,15 @@ test("displayed recap has an enforced 80-word limit with a visible omission mark
 test("recap ends before split-turn scaffolding and strips markdown once", () => {
   const lines = digestLines("## Recap\n- Fix `a*b` and **ship it**.\n- -flag-style option stays.\n--\n*Turn Context (split turn):**\nPrivate continuation text", 1, 120);
   assert.deepEqual(lines.slice(1), ["  Fix a*b and ship it. -flag-style option stays."]);
+});
+
+test("summary text is dimmed; the header stays coloured", () => {
+  const spy = { fg: (name, text) => `[${name}]${text}[/]` };
+  const rows = digestLines("## Recap\nA recap line.", 1, 80, spy);
+  assert.match(rows[0], /^\[accent\]◇\[/);
+  assert.equal(rows[1], "[dim]  A recap line.[/]", "the recap paragraph carries dim");
+  const fallback = digestLines("plain summary line", 1, 80, spy);
+  assert.equal(fallback[1], "[dim]  plain summary line[/]", "the fallback text carries dim too");
 });
 
 test("legacy sections retain goal, current work, blocker, and next step", () => {

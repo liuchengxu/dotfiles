@@ -43,7 +43,8 @@ export function digestLines(summary: string, tokensBefore: number, width: number
   const rule = "─".repeat(Math.max(1, width - visibleWidth(head) - visibleWidth(tail) - 2));
   const header = theme.fg("accent", "◇") + head.slice(1) + " " + theme.fg("dim", rule + " " + tail);
   const indent = width > 2 ? "  " : "";
-  const body = text ? wrapTextWithAnsi(text, Math.max(1, width - indent.length)).map(line => indent + line) : [];
+  // The digest is reference text; only its header orients, so the body is dim.
+  const body = text ? wrapTextWithAnsi(text, Math.max(1, width - indent.length)).map(line => theme.fg("dim", indent + line)) : [];
   return [header, ...body].map(line => truncateToWidth(line, width, "…"));
 }
 
@@ -194,6 +195,11 @@ export default function idleCompaction(pi: ExtensionAPI, controls: Controls = fi
         || ctx.sessionManager.getLeafId() !== current.leafId || !controls.enabled()
         || !controls.autoCompactionEnabled(ctx) || ctx.hasPendingMessages() || ctx.ui.getEditorText().trim() !== "") return { cancel: true };
     } catch { return { cancel: true }; }
+    // Pi appends <read-files>/<modified-files> to the summary; that text should
+    // stay prose, and this preparation is the last hook before Pi builds it.
+    event.preparation.fileOps.read.clear();
+    event.preparation.fileOps.written.clear();
+    event.preparation.fileOps.edited.clear();
   });
   pi.on("session_compact", (event, ctx) => {
     if (!attempt) {
