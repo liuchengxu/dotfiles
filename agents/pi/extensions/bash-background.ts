@@ -98,18 +98,29 @@ type SharedRunning = { [runningKey]?: RunningBgTask[] };
 export const bgHintText = (tmux: boolean): string =>
 	tmux ? "Ctrl+B Ctrl+B to run in background" : "Ctrl+B to run in background";
 
+/** Render-boundary redaction: credentials never print where this extension
+ * draws text — rows, tails, dock labels, notifications, toasts. Redaction
+ * happens before any width cut, so a truncated preview cannot expose a
+ * password prefix. Tool inputs, delivered notification payloads, and the
+ * session file keep the originals. */
+export function redactSecrets(text: string): string {
+	return text
+		.replace(/[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s@\/]+@[^\s"']+/g, (url) => `${url.split("://")[0]}://<redacted>`)
+		.replace(/(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{36,}(?![A-Za-z0-9_-])/g, "<redacted>");
+}
+
 /** The one sanitizer every dock label crosses — the footer rows here and the
  * subagent-run rows subagent-dock publishes: CSI/OSC/charset/DCS escapes and
  * other control characters become spaces, runs collapse to one, edges trim.
  * Terminal escapes must die here, not at a width cut, or they corrupt the row. */
 export function dockLabel(text: string): string {
-	return text
+	return redactSecrets(text
 		.replace(/\x1b\[[0-9:;<=>?]*[ -/]*[@-~]/g, "")
 		.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
 		.replace(/\x1b[()][0-9A-B]/g, "")
 		.replace(/\x1b[P^_][\s\S]*?(?:\x1b\\|\x07)/g, "")
 		.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
-		.replace(/ +/g, " ").trim();
+		.replace(/ +/g, " ").trim());
 }
 
 export function dockTask(task: BgTask): RunningBgTask {
@@ -291,7 +302,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 		sendNotification(task, summary, lastOutput);
 	}
 
-	function sendNotification(task: BgTask, summary: string, lastOutput?: string): void {
+	function sendNotification(task: BgTask, summary: string, lastOutput?: string, displayTail?: string): void {
 		const duration = Math.round((Date.now() - task.startedAt) / 1000);
 		const parts = [
 			`<bg-task-notification>`,
@@ -307,7 +318,10 @@ export default function bashBackground(pi: ExtensionAPI) {
 		if (lastOutput !== undefined) parts.push(`Last output:\n${lastOutput.trimEnd()}`);
 		const message: NoticeMessage = {
 			customType: "bg-task-notification",
-			details: { id: task.id, label: task.description ?? "Background command", state: task.state, summary },
+			// tailPreview is the display twin of the raw tail: redaction needs the
+			// whole string, because a width cut can split the very URL it hides.
+			details: { id: task.id, label: task.description ?? "Background command", state: task.state, summary,
+				...(lastOutput !== undefined ? { tailPreview: redactSecrets(displayTail ?? lastOutput).slice(-400).trimEnd() } : {}) },
 			content: parts.filter(Boolean).join("\n"),
 			display: true,
 		};
@@ -354,7 +368,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			const tail = tailBytes(call.logPath, STALL_TAIL_BYTES);
 			if (looksLikePrompt(tail) && !call.stallNotified) {
 				call.stallNotified = true;
-				notifyUser?.(`"${call.description ?? call.command.slice(0, 40)}" appears to be waiting for interactive input (Ctrl+B to background it)`);
+				notifyUser?.(redactSecrets(`"${call.description ?? redactSecrets(call.command).slice(0, 40)}" appears to be waiting for interactive input (Ctrl+B to background it)`));
 				clearInterval(timer);
 			}
 		}, STALL_CHECK_MS);
@@ -382,6 +396,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 					task,
 					`"${task.description ?? task.command.slice(0, 40)}" appears to be waiting for interactive input`,
 					tail.slice(-400),
+					tail,
 				);
 				clearInterval(timer);
 			}
@@ -721,24 +736,22 @@ export default function bashBackground(pi: ExtensionAPI) {
 		theme: { fg: (token: string, text: string) => string; bold: (text: string) => string },
 		expanded = false,
 		cwd?: string,
-		detailsCollapsed = false,
 		manualHint = false,
 	): Component {
-		const description = typeof args.description === "string" ? args.description : "bash";
-		const command = typeof args.command === "string" ? args.command : "";
+		const description = redactSecrets(typeof args.description === "string" ? args.description : "bash").replace(/\s+/g, " ").trim();
+		const command = redactSecrets(typeof args.command === "string" ? args.command : "");
 		if (expanded) {
 			const lines = [description, `  ⎿ $ ${command}`];
 			if (cwd) lines.push(`  ⎿ cwd ${cwd}`);
 			return new Text(lines.join("\n"), 0, 0);
 		}
+		// Collapsed: one label line. The command and its output stay behind
+		// Ctrl+O; the activity summary already counts the work.
 		return {
 			render(width) {
 				if (width <= 0) return [];
-				// Collapsed: label line, then the first command line on its own row
-				// so long commands stay readable instead of truncating into the label.
 				return [
-					theme.fg("toolTitle", description.replace(/\s+/g, " ").trim()),
-					...(!detailsCollapsed ? [theme.fg("accent", `  ⎿ $ ${command.split(/\r?\n/).find(line => line.trim())?.trim() ?? ""}`)] : []),
+					theme.fg("toolTitle", description),
 				...(manualHint ? [theme.fg("dim", `  ${bgHintText(Boolean(process.env.TMUX))}`)] : []),
 				].map(line => truncateToWidth(line, width));
 			},
@@ -852,6 +865,56 @@ export default function bashBackground(pi: ExtensionAPI) {
 		return name;
 	}
 
+	// gh reads are probes like grep: they vanish when they succeed. Anything
+	// that changes GitHub state (merge, comment, create, rerun) keeps its row.
+	const READ_ONLY_GH = new Map([
+		["pr", new Set(["view", "list", "diff", "checks", "status"])],
+		["issue", new Set(["view", "list", "status"])],
+		["run", new Set(["view", "list", "watch"])],
+		["repo", new Set(["view"])],
+		["release", new Set(["view", "list"])],
+		["label", new Set(["list"])],
+		["milestone", new Set(["list"])],
+		["search", new Set(["prs", "issues", "repos", "code", "commits"])],
+		["auth", new Set(["status"])],
+		["workflow", new Set(["view", "list"])],
+	]);
+	// `gh api` reads only with a GET (or default) method and no field or
+	// input flag; pflag's attached and clustered forms all count as evidence.
+	function readOnlyGh(tokens: string[]): boolean {
+		let index = 0;
+		const positional: string[] = [];
+		while (index < tokens.length) {
+			const token = tokens[index];
+			if (token === "-R" || token === "--repo" || token === "--hostname") { index += 2; continue; }
+			if (token === "-X" || token === "--method") {
+				if ((tokens[index + 1] ?? "").toUpperCase() !== "GET") return false;
+				index += 2; continue;
+			}
+			if (/^--/.test(token) || /^-[^-]/.test(token)) { index += 1; continue; }
+			positional.push(token);
+			index += 1;
+		}
+		if (!positional.length) return false;
+		const [group, sub] = positional;
+		if (group === "api") {
+			// pflag accepts --method=DELETE, -XDELETE and -ftitle=x; attached
+			// values must count as method or body evidence, or a write hides.
+			const method = tokens.some((token, i) => {
+				if (token === "-X" || token === "--method") return (tokens[i + 1] ?? "").toUpperCase() !== "GET";
+				if (/^-X.+/.test(token)) return token.slice(2).toUpperCase() !== "GET";
+				if (/^--method=.+/.test(token)) return token.slice(9).toUpperCase() !== "GET";
+				// pflag clusters short flags: -iXDELETE is --include + method.
+				const cluster = /^-([^-]+)X(.*)$/.exec(token);
+				if (cluster) return (cluster[2] || (tokens[i + 1] ?? "")).toUpperCase() !== "GET";
+				return false;
+			});
+			const body = tokens.some(token => /^-[a-zA-Z]*[fF]/.test(token) || /^--(?:field|raw-field|input)(?:=|$)/.test(token));
+			return !method && !body;
+		}
+		return READ_ONLY_GH.get(group)?.has(sub ?? "") === true;
+	}
+
 	function readOnlySegment(segment: string): boolean {
 		// Redirections, heredoc-to-file forms, command substitution and
 		// backticks all escape the allowlist: keep the row.
@@ -860,6 +923,11 @@ export default function bashBackground(pi: ExtensionAPI) {
 		while (tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[0])) tokens.shift();
 		if (!tokens.length) return false;
 		const name = commandName(tokens[0]);
+		// Quotes, parameter, brace and pathname expansion hide flags from a
+		// whitespace tokenizer ('--method=DELETE', $F, {-X,DELETE}, -?DELETE);
+		// until classification is shell-aware, any of these metacharacters in a
+		// gh segment keeps its row.
+		if (name === "gh") return !/['"\\${}*?[\]]/.test(segment) && readOnlyGh(tokens.slice(1));
 		if (name === "git") {
 			let index = 1;
 			let subcommand = "";
@@ -932,7 +1000,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 		return task ? taskElapsed(task) : "";
 	}
 
-	function taskElapsed(task: BgTask): string {
+function taskElapsed(task: BgTask): string {
 		if (!task.processAlive && task.finishedAt === undefined) return "";
 		const seconds = Math.max(0, Math.floor(((task.finishedAt ?? Date.now()) - (task.executionStartedAt ?? task.startedAt)) / 1000));
 		const minutes = Math.floor(seconds / 60);
@@ -1009,7 +1077,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 	const mutationTools = new Set(["write", "edit", "bg_kill", "bg_watch"]);
 	// Mutation-shaped names keep a row even for tools this extension has
 	// never seen: an mcp create/delete/write is a state change, not a probe.
-	const MUTATION_NAME = /write|create|update|delete|remove|edit|put|post|patch|apply|save|upload|send|kill|move|copy/i;
+	const MUTATION_NAME = /write|create|update|delete|remove|edit|put|post|patch|apply|save|upload|send|kill|move|copy|deploy|publish|merge|approve|submit/i;
 	function persistsWhenDone(name: string, args: Record<string, unknown> | undefined): boolean {
 		if (mutationTools.has(name) || MUTATION_NAME.test(name)) return true;
 		if (name === "bash") return !readOnlyInspection(String(args?.command ?? ""));
@@ -1034,16 +1102,11 @@ export default function bashBackground(pi: ExtensionAPI) {
 					(typeof input.description !== "string" || !input.description.trim())) {
 					return new Container();
 				}
-				// The turn settled and the activity summary carries the count:
-				// the folded rows come back with Ctrl+O.
-				if (!context.expanded && !context.isPartial && !context.isError && context.state?.folded) {
-					return new Container();
-				}
 				if (!context.expanded && context.state?.causal) {
-					const name = typeof input.description === "string" && input.description.trim()
+					const name = redactSecrets(typeof input.description === "string" && input.description.trim()
 						? input.description.trim()
-						: "bash";
-					const hint = (String(input.command ?? "").split(/\r?\n/).find(line => line.trim()) ?? "").trim();
+						: "bash");
+					const hint = redactSecrets(String(input.command ?? "").split(/\r?\n/).find(line => line.trim()) ?? "").trim();
 					return {
 						render(width) {
 							return width > 0 ? [truncateToWidth(theme.fg("muted", `└ ${name.replace(/\s+/g, " ")}${hint ? ` · ${hint}` : ""}`), width)] : [];
@@ -1057,7 +1120,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 				}
 				const call = context.toolCallId ? active.get(context.toolCallId) : undefined;
 				const hintRequested = call?.state === "foreground" && call.hintRequested;
-				return operationHeader(renderBashCall(input, theme, context.expanded, context.cwd, context.state?.detailsCollapsed === true && !context.isPartial, hintRequested), theme, context);
+				return operationHeader(renderBashCall(input, theme, context.expanded, context.cwd, hintRequested), theme, context);
 			}
 			if (context.expanded) return (next() ?? builtInRenderers[toolName])?.renderCall?.(args, theme, forDelegate(context)) ?? new Text(`${toolName}\n${JSON.stringify(args, null, 2)}`, 0, 0);
 			const input = args as Record<string, unknown>;
@@ -1076,7 +1139,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			const describe = () => {
 				let label = labels[toolName] ?? toolName.replace(/^mcp__/, "").replace(/[_-]+/g, " ");
 				const path = worktreePath(value("path"));
-				let detail = path || value("query") || value("pattern") || value("id");
+				let detail = redactSecrets(path || value("query") || value("pattern") || value("id"));
 				if (toolName === "write") {
 					label = `Write (${path || "file"})`;
 					detail = "";
@@ -1094,22 +1157,23 @@ export default function bashBackground(pi: ExtensionAPI) {
 
 				} else if (toolName === "codemode") {
 					const lines = value("code").split("\n");
-					label = lines.map(line => /^\s*\/\/\s?(.*)$/.exec(line)?.[1]).find(text => text?.trim())?.trim() || label;
+					const comment = lines.map(line => /^\s*\/\/\s?(.*)$/.exec(line)?.[1]).find(text => text?.trim())?.trim();
+					label = comment ? redactSecrets(comment) : label;
 					const aggregate = context.toolCallId ? nestedEdits.get(context.toolCallId) : undefined;
 					if (aggregate) {
 						const counts = colorChangeSummary(formatChangeCounts(aggregate), theme);
 						const files = `${aggregate.files.size} file${aggregate.files.size === 1 ? "" : "s"}`;
 						label = `${label} (${counts ? `${counts} · ` : ""}${files})`;
 					}
-					detail = "js " + (lines.find(line => line.trim() && !/^\s*\/\//.test(line)) ?? "").trim();
+					detail = redactSecrets("js " + (lines.find(line => line.trim() && !/^\s*\/\//.test(line)) ?? "").trim());
 				} else if (toolName === "edit") {
 					label = `Update ${path || "file"}`;
 					detail = "";
 				} else if (toolName === "bg_watch") {
-					label = value("description") || label;
-					detail = value("command");
+					label = redactSecrets(value("description")) || label;
+					detail = redactSecrets(value("command"));
 				} else if (toolName.startsWith("mcp__")) {
-					label = value("instruction") || label;
+					label = redactSecrets(value("instruction")) || label;
 					detail = toolName;
 				}
 				return { label, detail };
@@ -1121,7 +1185,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 					const action = context.isError ? "Could not stop" : task?.processAlive
 						? task.killRequested ? "Stopping" : "Stop"
 						: task?.state === "killed" ? "Stopped" : task ? "Already finished" : "Stop";
-					return `${action}: ${task?.description ?? value("id") ?? "background task"}`;
+					return `${action}: ${redactSecrets(task?.description ?? value("id") ?? "background task")}`;
 				}
 				if (toolName === "write") {
 					const summary = context.state?.editLineSummary;
@@ -1208,11 +1272,11 @@ export default function bashBackground(pi: ExtensionAPI) {
 						// name the worktree the footer already names, twice.
 						const relPath = rawPath ? worktreePath(rawPath) : "";
 						const label = context.state?.detailsCollapsed && typeof args?.description === "string" && args.description.trim()
-							? args.description.trim().replace(/\s+/g, " ")
+							? redactSecrets(args.description.trim()).replace(/\s+/g, " ")
 							: context.state?.detailsCollapsed && relPath ? `${verbs[toolName] ?? toolName} ${relPath}` : verbs[toolName] ?? toolName;
 						// The tool's own message embeds the path it was given; show it the way the
 						// row names it, so one screen does not carry both forms.
-						const text = rawPath && relPath && relPath !== rawPath ? error.split(rawPath).join(relPath) : error;
+						const text = redactSecrets(rawPath && relPath && relPath !== rawPath ? error.split(rawPath).join(relPath) : error);
 						return width > 0 ? [truncateToWidth(theme.fg("error", `✗ ${label}: ${text.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")}`), width)] : [];
 					},
 					invalidate() {},
@@ -1253,7 +1317,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 					if (!tail.length) return new Container();
 					return {
 						render(width) {
-							return width > 0 ? tail.map(line => truncateToWidth(theme.fg("dim", `  ${line}`), width)) : [];
+							return width > 0 ? tail.map(line => truncateToWidth(theme.fg("dim", `  ${redactSecrets(line)}`), width)) : [];
 						},
 						invalidate() {},
 					};
@@ -1268,10 +1332,10 @@ export default function bashBackground(pi: ExtensionAPI) {
 						// The call row may have vanished as a read-only probe; the
 						// handoff row is then the only place the work is named.
 						const args = (context as { args?: { description?: unknown; command?: unknown } }).args;
-						const name = typeof args?.description === "string" && args.description.trim()
+						const name = redactSecrets(typeof args?.description === "string" && args.description.trim()
 							? args.description.trim()
-							: (String(args?.command ?? "").split(/\r?\n/).find(line => line.trim()) ?? "").trim();
-						const headingHidden = context.state?.causal || context.state?.folded
+							: (String(args?.command ?? "").split(/\r?\n/).find(line => line.trim()) ?? "").trim());
+						const headingHidden = context.state?.causal
 							|| readOnlyInspection(String(args?.command ?? ""));
 						return {
 							render(width) {
@@ -1789,7 +1853,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			const rows = [...tasks.values()]
 				.map(
 					(task) =>
-						`${task.id}  ${task.state}\n  \u23BF ${task.description ?? task.command.slice(0, 60)}\n    ${task.command.slice(0, 70)}  ${task.logPath}`,
+						`${task.id}  ${task.state}\n  \u23BF ${redactSecrets(task.description ?? task.command).slice(0, 60)}\n    ${redactSecrets(task.command).slice(0, 70)}  ${task.logPath}`,
 				)
 				.join("\n");
 			ctx.ui.notify(rows || "No background tasks.", "info");
@@ -1797,7 +1861,13 @@ export default function bashBackground(pi: ExtensionAPI) {
 	});
 
 	pi.registerMessageRenderer("bg-task-notification", (message, options, theme) => {
-		const text = typeof message.content === "string" ? message.content : JSON.stringify(message.content);
+		// The delivered payload keeps raw text for the agent; redaction is a
+		// property of the screen, applied here at the render boundary.
+		const raw = typeof message.content === "string" ? message.content : JSON.stringify(message.content);
+		const preview = (message.details as { tailPreview?: string } | undefined)?.tailPreview;
+		// A callback inserts the preview literally; a replacement string would
+		// interpret $& in captured output and reinsert the raw tail.
+		const text = redactSecrets(preview !== undefined ? raw.replace(/(Last output:\n)[\s\S]*$/, (_match, head) => head + preview) : raw);
 		if (options.expanded) return new Text(text, 0, 0);
 		const details = message.details as { id?: string; label?: string; state?: string; summary?: string } | undefined;
 		const id = details?.id ?? /<id>(.*?)<\/id>/.exec(text)?.[1] ?? "?";
@@ -1813,7 +1883,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			render(width) {
 				if (width <= 0) return [];
 				if (["completed", "failed", "killed"].includes(state ?? "") && renderedBackgroundOutcomes.has(id)) return [];
-				return [truncateToWidth(theme.fg(color, `${icon} Background command "${details?.label ?? id}" ${outcome}`.replace(/\s+/g, " ")), width)];
+				return [truncateToWidth(theme.fg(color, `${icon} Background command "${redactSecrets(details?.label ?? id)}" ${redactSecrets(outcome)}`.replace(/\s+/g, " ")), width)];
 			},
 			invalidate() {},
 		};
@@ -2001,7 +2071,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 				ctx.ui.setStatus(
 					"bg-nested",
 					running > 0
-						? ctx.ui.theme.fg("muted", `\u23BF ${last} (+${running - 1})`)
+						? ctx.ui.theme.fg("muted", `\u23BF ${redactSecrets(last)} (+${running - 1})`)
 						: undefined,
 				);
 			} catch {
@@ -2014,9 +2084,9 @@ export default function bashBackground(pi: ExtensionAPI) {
 			const args = event.args && typeof event.args === "object" ? event.args as Record<string, unknown> : {};
 			const hint =
 				typeof args.command === "string"
-					? String(args.command).slice(0, 40)
+					? redactSecrets(String(args.command)).slice(0, 40)
 					: typeof args.path === "string"
-						? String(args.path).slice(-40)
+						? redactSecrets(String(args.path)).slice(-40)
 						: "";
 			last = `${event.toolName}${hint ? ` ${hint}` : ""}`;
 			show();

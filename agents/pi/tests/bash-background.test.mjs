@@ -13,7 +13,7 @@ const jiti = createJiti(import.meta.url, { alias: {
   "@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
   "@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
-const { default: extension, dockTask, bgHintText } = await jiti.import(new URL("../extensions/bash-background.ts", import.meta.url).pathname);
+const { default: extension, dockTask, bgHintText, redactSecrets } = await jiti.import(new URL("../extensions/bash-background.ts", import.meta.url).pathname);
 
 test("a dock label is one line: edge newlines that pass validation are stripped from the description", () => {
   const task = { id: "bg-1", command: "sleep 1", description: "\nRun a short check\n", startedAt: 0, state: "running" };
@@ -99,6 +99,7 @@ test("bg_wait for an unknown task falls through to pi-subagents", () => {
 function session() {
   const handlers = new Map();
   const tools = new Map();
+  const messageRenderers = new Map();
   const sent = [];
   const renderers = [];
   const inputHandlers = [];
@@ -112,7 +113,8 @@ function session() {
     },
     registerTool(tool) { tools.set(tool.name, tool); },
     sendMessage(message, options) { sent.push({ message, options }); },
-    registerCommand() {}, registerMessageRenderer() {},
+    registerCommand() {},
+    registerMessageRenderer(type, renderer) { messageRenderers.set(type, renderer); },
     registerShortcut(id, def) { shortcuts.set(id, def); },
     registerToolRenderer(factory) { renderers.push(factory); },
   });
@@ -132,6 +134,7 @@ function session() {
     sent,
     notices,
     renderer(toolName) { return renderers[0](toolName, () => undefined); },
+    messageRenderer(type) { return messageRenderers.get(type); },
     start() { emit("agent_start", { type: "agent_start" }); },
     /** Registers the terminal-input listener the way a real TUI session does. */
     startTui() {
@@ -340,6 +343,120 @@ test("steered notices leave nothing for settle, even after an error outcome", as
   } finally { s.shutdown(); }
 });
 
+test("routine GitHub reads fold, but mutations, mutation-named tools and failures remain", () => {
+  const s = session();
+  try {
+    const theme = { fg: (_color, text) => text, bold: text => text };
+    const render = (tool, args, extra = {}) => s.renderer(tool).renderCall(args, theme, {
+      args, state: {}, expanded: false, isPartial: false, isError: false, ...extra,
+    }).render(160);
+    for (const command of ["gh pr view 42 --json title", "gh issue list --repo owner/repo", "gh run view 123 --log-failed", "gh api repos/owner/repo/pulls --paginate", "gh api -X GET repos/owner/repo/issues"]) {
+      const args = { command, description: "Inspect GitHub state" };
+      assert.deepEqual(render("bash", args), [], command);
+      assert.match(render("bash", args, { expanded: true }).join("\n"), new RegExp(command.replaceAll(".", "\\.")), "Ctrl+O shows the command text of " + command);
+      assert.ok(render("bash", args, { isError: true }).length, "failure stays: " + command);
+    }
+    for (const command of ["cat README.md", "git status --short", "rg -n pattern agents/", "gh api --method=GET repos/owner/repo/issues"]) {
+      assert.deepEqual(render("bash", { command, description: "Inspect state" }), [], command);
+    }
+    for (const command of ["gh api -X GET repos/owner/repo", "gh api --method=GET repos/owner/repo", "gh api -XGET repos/owner/repo"]) {
+      assert.deepEqual(render("bash", { command, description: "Fetch state" }), [], command);
+    }
+    for (const command of ["gh api repos/o/r/git/refs/heads/topic -?DELETE", "gh api repos/o/r/*", "gh api repos/o/r/git/[r]efs", "gh api repos/o/r/git/refs/heads/topic {-X,DELETE}", "gh api $FLAGS repos/o/r", "gh api repos/o/r/git/refs/heads/topic '--method=DELETE'", "gh api repos/o/r/issues '-ftitle=new'", 'gh pr merge 42', "gh pr comment 42 --body approved", "gh api repos/o/r/issues -f title=new", "gh api graphql -f query=mutation", "gh api -X DELETE repos/o/r", "gh api --method=DELETE repos/o/r", "gh api -XDELETE repos/o/r", "gh api repos/o/r/git/refs/heads/topic -iXDELETE", "gh api repos/o/r/git/refs/heads/topic -iX DELETE", "gh api -ftitle=x repos/o/r", "gh api -Fnum=1 repos/o/r", "gh api --field=title=x repos/o/r", "gh api --input=payload.json repos/o/r", "gh api --method=POST repos/o/r", "gh run rerun 1", "git push", "printf x > .env", "python3 check.py"]) {
+      assert.ok(render("bash", { command, description: "Perform requested operation" }).length, command);
+    }
+    for (const tool of ["mcp__slack__post_message", "mcp__service__deploy", "mcp__github__merge_pull_request"]) {
+      assert.ok(render(tool, {}).length, tool + " must not disappear on success");
+    }
+  } finally { s.shutdown(); }
+});
+
+test("collapsed calls are one-line labels with URL credentials omitted from previews", () => {
+  const s = session();
+  try {
+    const theme = { fg: (_color, text) => text, bold: text => text };
+    const url = "https://user:password@rpc.example.test/btc/secret-path?key=secret-query";
+    const args = { command: `curl '${url}'`, description: `Check endpoint ${url}` };
+    const context = { args, state: {}, isPartial: true, expanded: false, isError: false };
+    const renderer = s.renderer("bash");
+    const lines = renderer.renderCall(args, theme, context).render(200);
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /Check endpoint/);
+    assert.doesNotMatch(lines.join("\n"), /password|secret-path|secret-query/);
+    assert.ok(args.command.includes(url), "display changes must not alter execution inputs");
+    const error = renderer.renderResult({ content: [{ type: "text", text: `Error contacting ${url}` }] }, { expanded: false }, theme, { ...context, isPartial: false, isError: true });
+    assert.match(error.render(200).join("\n"), /Error contacting/);
+    assert.doesNotMatch(error.render(200).join("\n"), /password|secret-path|secret-query/);
+  } finally { s.shutdown(); }
+});
+
+test("causal names and dock labels redact credentials, including ghp_ tokens", () => {
+  const secret = "https://user:password@rpc.example.test/btc  token ghp_16C7e42F292c6912E7710c838347Ae178B4a";
+  const s = session();
+  try {
+    const theme = { fg: (_color, text) => text, bold: text => text };
+    const args = { command: "python3 check.py", description: `Check endpoint ${secret}` };
+    const causal = s.renderer("bash").renderCall(args, theme, { args, state: { causal: true }, expanded: false, isPartial: false, isError: false }).render(200).join("\n");
+    assert.doesNotMatch(causal, /password|ghp_[0-9A-Za-z]+/);
+    assert.match(causal, /Check endpoint https:\/\/<redacted>/);
+    const dock = dockTask({ id: "bg-1", command: `curl '${secret}'`, description: `Watch ${secret}`, startedAt: 0, state: "running" });
+    assert.doesNotMatch(dock.label, /password|ghp_[0-9A-Za-z]+/);
+    assert.match(dock.label, /Watch https:\/\/<redacted>/);
+  } finally { s.shutdown(); }
+});
+
+test("opaque tokens with trailing hyphens redact; short runs stay; long passwords survive width cuts", () => {
+  const hyphens = "A".repeat(32) + "-".repeat(16);
+  const short = "B".repeat(35);
+  const theme = { fg: (_color, text) => text, bold: text => text };
+  const s = session();
+  try {
+    for (const secret of [hyphens, `https://user:${"pw.".repeat(30)}@example.test/x`]) {
+      const label = s.renderer("bash").renderCall({ command: "python3 probe.py", description: `Probe ${secret}` }, theme, { args: {}, state: {}, expanded: false, isPartial: false, isError: false }).render(200).join("\n");
+      assert.doesNotMatch(label, /user:|A{16}/, "credential material must not print");
+    }
+    const keeps = s.renderer("bash").renderCall({ command: "python3 probe.py", description: `Probe ${short}` }, theme, { args: {}, state: {}, expanded: false, isPartial: false, isError: false }).render(200).join("\n");
+    assert.match(keeps, new RegExp(short), "a 35-character run is not a credential");
+    const dock = dockTask({ id: "bg-1", command: `curl https://user:${"q.".repeat(40)}@h/x`, description: "Watch", startedAt: 0, state: "running" });
+    assert.doesNotMatch(dock.label, /user:/);
+  } finally { s.shutdown(); }
+});
+
+test("a codemode script without a comment renders its fallback label without throwing", () => {
+  const s = session();
+  try {
+    const theme = { fg: (_color, text) => text, bold: text => text };
+    for (const code of ["const x = 1;", ""]) {
+      const row = s.renderer("codemode").renderCall({ code }, theme, { args: { code }, state: {}, expanded: false, isPartial: true, isError: false }).render(120).join("\n");
+      assert.match(row, /Run tool script/, "running without a comment shows the fallback label for " + JSON.stringify(code));
+    }
+    const commented = s.renderer("codemode").renderCall({ code: "// Check https://user:pw@h/x\nconst x = 1;" }, theme, { args: {}, state: {}, expanded: false, isPartial: true, isError: false }).render(200).join("\n");
+    assert.match(commented, /Check https:\/\/<redacted>/);
+    assert.doesNotMatch(commented, /user:pw/);
+  } finally { s.shutdown(); }
+});
+
+test("the notification renderer redacts a stall tail longer than the payload cut", () => {
+  const s = session();
+  try {
+    const renderer = s.messageRenderer("bg-task-notification");
+    assert.ok(renderer, "bg-task-notification renderer registered");
+    const fullTail = `https://user:${"pw.".repeat(140)}@example.test/private\n$&\nPassword:`;
+    const payloadTail = fullTail.slice(-400);
+    assert.match(redactSecrets(payloadTail), /pw\./, "sanity: a cut tail can no longer be recognized, hence the whole-tail preview");
+    const preview = redactSecrets(fullTail).slice(-400).trimEnd();
+    const message = {
+      content: `<bg-task-notification>\n<id>bg-1</id>\n<summary>waiting for interactive input</summary>\n</bg-task-notification>\nLast output:\n${payloadTail}`,
+      details: { id: "bg-1", label: "Probe endpoint", state: "running", summary: "waiting for interactive input", tailPreview: preview },
+    };
+    const theme = { fg: (_c, t) => t };
+    for (const expanded of [true, false]) {
+      const rows = renderer(message, { expanded, outputPad: 0 }, theme).render(300).join("\n");
+      assert.doesNotMatch(rows, /user:|pw\./, `no credential material in ${expanded ? "expanded" : "collapsed"} view`);
+    }
+  } finally { s.shutdown(); }
+});
+
 test("expanding a collapsed tool row does not hand our component to the built-in renderer", () => {
   const s = session();
   try {
@@ -463,13 +580,13 @@ test("a background task is one row: the header carries its id, time, and exit", 
     assert.match(header(), new RegExp(`Wait then fail · ${id} · \\d+s$`));
     assert.doesNotMatch(header(), /Running/, "the spinner says it");
     assert.deepEqual(handoff(), [], "no second row while the header is visible");
-    assert.match(handoff({ folded: true })[0], new RegExp(`^↳ Wait then fail · ${id} · Running · \\d+s$`), "a row without the spinner says Running");
+    assert.match(handoff({ causal: true })[0], new RegExp(`^↳ Wait then fail · ${id} · Running · \\d+s$`), "a row without the spinner says Running");
     writeFileSync(release, "");
     await s.finish(id);
     assert.match(header(), new RegExp(`^✗ Wait then fail · ${id} · Failed \\(exit code 2\\) · \\d+s$`));
     assert.deepEqual(handoff(), []);
     assert.match(renderer.renderCall(args, theme, context).render(40)[0], /Failed \(exit code 2\)/, "a narrow row cuts the time, not the exit code");
-    assert.match(handoff({ folded: true })[0], new RegExp(`^↳ Wait then fail · ${id} · Failed \\(exit code 2\\) · \\d+s$`), "a hidden header leaves one named row");
+    assert.match(handoff({ causal: true })[0], new RegExp(`^↳ Wait then fail · ${id} · Failed \\(exit code 2\\) · \\d+s$`), "a hidden header leaves one named row");
   } finally {
     rmSync(release, { force: true });
     s.shutdown();

@@ -343,31 +343,6 @@ function patchHost(): void {
   // A failed turn names its own steps: mark the last few finished tool rows
   // so their renderers draw a muted causal line instead of vanishing.
   const causalKey = Symbol.for("pi.disclosure.causal");
-  // A settled turn needs no per-command rows: the frozen activity summary
-  // already says "ran N commands". Two or more finished foreground bash
-  // steps fold away together, the way Claude Code shows "Run 2 shell
-  // commands"; failures and background handoffs stay, and Ctrl+O restores.
-  function foldFinishedCommands(host: any, turnOnly: boolean) {
-    const foldable: any[] = [];
-    for (const child of [...host.chatContainer.children].reverse()) {
-      if (turnOnly
-        && (child instanceof AssistantMessageComponent
-          || child instanceof UserMessageComponent
-          || child instanceof CustomMessageComponent
-          || child instanceof BashExecutionComponent)) break;
-      if (!(child instanceof ToolExecutionComponent)) continue;
-      if (child.toolName !== "bash" || child.result?.isError) continue;
-      if (child.result?.details?.handoff) continue;
-      if (child.rendererState.causal) continue;
-      foldable.push(child);
-    }
-    if (foldable.length < 2) return;
-    for (const child of foldable) {
-      child.rendererState.folded = true;
-      child.invalidate();
-    }
-  }
-
   function collapseFinishedDetails(host: any) {
     for (const child of host.chatContainer.children) {
       if (!(child instanceof ToolExecutionComponent) || !child.result || child.isPartial) continue;
@@ -404,7 +379,6 @@ function patchHost(): void {
     (proto as any).renderSessionItems = function (...args: any[]) {
       const result = renderSessionItems.apply(this, args);
       collapseFinishedDetails(this);
-      foldFinishedCommands(this, false);
       return result;
     };
   }
@@ -416,9 +390,6 @@ function patchHost(): void {
       collapseFinishedDetails(this);
     }
     if (event?.type === "message_end" && failedAssistant(event.message)) causalTail(this);
-    if (event?.type === "message_end"
-      && event.message?.role === "assistant"
-      && !failedAssistant(event.message)) foldFinishedCommands(this, true);
     const result = await handleEvent.call(this, event);
     if (event.type === "message_start" && event.message.role === "assistant" && this.streamingComponent) {
       this.streamingComponent.setExpanded(Boolean(this.toolOutputExpanded));
@@ -452,7 +423,6 @@ function patchHost(): void {
   proto.addMessageToChat = function (...args: any[]) {
     if (["assistant", "user"].includes(args[0]?.role)) collapseFinishedDetails(this);
     if (failedAssistant(args[0])) causalTail(this);
-    if (args[0]?.role === "assistant" && !failedAssistant(args[0])) foldFinishedCommands(this, true);
     const existing = new Set(this.chatContainer.children);
     const result = addMessageToChat.apply(this, args);
     for (const child of this.chatContainer.children) {
