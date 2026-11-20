@@ -13,6 +13,10 @@ export interface SubagentRow {
 	id: string;
 	agent: string;
 	goal: string;
+	/** Newest transcript activity, refreshed by subagent-dock while running. */
+	progress?: string;
+	/** Model summary of `progress`; shown in its place once it arrives. */
+	brief?: string;
 	startedAt: number;
 	endedAt?: number;
 	state: "running" | "done" | "failed" | "stopped";
@@ -138,6 +142,70 @@ export function clearRegistry(): void {
 	registry().launches.clear();
 }
 
+/** The newest tool activity in a run-transcript tail: an assistant toolCall
+ * renders as `name primary-argument`, a toolResult as `name first text`;
+ * whichever record appears last wins, so a call with no result yet is what
+ * the run is doing now. dockLabel strips escapes and redacts secrets. */
+export function lastToolLine(tail: string): string | undefined {
+	const lines = tail.split("\n");
+	for (let i = lines.length - 1; i >= 0; i--) {
+		const line = lines[i].trim();
+		if (!line) continue;
+		let entry: Record<string, unknown>;
+		try { entry = JSON.parse(line); } catch { continue; }
+		const message = entry.message;
+		if (typeof message !== "object" || message === null) continue;
+		const m = message as { role?: unknown; content?: unknown; toolName?: unknown };
+		if (m.role === "toolResult" && typeof m.toolName === "string") {
+			const text = firstText(m.content);
+			return dockLabel(text ? `${m.toolName} ${text}` : m.toolName);
+		}
+		if (m.role === "assistant" && Array.isArray(m.content)) {
+			for (let j = m.content.length - 1; j >= 0; j--) {
+				const item = m.content[j] as { type?: unknown; name?: unknown; arguments?: unknown };
+				if (item?.type !== "toolCall" || typeof item.name !== "string") continue;
+				const arg = primaryArgument(item.arguments);
+				return dockLabel(arg ? `${item.name} ${arg}` : item.name);
+			}
+		}
+	}
+	return undefined;
+}
+
+function firstText(content: unknown): string {
+	if (typeof content === "string") return content.slice(0, 200);
+	if (Array.isArray(content)) {
+		for (const part of content) {
+			const text = (part as { text?: unknown }).text;
+			if (typeof text === "string" && text) return text.slice(0, 200);
+		}
+	}
+	return "";
+}
+
+function primaryArgument(args: unknown): string {
+	if (typeof args !== "object" || args === null) return "";
+	for (const key of ["command", "path", "query", "pattern", "description"]) {
+		const value = (args as Record<string, unknown>)[key];
+		if (typeof value === "string" && value) return value.slice(0, 200);
+	}
+	return "";
+}
+
+/** Whole words only, greedy by visible width; a word wider than the room is
+ * hard-cut, since a path or command can be one huge token. */
+function truncateWords(text: string, max: number): string {
+	if (max <= 0) return "";
+	if (visibleWidth(text) <= max) return text;
+	let out = "";
+	for (const word of text.split(" ")) {
+		const candidate = out ? `${out} ${word}` : word;
+		if (visibleWidth(candidate) > max) break;
+		out = candidate;
+	}
+	return out || truncateToWidth(text, max, "");
+}
+
 /** One footer line per row in the bg-dock shape; the builder lives here so
  * tests cover it without a TUI. */
 export function subagentLines(
@@ -159,9 +227,22 @@ export function subagentLines(
 					: theme.fg("success", `✓ ${time}`);
 		const head = theme.fg("accent", `${row.agent} ◆ `) + row.goal;
 		const room = width - visibleWidth(suffix) - 1;
-		return room > 0
-			? truncateToWidth(head, room, "") + " " + suffix
-			: truncateToWidth(`${head} ${suffix}`, width, "...");
+		if (room <= 0) {
+			return truncateToWidth(`${head} ${suffix}`, width, "...");
+		}
+		// Words are never torn: the goal keeps whole words within 60% of the
+		// room, and the live activity joins only with a whole word of its own
+		// left in the rest.
+		const prefixWidth = visibleWidth(`${row.agent} ◆ `);
+		const goalText = truncateWords(row.goal, Math.min(room - prefixWidth, Math.floor(room * 0.6)));
+		let left = theme.fg("accent", `${row.agent} ◆ `) + goalText;
+		const live = row.state === "running" ? (row.brief ?? row.progress) : undefined;
+		if (live) {
+			const activityRoom = room - prefixWidth - visibleWidth(goalText) - 3;
+			const activity = activityRoom >= 4 ? truncateWords(live, activityRoom) : "";
+			if (activity) left += theme.fg("dim", ` · ${activity}`);
+		}
+		return left + " " + suffix;
 	});
 	if (rows.length > MAX_ROWS) {
 		lines.push(theme.fg("dim", `+${rows.length - MAX_ROWS} more`));

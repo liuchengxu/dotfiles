@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
@@ -11,7 +12,8 @@ const jiti = createJiti(import.meta.url, { alias: {
 	"@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
 	"@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
-const { applyComplete, applyStarted, clearRegistry, prune, recordLaunch, subagentLines, visibleRows, workflowLabel, LINGER_MS, MAX_ROWS } = await jiti.import(new URL("../extensions/lib/subagent-runs.ts", import.meta.url).pathname);
+const { applyComplete, applyStarted, clearRegistry, lastToolLine, prune, recordLaunch, subagentLines, visibleRows, workflowLabel, LINGER_MS, MAX_ROWS } = await jiti.import(new URL("../extensions/lib/subagent-runs.ts", import.meta.url).pathname);
+const { refreshRunProgress, maybeBrief } = await jiti.import(new URL("../extensions/subagent-dock.ts", import.meta.url).pathname);
 const { stripVTControlCharacters } = await import("node:util");
 
 const theme = { fg: (_token, text) => text };
@@ -81,6 +83,119 @@ test("a cramped row keeps the time beside a truncated goal", () => {
 	const plain = stripVTControlCharacters(line);
 	assert.ok(plain.includes("59s"), `time survives: ${plain}`);
 	assert.ok(plain.length <= 24, `fits the width: ${JSON.stringify(plain)}`);
+});
+
+test("lastToolLine names the newest call or result and redacts secrets", () => {
+	const call = JSON.stringify({ type: "message", message: { role: "assistant", content: [
+		{ type: "toolCall", name: "bash", arguments: { command: "ls -la /tmp", timeout: 20 } } ] } });
+	assert.equal(lastToolLine(call), "bash ls -la /tmp");
+	const result = JSON.stringify({ type: "message", message: { role: "toolResult", toolName: "read", content: [{ type: "text", text: "(50 lines truncated)" }] } });
+	assert.equal(lastToolLine(`${call}\n${result}`), "read (50 lines truncated)", "a result outranks the earlier call");
+	assert.equal(lastToolLine(`{"bad json\n${call}`), "bash ls -la /tmp", "a torn first line is skipped, and so is a trailing bad one");
+	assert.equal(lastToolLine("thinking only\n{}"), undefined, "no tool record yields nothing");
+	const secret = JSON.stringify({ type: "message", message: { role: "assistant", content: [
+		{ type: "toolCall", name: "bash", arguments: { command: "curl https://user:hunter2@host/api" } } ] } });
+	assert.equal(lastToolLine(secret), "bash curl https://<redacted>", "credentials never reach the dock");
+});
+
+test("a running row trails its goal with the live activity inside the width", () => {
+	const line = subagentLines([row({ progress: "bash cargo test -p prover-service" })], 80, theme, 10_000)[0];
+	const plain = stripVTControlCharacters(line);
+	assert.match(plain, /Probe the todo panel · bash cargo test -p prover-service 9s/);
+	const done = subagentLines([row({ progress: "bash cargo test", endedAt: 9_000, state: "done" })], 80, theme, 10_000)[0];
+	assert.ok(!stripVTControlCharacters(done).includes("· "), "a settled row carries no live activity");
+});
+
+test("neither the goal nor the activity is ever cut mid-word", () => {
+	const goal = "Investigate whether a pi extension can customize the todo panel rendering";
+	const progress = "bash sleep 12; echo probe step 3 done";
+	for (const width of [40, 47, 55, 60, 72]) {
+		const plain = stripVTControlCharacters(subagentLines([row({ goal, progress })], width, theme, 60_000)[0]);
+		assert.ok(plain.length <= width, `fits at ${width}: ${JSON.stringify(plain)}`);
+		assert.ok(plain.includes("59s"), `time survives at ${width}: ${plain}`);
+		const [shownGoal, shownActivity] = plain.replace(/ 59s$/, "").split(" · ");
+		assert.ok(goal.startsWith(shownGoal.trim().replace(/^.*?◆ /, "")), `goal is whole words at ${width}: ${shownGoal}`);
+		if (shownActivity !== undefined) {
+			assert.ok(progress.startsWith(shownActivity.trim()), `activity is whole words at ${width}: ${shownActivity}`);
+		}
+	}
+});
+
+test("a row too narrow for the activity shows the goal alone, never a torn word", () => {
+	const plain = stripVTControlCharacters(subagentLines([row({ progress: "read SKILL.md" })], 30, theme, 60_000)[0]);
+	assert.ok(!plain.includes("· "), `activity dropped whole: ${JSON.stringify(plain)}`);
+	assert.ok(/ probe| panel| todo/.test(plain) || !plain.includes("Pro"), `goal ends on a word: ${JSON.stringify(plain)}`);
+	assert.ok(plain.length <= 30 && plain.includes("59s"), `time still survives: ${JSON.stringify(plain)}`);
+});
+
+test("a long goal yields width to the activity, and a cramped row drops it", () => {
+	const long = row({ goal: "Investigate whether a pi extension can customize the todo panel rendering", progress: "read SKILL.md" });
+	const plain = stripVTControlCharacters(subagentLines([long], 60, theme, 60_000)[0]);
+	assert.ok(plain.includes("read SKILL.md"), `activity shares the row: ${plain}`);
+	assert.ok(plain.includes("· ") && plain.length <= 60, `fits: ${JSON.stringify(plain)}`);
+	const cramped = stripVTControlCharacters(subagentLines([row({ progress: "read SKILL.md" })], 26, theme, 60_000)[0]);
+	assert.ok(!cramped.includes("· ") && cramped.length <= 26, `no torn activity: ${JSON.stringify(cramped)}`);
+});
+
+test("the model brief replaces the raw line once it lands, and only for the activity it describes", async () => {
+	const line = subagentLines([row({ progress: "bash sleep 12; echo probe step 3", brief: "waiting between probe steps" })], 80, theme, 10_000)[0];
+	assert.match(stripVTControlCharacters(line), /Probe the todo panel · waiting between probe steps 9s/);
+	const raw = subagentLines([row({ progress: "bash sleep 12; echo probe step 3" })], 80, theme, 10_000)[0];
+	assert.match(stripVTControlCharacters(raw), / · bash sleep 12; echo probe step 3 9s/);
+
+	const calls = [];
+	const registry = {
+		find: () => ({ id: "cheap" }),
+		hasConfiguredAuth: () => true,
+		streamSimple: (_model, context) => {
+			calls.push(context.messages[0].content);
+			return { result: async () => ({ stopReason: "stop", content: [{ type: "text", text: "running cargo tests" }] }) };
+		},
+	};
+	const running = row({ progress: "bash cargo test -p service" });
+	maybeBrief(registry, [running], 10_000);
+	assert.equal(calls.length, 1, "a changed activity earns one call");
+	maybeBrief(registry, [running], 12_000);
+	assert.equal(calls.length, 1, "the same raw line never re-calls");
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(running.brief, "running cargo tests");
+	running.progress = "bash cargo clippy -p service";
+	maybeBrief(registry, [running], 30_000);
+	assert.equal(calls.length, 2, "a changed line calls again past the throttle");
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(running.brief, "running cargo tests", "the in-flight brief for the old line never lands");
+});
+
+test("a missing key or failed call keeps the raw line", async () => {
+	const noAuth = { find: () => undefined, hasConfiguredAuth: () => false, streamSimple: () => { throw new Error("unreachable"); } };
+	const running = row({ progress: "bash cargo test" });
+	maybeBrief(noAuth, [running]);
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(running.brief, undefined);
+});
+
+test("refreshRunProgress resolves a run tree read-only and stamps its newest call", () => {
+	const root = mkdtempSync(join(tmpdir(), "sa-dock-"));
+	try {
+		const runDir = join(root, "--proj--", "2026-11-20T sess-ion", "run-abc");
+		mkdirSync(join(runDir, "run-0"), { recursive: true });
+		mkdirSync(join(runDir, "run-1"), { recursive: true });
+		writeFileSync(join(runDir, "run-0", "session.jsonl"), JSON.stringify({ type: "message", message: { role: "assistant", content: [
+			{ type: "toolCall", name: "read", arguments: { path: "/old/SKILL.md" } } ] } }) + "\n");
+		writeFileSync(join(runDir, "run-1", "session.jsonl"), "junk".repeat(20_000) + "\n" + JSON.stringify({ type: "message", message: { role: "toolResult", toolName: "bash", content: [{ type: "text", text: "3 tests pass" }] } }) + "\n");
+		const running = row({ id: "run-abc" });
+		const done = row({ id: "run-done", endedAt: 1, state: "done" });
+		refreshRunProgress(root, [running, done]);
+		assert.equal(running.progress, "bash 3 tests pass", "the newest run-N wins");
+		assert.equal(done.progress, undefined, "settled rows are not read");
+		running.brief = "stale words";
+		writeFileSync(join(runDir, "run-1", "session.jsonl"), JSON.stringify({ type: "message", message: { role: "toolResult", toolName: "read", content: [{ type: "text", text: "40 lines" }] } }) + "\n");
+		refreshRunProgress(root, [running]);
+		assert.equal(running.progress, "read 40 lines");
+		assert.equal(running.brief, undefined, "a changed activity retires its stale brief");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
 });
 
 test("a workflow row shows its phases, not its own name twice", () => {
