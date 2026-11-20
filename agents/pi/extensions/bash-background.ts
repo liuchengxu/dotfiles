@@ -248,6 +248,28 @@ function looksLikePrompt(text: string): boolean {
 	return /([:>?]\s*$|\?\s*\[y\/n\]\s*:?\s*$|%\s*$|#\s*$|\$\s*$)/.test(lastLine);
 }
 
+/** The one live-tail shaper both bash surfaces read. Strip terminal
+ * control sequences, not only SGR: erase-line and cursor CSI (\x1b[K,
+ * \x1b[?25l), OSC payloads, and lone escapes would otherwise leak as
+ * visible garbage. CRLF is a line ending, not an overwrite (normalized
+ * before the carriage-return rule); a carriage return overwrites a line,
+ * so only its last segment survives; other control characters become
+ * spaces. */
+function streamableTail(text: string): string[] {
+	return text
+		.replace(/\r\n/g, "\n")
+		.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+		.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+		.replace(/\x1b./g, "")
+		.split("\n")
+		.map((line) => {
+			const segments = line.split("\r");
+			return segments[segments.length - 1];
+		})
+		.map((line) => line.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, " ").trimEnd())
+		.filter((line) => line.trim());
+}
+
 export default function bashBackground(pi: ExtensionAPI) {
 	mkdirSync(LOG_DIR, { recursive: true });
 	const tasks = new Map<string, BgTask>();
@@ -1294,26 +1316,7 @@ function taskElapsed(task: BgTask): string {
 					// While the command runs, the tail of its output streams
 					// under the row: the reader watches the work, not a spinner.
 					const text = result.content.filter(block => block?.type === "text").map(block => (block as { text?: string }).text ?? "").join("\n");
-					// Strip terminal control sequences, not only SGR: erase-line
-					// and cursor CSI (\x1b[K, \x1b[?25l), OSC payloads, and lone
-					// escapes would otherwise leak as visible garbage.
-					const tail = text
-						// CRLF is a line ending, not an overwrite: normalize
-						// before the carriage-return rule below.
-						.replace(/\r\n/g, "\n")
-						.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
-						.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
-						.replace(/\x1b./g, "")
-						.split("\n")
-						.map(line => {
-							// A carriage return overwrites the line; only the
-							// last segment of a progress line survives.
-							const segments = line.split("\r");
-							return segments[segments.length - 1];
-						})
-						.map(line => line.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, " ").trimEnd())
-						.filter(line => line.trim())
-						.slice(-3);
+					const tail = streamableTail(text).slice(-3);
 					if (!tail.length) return new Container();
 					return {
 						render(width) {
@@ -1848,8 +1851,25 @@ function taskElapsed(task: BgTask): string {
 	});
 
 	pi.registerCommand("bg", {
-		description: "List the background bash tasks of this session",
-		handler: async (_args, ctx) => {
+		description: "List the background bash tasks of this session; /bg <id> pins one task's live tail in the widget",
+		handler: async (args, ctx) => {
+			const wanted = args.trim();
+			if (wanted !== "") {
+				const id = wanted.startsWith("bg-") ? wanted : `bg-${wanted}`;
+				if (!tasks.has(id)) {
+					ctx.ui.notify(`No such background task: ${id}`, "error");
+					return;
+				}
+				pinnedTask = id;
+				ctx.ui.notify(`Pinned ${id}: deep tail in the live widget until it finishes.`, "info");
+				return;
+			}
+			if (pinnedTask !== undefined) {
+				const was = pinnedTask;
+				pinnedTask = undefined;
+				ctx.ui.notify(`Unpinned ${was}: the widget is back to shallow tails.`, "info");
+				return;
+			}
 			const rows = [...tasks.values()]
 				.map(
 					(task) =>
@@ -1918,6 +1938,78 @@ function taskElapsed(task: BgTask): string {
 			dockTimer = undefined;
 			(globalThis as unknown as SharedRunning)[runningKey] = [];
 			ctx.ui.setStatus("bg-tasks", undefined);
+		});
+	});
+
+	// The live widget: the footer dock names each running task; this widget
+	// above the editor shows the work itself, streaming each task's tail.
+	// `/bg <id>` pins one task for a deeper tail until it finishes.
+	const WIDGET_TAIL_LINES = 4;
+	const PINNED_TAIL_LINES = 10;
+	const WIDGET_LINGER_MS = 60_000;
+	const WIDGET_MAX_TASKS = 4;
+	let pinnedTask: string | undefined;
+	let widgetTimer: ReturnType<typeof setInterval> | undefined;
+
+	function widgetTail(task: BgTask, count: number): string[] {
+		try {
+			return streamableTail(tailBytes(task.logPath, 16384))
+				.slice(-count)
+				.map((line) => redactSecrets(line).slice(0, 200));
+		} catch {
+			// A missing or unreadable log shows the header alone.
+			return [];
+		}
+	}
+
+	function renderBgWidget(ctx: { ui: { setWidget(key: string, lines: string[] | undefined): void } }): void {
+		const now = Date.now();
+		// A pin ends with its task; the deep tail is for watching live work.
+		if (pinnedTask !== undefined && tasks.get(pinnedTask)?.processAlive !== true) pinnedTask = undefined;
+		const ordered = [...tasks.values()].filter((task) => task.processAlive).sort((a, b) => a.startedAt - b.startedAt);
+		const lingered = [...tasks.values()]
+			.filter((task) => !task.processAlive && task.finishedAt !== undefined && now - task.finishedAt < WIDGET_LINGER_MS)
+			.sort((a, b) => a.startedAt - b.startedAt);
+		const pinned = pinnedTask !== undefined ? tasks.get(pinnedTask) : undefined;
+		const visible = [
+			...(pinned ? [pinned] : []),
+			...ordered.filter((task) => task !== pinned).slice(-(pinned ? WIDGET_MAX_TASKS - 1 : WIDGET_MAX_TASKS)),
+			...lingered.slice(-2),
+		];
+		const lines: string[] = [];
+		for (const task of visible) {
+			const label = dockLabel(task.description ?? task.command).slice(0, 80);
+			if (task.processAlive) {
+				const mark = task === pinned ? "◆" : ["⠋", "⠙", "⠹", "⠸"][Math.floor(now / 500) % 4];
+				lines.push(`${mark} ${task.id} ${taskElapsed(task)} ${label}`);
+				lines.push(...widgetTail(task, task === pinned ? PINNED_TAIL_LINES : WIDGET_TAIL_LINES).map((line) => `  ${line}`));
+			} else {
+				const mark = task.state === "failed" ? "✗" : task.state === "killed" ? "■" : "✔";
+				lines.push(`${mark} ${task.id}${task.exit ? ` exit ${exitText(task.exit)}` : ""} (${taskElapsed(task)}) ${label}`);
+			}
+		}
+		try {
+			ctx.ui.setWidget("bg-widget", lines.length > 0 ? lines : undefined);
+		} catch {
+			// Stale ctx between ticks.
+		}
+	}
+
+	pi.on("session_start", (_event, ctx) => {
+		if (ctx.mode !== "tui") return;
+		// A rebind fires session_start again; the old tick dies with its stale ctx.
+		if (widgetTimer !== undefined) clearInterval(widgetTimer);
+		widgetTimer = setInterval(() => renderBgWidget(ctx), 500);
+		widgetTimer.unref();
+		pi.on("session_shutdown", () => {
+			if (widgetTimer !== undefined) clearInterval(widgetTimer);
+			widgetTimer = undefined;
+			pinnedTask = undefined;
+			try {
+				ctx.ui.setWidget("bg-widget", undefined);
+			} catch {
+				// The ctx can already be disposed.
+			}
 		});
 	});
 
