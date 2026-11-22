@@ -100,6 +100,8 @@ function session() {
   const handlers = new Map();
   const tools = new Map();
   const messageRenderers = new Map();
+  const commands = new Map();
+  const widgets = new Map();
   const sent = [];
   const renderers = [];
   const inputHandlers = [];
@@ -113,7 +115,7 @@ function session() {
     },
     registerTool(tool) { tools.set(tool.name, tool); },
     sendMessage(message, options) { sent.push({ message, options }); },
-    registerCommand() {},
+    registerCommand(name, def) { commands.set(name, def); },
     registerMessageRenderer(type, renderer) { messageRenderers.set(type, renderer); },
     registerShortcut(id, def) { shortcuts.set(id, def); },
     registerToolRenderer(factory) { renderers.push(factory); },
@@ -135,6 +137,9 @@ function session() {
     notices,
     renderer(toolName) { return renderers[0](toolName, () => undefined); },
     messageRenderer(type) { return messageRenderers.get(type); },
+    command(name) { return commands.get(name); },
+    widgets,
+    running: () => (globalThis)[Symbol.for("pi.bash-background.running")] ?? [],
     start() { emit("agent_start", { type: "agent_start" }); },
     /** Registers the terminal-input listener the way a real TUI session does. */
     startTui() {
@@ -142,6 +147,7 @@ function session() {
         onTerminalInput(handler) { inputHandlers.push(handler); return () => {}; },
         notify(message) { notices.push(message); },
         setStatus() {},
+        setWidget(key, lines) { widgets.set(key, lines); },
         theme: { fg: (_token, text) => text },
       } });
     },
@@ -515,6 +521,35 @@ test("a collapsed error row names the file the way the heading does, and the too
     delete globalThis[current];
     s.shutdown();
   }
+});
+
+test("the live widget and footer dock stay hidden until /bg pins a task", async () => {
+  const s = session();
+  try {
+    s.startTui();
+    const first = await s.background("for i in $(seq 1 14); do echo \"alpha-$i\"; done; sleep 30");
+    const second = await s.background("sleep 30");
+    await sleep(1500);
+    assert.deepEqual(s.running().map((t) => t.id), [], "no footer row while tasks run unpinned");
+    assert.equal(s.widgets.get("bg-widget"), undefined, "no widget lines while unpinned");
+    const bg = s.command("bg");
+    assert.ok(bg, "/bg command registered");
+    await bg.handler(first, { ui: { notify() {} } });
+    await sleep(1500);
+    assert.deepEqual(s.running().map((t) => t.id), [first], "only the pinned task reaches the footer; the other running task stays out");
+    const lines = s.widgets.get("bg-widget");
+    assert.ok(Array.isArray(lines), "the pinned task streams in the widget");
+    assert.match(lines[0], new RegExp(`^◆ ${first} `));
+    assert.deepEqual(lines.slice(1), Array.from({ length: 10 }, (_, i) => `  alpha-${i + 5}`), "the tail is exactly the last ten output lines");
+    await bg.handler("", { ui: { notify() {} } });
+    await sleep(1500);
+    assert.deepEqual(s.running(), [], "unpinning empties the footer while both tasks still run");
+    assert.equal(s.widgets.get("bg-widget"), undefined, "unpinning hides the widget");
+    await s.call("bg_kill", { id: first });
+    await s.call("bg_kill", { id: second });
+    await s.finish(first);
+    await s.finish(second);
+  } finally { s.shutdown(); }
 });
 
 test("a dock label strips terminal escapes that a bg_watch description can carry", () => {

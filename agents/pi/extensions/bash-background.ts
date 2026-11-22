@@ -1851,7 +1851,7 @@ function taskElapsed(task: BgTask): string {
 	});
 
 	pi.registerCommand("bg", {
-		description: "List the background bash tasks of this session; /bg <id> pins one task's live tail in the widget",
+		description: "List the background bash tasks of this session; /bg <id> shows that task's live tail in the widget until it finishes",
 		handler: async (args, ctx) => {
 			const wanted = args.trim();
 			if (wanted !== "") {
@@ -1861,13 +1861,13 @@ function taskElapsed(task: BgTask): string {
 					return;
 				}
 				pinnedTask = id;
-				ctx.ui.notify(`Pinned ${id}: deep tail in the live widget until it finishes.`, "info");
+				ctx.ui.notify(`Pinned ${id}: live tail in the widget until it finishes.`, "info");
 				return;
 			}
 			if (pinnedTask !== undefined) {
 				const was = pinnedTask;
 				pinnedTask = undefined;
-				ctx.ui.notify(`Unpinned ${was}: the widget is back to shallow tails.`, "info");
+				ctx.ui.notify(`Unpinned ${was}: the widget is hidden until you pin again.`, "info");
 				return;
 			}
 			const rows = [...tasks.values()]
@@ -1912,6 +1912,7 @@ function taskElapsed(task: BgTask): string {
 	// The dock: footer-model-prefix renders one footer line per entry of the
 	// published snapshot; setStatus carries no text and is only the render
 	// heartbeat that keeps the seconds ticking while pi is otherwise idle.
+	// Only the pinned task is published: unpinned running tasks cost no space.
 	let dockTimer: ReturnType<typeof setInterval> | undefined;
 	pi.on("session_start", (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
@@ -1919,7 +1920,7 @@ function taskElapsed(task: BgTask): string {
 		if (dockTimer !== undefined) clearInterval(dockTimer);
 		let published = false;
 		const timer = setInterval(() => {
-			const running = [...tasks.values()].filter((task) => task.processAlive).map(dockTask);
+			const running = [...tasks.values()].filter((task) => task.processAlive && task.id === pinnedTask).map(dockTask);
 			(globalThis as unknown as SharedRunning)[runningKey] = running;
 			if (running.length > 0 || published) {
 				published = running.length > 0;
@@ -1941,13 +1942,11 @@ function taskElapsed(task: BgTask): string {
 		});
 	});
 
-	// The live widget: the footer dock names each running task; this widget
-	// above the editor shows the work itself, streaming each task's tail.
-	// `/bg <id>` pins one task for a deeper tail until it finishes.
-	const WIDGET_TAIL_LINES = 4;
+	// The live widget above the editor is pinned-only: `/bg <id>` shows that
+	// one task's tail until it finishes, and nothing else occupies the space.
+	// Unpinned running tasks stay visible through notifications, the `/bg`
+	// listing, and the agent-facing tools.
 	const PINNED_TAIL_LINES = 10;
-	const WIDGET_LINGER_MS = 60_000;
-	const WIDGET_MAX_TASKS = 4;
 	let pinnedTask: string | undefined;
 	let widgetTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -1963,33 +1962,19 @@ function taskElapsed(task: BgTask): string {
 	}
 
 	function renderBgWidget(ctx: { ui: { setWidget(key: string, lines: string[] | undefined): void } }): void {
-		const now = Date.now();
-		// A pin ends with its task; the deep tail is for watching live work.
+		// A pin ends with its task; the tail is for watching live work.
 		if (pinnedTask !== undefined && tasks.get(pinnedTask)?.processAlive !== true) pinnedTask = undefined;
-		const ordered = [...tasks.values()].filter((task) => task.processAlive).sort((a, b) => a.startedAt - b.startedAt);
-		const lingered = [...tasks.values()]
-			.filter((task) => !task.processAlive && task.finishedAt !== undefined && now - task.finishedAt < WIDGET_LINGER_MS)
-			.sort((a, b) => a.startedAt - b.startedAt);
 		const pinned = pinnedTask !== undefined ? tasks.get(pinnedTask) : undefined;
-		const visible = [
-			...(pinned ? [pinned] : []),
-			...ordered.filter((task) => task !== pinned).slice(-(pinned ? WIDGET_MAX_TASKS - 1 : WIDGET_MAX_TASKS)),
-			...lingered.slice(-2),
-		];
-		const lines: string[] = [];
-		for (const task of visible) {
-			const label = dockLabel(task.description ?? task.command).slice(0, 80);
-			if (task.processAlive) {
-				const mark = task === pinned ? "◆" : ["⠋", "⠙", "⠹", "⠸"][Math.floor(now / 500) % 4];
-				lines.push(`${mark} ${task.id} ${taskElapsed(task)} ${label}`);
-				lines.push(...widgetTail(task, task === pinned ? PINNED_TAIL_LINES : WIDGET_TAIL_LINES).map((line) => `  ${line}`));
-			} else {
-				const mark = task.state === "failed" ? "✗" : task.state === "killed" ? "■" : "✔";
-				lines.push(`${mark} ${task.id}${task.exit ? ` exit ${exitText(task.exit)}` : ""} (${taskElapsed(task)}) ${label}`);
-			}
+		let lines: string[] | undefined;
+		if (pinned) {
+			const label = dockLabel(pinned.description ?? pinned.command).slice(0, 80);
+			lines = [
+				`◆ ${pinned.id} ${taskElapsed(pinned)} ${label}`,
+				...widgetTail(pinned, PINNED_TAIL_LINES).map((line) => `  ${line}`),
+			];
 		}
 		try {
-			ctx.ui.setWidget("bg-widget", lines.length > 0 ? lines : undefined);
+			ctx.ui.setWidget("bg-widget", lines);
 		} catch {
 			// Stale ctx between ticks.
 		}
