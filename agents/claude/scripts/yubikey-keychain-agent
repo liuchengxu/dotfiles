@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Serve the YubiKey PIN from the logged-in GUI session over a user-only socket.
+
+A process started over SSH runs in a Background launchd domain. There the login
+keychain answers "User interaction is not allowed", so ssh-askpass cannot read
+the PIN it stores under yubikey-fido-pin. This agent runs from a per-user
+LaunchAgent in the Aqua session, where the keychain is unlocked.
+
+The protocol is a single fixed lookup: any client that connects receives the
+PIN, or nothing. The agent runs no other command. Only the same user can
+connect: the socket directory and the socket are mode 0700 and 0600.
+"""
+
+import os
+import pwd
+import socket
+import stat
+import subprocess
+import sys
+import threading
+from pathlib import Path
+
+SERVICE = "yubikey-fido-pin"
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "yubikey-signing"
+SOCKET = STATE_DIR / "keychain.sock"
+MAX_CONNECTIONS = 64
+ACCEPT_TIMEOUT = 3600
+ACCOUNT = pwd.getpwuid(os.getuid()).pw_name
+
+
+def read_pin():
+    result = subprocess.run(
+        ["/usr/bin/security", "find-generic-password", "-a", ACCOUNT, "-s", SERVICE, "-w"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    return result.stdout if result.returncode == 0 else ""
+
+
+def serve(client):
+    with client:
+        client.settimeout(5)
+        try:
+            client.sendall(read_pin().encode())
+        except OSError:
+            pass
+
+
+def secure_state_dir():
+    STATE_DIR.mkdir(parents=True, mode=0o700, exist_ok=True)
+    mode = STATE_DIR.stat().st_mode
+    if stat.S_IMODE(mode) != 0o700:
+        STATE_DIR.chmod(0o700)
+    owner = STATE_DIR.stat().st_uid
+    if owner != os.getuid():
+        sys.exit(f"refusing {STATE_DIR}: owned by uid {owner}")
+
+
+def main():
+    secure_state_dir()
+    if SOCKET.exists():
+        if SOCKET.stat().st_uid != os.getuid():
+            sys.exit(f"refusing to replace {SOCKET}: owned by another user")
+        SOCKET.unlink()
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(SOCKET))
+    SOCKET.chmod(0o600)
+    server.listen(MAX_CONNECTIONS)
+    server.settimeout(ACCEPT_TIMEOUT)
+    print(f"yubikey-keychain-agent: serving on {SOCKET}", file=sys.stderr, flush=True)
+    while True:
+        try:
+            client, _ = server.accept()
+        except socket.timeout:
+            continue
+        threading.Thread(target=serve, args=(client,), daemon=True).start()
+
+
+if __name__ == "__main__":
+    main()
