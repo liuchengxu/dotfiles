@@ -606,12 +606,19 @@ export default function bashBackground(pi: ExtensionAPI) {
 					call.settleOuter = resolveOuter;
 					call.controller = controller;
 				}
+				// detach() wakes the core with exitCode null, which core reports as
+				// "Command terminated without an exit code". That is the handshake,
+				// not the command's outcome: `inner` keeps observing the shell and
+				// delivers its real exit code or timeout when the process ends.
+				const settled = (result: { exitCode: number | null }): void => {
+					if (call) finishCall(call, result.exitCode);
+					resolveOuter(result);
+				};
 				inner.then(
-					(result) => {
-						if (call) finishCall(call, result.exitCode);
-						resolveOuter(result);
-					},
+					(result) => settled(result),
 					(error) => {
+						// A detached call already returned its handoff result to core;
+						// the task still ends with the error's own reason below.
 						const detached = call?.state === "detached";
 						const timeoutSeconds = /^timeout:(.+)$/.exec(
 							error instanceof Error ? error.message : String(error),
@@ -623,7 +630,6 @@ export default function bashBackground(pi: ExtensionAPI) {
 								timeoutSeconds === undefined ? undefined : `exceeded its ${timeoutSeconds}s timeout`,
 							);
 						}
-						// Preserve foreground errors after cleanup changes the state.
 						if (detached) resolveOuter({ exitCode: null });
 						else rejectOuter(error);
 					},
@@ -759,8 +765,9 @@ export default function bashBackground(pi: ExtensionAPI) {
 		expanded = false,
 		cwd?: string,
 		manualHint = false,
+		running = false,
 	): Component {
-		const description = redactSecrets(typeof args.description === "string" ? args.description : "bash").replace(/\s+/g, " ").trim();
+		const description = tenseVerb(redactSecrets(typeof args.description === "string" ? args.description : "bash").replace(/\s+/g, " ").trim(), running);
 		const command = redactSecrets(typeof args.command === "string" ? args.command : "");
 		if (expanded) {
 			const lines = [description, `  ⎿ $ ${command}`];
@@ -773,7 +780,7 @@ export default function bashBackground(pi: ExtensionAPI) {
 			render(width) {
 				if (width <= 0) return [];
 				return [
-					theme.fg("toolTitle", description),
+					theme.fg("toolTitle", boldVerb(theme, description)),
 				...(manualHint ? [theme.fg("dim", `  ${bgHintText(Boolean(process.env.TMUX))}`)] : []),
 				].map(line => truncateToWidth(line, width));
 			},
@@ -1068,9 +1075,10 @@ function taskElapsed(task: BgTask): string {
 				const [color, icon] = context.isError || liveTask?.state === "failed" ? ["error", "✗"]
 					: context.isPartial || liveTask?.processAlive ? ["accent", ["⠋", "⠙", "⠹", "⠸"][Math.floor(Date.now() / 120) % 4]]
 					: ["success", "⏺"];
-				// A detached task's id, time, and outcome ride on this one line
-				// instead of a second row.
-				const suffix = liveTask ? ` · ${backgroundTag(liveTask)}` : context.isPartial ? " · Running" : "";
+				// A detached task's id, time, and outcome ride on this line instead
+				// of a second row. A running call needs no "Running" suffix: its
+				// spinner and progressive verb already say so.
+				const suffix = liveTask ? ` · ${backgroundTag(liveTask)}` : "";
 				return component.render(width - 2).map((line, index) => {
 					if (index === 0 && suffix) {
 						line = truncateToWidth(line, Math.max(0, width - 2 - suffix.length), "") + theme.fg("muted", suffix);
@@ -1100,6 +1108,30 @@ function taskElapsed(task: BgTask): string {
 	// Mutation-shaped names keep a row even for tools this extension has
 	// never seen: an mcp create/delete/write is a state change, not a probe.
 	const MUTATION_NAME = /write|create|update|delete|remove|edit|put|post|patch|apply|save|upload|send|kill|move|copy|deploy|publish|merge|approve|submit/i;
+	// A model-written label is an imperative ("Run the tests"). While the call
+	// runs its leading verb becomes progressive, but only for verbs whose form
+	// is known: English has no rule that survives "Open", "Monitor" or "Set up".
+	// Any other label, and every finished label, stays as written.
+	const PROGRESSIVE: Record<string, string> = {
+		run: "Running", read: "Reading", write: "Writing", edit: "Editing", build: "Building", make: "Making",
+		find: "Finding", search: "Searching", list: "Listing", check: "Checking", verify: "Verifying",
+		test: "Testing", explore: "Exploring", inspect: "Inspecting", review: "Reviewing", stop: "Stopping",
+		start: "Starting", install: "Installing", update: "Updating", apply: "Applying", wait: "Waiting",
+		watch: "Watching", fetch: "Fetching", show: "Showing", print: "Printing", count: "Counting",
+		compare: "Comparing", measure: "Measuring", probe: "Probing", retry: "Retrying", compile: "Compiling",
+	};
+	function tenseVerb(phrase: string, running: boolean): string {
+		if (!running) return phrase;
+		const [verb, ...rest] = phrase.split(/\s+/);
+		// Own properties only: a label such as "constructor checks" must not
+		// resolve to Object.prototype.constructor.
+		const key = verb.toLowerCase();
+		const doing = Object.hasOwn(PROGRESSIVE, key) ? PROGRESSIVE[key] : undefined;
+		return doing ? [doing, ...rest].join(" ") : phrase;
+	}
+	function boldVerb(theme: { bold: (text: string) => string }, label: string): string {
+		return label.replace(/^[^\s(:]+/, word => theme.bold(word));
+	}
 	function persistsWhenDone(name: string, args: Record<string, unknown> | undefined): boolean {
 		if (mutationTools.has(name) || MUTATION_NAME.test(name)) return true;
 		if (name === "bash") return !readOnlyInspection(String(args?.command ?? ""));
@@ -1142,28 +1174,34 @@ function taskElapsed(task: BgTask): string {
 				}
 				const call = context.toolCallId ? active.get(context.toolCallId) : undefined;
 				const hintRequested = call?.state === "foreground" && call.hintRequested;
-				return operationHeader(renderBashCall(input, theme, context.expanded, context.cwd, hintRequested), theme, context);
+				return operationHeader(renderBashCall(input, theme, context.expanded, context.cwd, hintRequested, context.isPartial === true), theme, context);
 			}
 			if (context.expanded) return (next() ?? builtInRenderers[toolName])?.renderCall?.(args, theme, forDelegate(context)) ?? new Text(`${toolName}\n${JSON.stringify(args, null, 2)}`, 0, 0);
 			const input = args as Record<string, unknown>;
 			const value = (key: string) => typeof input[key] === "string" ? input[key] as string : "";
-			const labels: Record<string, string> = {
-				read: "Read file", write: "Write file", edit: "Update file",
-				grep: "Search file contents", find: "Find files", ls: "List directory",
-				tool_search: "Find available tools", codemode: "Run tool script",
-				bg_status: "Check background tasks", bg_logs: "Read background task log",
-				bg_kill: "Stop background task", bg_watch: "Watch command output",
-				bg_wait: "Wait for background task",
-				todo: "Update task list",
+			// [done, running] verbs with the noun they share; built-in rows are the
+			// only labels whose past tense pi can inflect reliably.
+			const labels: Record<string, [string, string, string]> = {
+				read: ["Read", "Reading", "file"], write: ["Wrote", "Writing", "file"], edit: ["Edited", "Editing", "file"],
+				grep: ["Searched", "Searching", "file contents"], find: ["Found", "Finding", "files"], ls: ["Listed", "Listing", "directory"],
+				tool_search: ["Found", "Finding", "available tools"], codemode: ["Ran", "Running", "tool script"],
+				bg_status: ["Checked", "Checking", "background tasks"], bg_logs: ["Read", "Reading", "background task log"],
+				bg_kill: ["Stopped", "Stopping", "background task"], bg_watch: ["Watched", "Watching", "command output"],
+				bg_wait: ["Waited", "Waiting", "background task"],
+				todo: ["Updated", "Updating", "task list"],
 			};
+			const running = context.isPartial === true;
+			const tensed = ([done, doing]: [string, string]): string => running ? doing : done;
 			// Built at render time, so a path stays relative to the worktree the footer names now,
 			// not the one it named when pi last called renderCall.
 			const describe = () => {
-				let label = labels[toolName] ?? toolName.replace(/^mcp__/, "").replace(/[_-]+/g, " ");
+				const name = toolName.replace(/^mcp__/, "").replace(/[_-]+/g, " ");
+				const [done, doing, noun] = labels[toolName] ?? [name, name, ""];
+				let label = [tensed([done, doing]), noun].filter(Boolean).join(" ");
 				const path = worktreePath(value("path"));
 				let detail = redactSecrets(path || value("query") || value("pattern") || value("id"));
 				if (toolName === "write") {
-					label = `Write (${path || "file"})`;
+					label = `${tensed(["Wrote", "Writing"])} (${path || "file"})`;
 					detail = "";
 				} else if (toolName === "read") {
 					const skill = skillName(value("path"));
@@ -1171,7 +1209,7 @@ function taskElapsed(task: BgTask): string {
 						label = `Skill(${skill})`;
 						detail = "";
 					} else {
-						label = `Read (${path || "file"})`;
+						label = `${tensed(["Read", "Reading"])} (${path || "file"})`;
 					}
 					const offset = Number(args?.offset ?? 0);
 					const streaming = context.argsComplete === false && context.isPartial === true;
@@ -1180,7 +1218,7 @@ function taskElapsed(task: BgTask): string {
 				} else if (toolName === "codemode") {
 					const lines = value("code").split("\n");
 					const comment = lines.map(line => /^\s*\/\/\s?(.*)$/.exec(line)?.[1]).find(text => text?.trim())?.trim();
-					label = comment ? redactSecrets(comment) : label;
+					label = comment ? tenseVerb(redactSecrets(comment), running) : label;
 					const aggregate = context.toolCallId ? nestedEdits.get(context.toolCallId) : undefined;
 					if (aggregate) {
 						const counts = colorChangeSummary(formatChangeCounts(aggregate), theme);
@@ -1189,13 +1227,13 @@ function taskElapsed(task: BgTask): string {
 					}
 					detail = redactSecrets("js " + (lines.find(line => line.trim() && !/^\s*\/\//.test(line)) ?? "").trim());
 				} else if (toolName === "edit") {
-					label = `Update ${path || "file"}`;
+					label = `${tensed(["Edited", "Editing"])} ${path || "file"}`;
 					detail = "";
 				} else if (toolName === "bg_watch") {
-					label = redactSecrets(value("description")) || label;
+					label = (value("description") ? tenseVerb(redactSecrets(value("description")), running) : "") || label;
 					detail = redactSecrets(value("command"));
 				} else if (toolName.startsWith("mcp__")) {
-					label = redactSecrets(value("instruction")) || label;
+					label = (value("instruction") ? tenseVerb(redactSecrets(value("instruction")), running) : "") || label;
 					detail = toolName;
 				}
 				return { label, detail };
@@ -1246,7 +1284,7 @@ function taskElapsed(task: BgTask): string {
 					if (width <= 0) return [];
 					// Collapsed: label line, then detail on its own row — long tool
 				// names and arguments must not truncate into the label.
-					const lines = [theme.fg("toolTitle", headerLabel())];
+					const lines = [theme.fg("toolTitle", boldVerb(theme, headerLabel()))];
 					const { detail } = describe();
 					if (detail) lines.push(theme.fg("accent", "  ⎿ " + (detail.split(/\r?\n/).find(line => line.trim()) ?? "").trim()));
 					return lines.map(line => truncateToWidth(line, width));
@@ -1284,7 +1322,7 @@ function taskElapsed(task: BgTask): string {
 					?? lines.find(line => /could not/i.test(line))
 					?? "Operation failed (Ctrl+O for details)";
 				const args = context.args as { description?: unknown; path?: unknown } | undefined;
-				const verbs: Record<string, string> = { edit: "Update", write: "Write", read: "Read" };
+				const verbs: Record<string, string> = { edit: "Edited", write: "Wrote", read: "Read" };
 				const rawPath = typeof args?.path === "string" ? args.path : "";
 				return {
 					// Built at render time, so the row follows the footer's worktree the way
@@ -1294,7 +1332,7 @@ function taskElapsed(task: BgTask): string {
 						// name the worktree the footer already names, twice.
 						const relPath = rawPath ? worktreePath(rawPath) : "";
 						const label = context.state?.detailsCollapsed && typeof args?.description === "string" && args.description.trim()
-							? redactSecrets(args.description.trim()).replace(/\s+/g, " ")
+							? tenseVerb(redactSecrets(args.description.trim()).replace(/\s+/g, " "), options.isPartial === true)
 							: context.state?.detailsCollapsed && relPath ? `${verbs[toolName] ?? toolName} ${relPath}` : verbs[toolName] ?? toolName;
 						// The tool's own message embeds the path it was given; show it the way the
 						// row names it, so one screen does not carry both forms.
@@ -1406,7 +1444,7 @@ function taskElapsed(task: BgTask): string {
 		parameters,
 		description: `${original.description} Commands that run past ${Math.round(BUDGET_MS / 1000)}s move to the background automatically (the call returns a task id and a completion notification arrives later); Ctrl+B or Ctrl+Shift+B converts the running command by hand. Pass run_in_background: true to start in the background from the beginning.`,
 		renderCall(args, theme, context) {
-			return renderBashCall(args, theme, context.expanded, context.cwd);
+			return renderBashCall(args, theme, context.expanded, context.cwd, false, context.isPartial === true);
 		},
 		async execute(toolCallId, input, signal, onUpdate, ctx): Promise<{ content: unknown[]; structuredContent?: unknown; isError?: boolean }> {
 			const { description, run_in_background, ...rest } = input as typeof input & {
@@ -1540,7 +1578,10 @@ function taskElapsed(task: BgTask): string {
 					if (!call.execStarted) finishCall(call, 0);
 					return result;
 				} catch (error) {
-					finishCall(call, null);
+					// detach() wakes the core with exitCode null, which core reports
+					// as "Command terminated without an exit code". That is the
+					// handshake, not the command's outcome: the process is alive.
+					if (call.state !== "detached") finishCall(call, null);
 					throw error;
 				}
 			});

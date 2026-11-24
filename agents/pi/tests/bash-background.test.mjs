@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { realpathSync, rmSync, writeFileSync } from "node:fs";
+import { realpathSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -387,7 +387,7 @@ test("collapsed calls are one-line labels with URL credentials omitted from prev
     const renderer = s.renderer("bash");
     const lines = renderer.renderCall(args, theme, context).render(200);
     assert.equal(lines.length, 1);
-    assert.match(lines[0], /Check endpoint/);
+    assert.match(lines[0], /Checking endpoint/, "a running call's verb is progressive");
     assert.doesNotMatch(lines.join("\n"), /password|secret-path|secret-query/);
     assert.ok(args.command.includes(url), "display changes must not alter execution inputs");
     const error = renderer.renderResult({ content: [{ type: "text", text: `Error contacting ${url}` }] }, { expanded: false }, theme, { ...context, isPartial: false, isError: true });
@@ -434,10 +434,11 @@ test("a codemode script without a comment renders its fallback label without thr
     const theme = { fg: (_color, text) => text, bold: text => text };
     for (const code of ["const x = 1;", ""]) {
       const row = s.renderer("codemode").renderCall({ code }, theme, { args: { code }, state: {}, expanded: false, isPartial: true, isError: false }).render(120).join("\n");
-      assert.match(row, /Run tool script/, "running without a comment shows the fallback label for " + JSON.stringify(code));
+      assert.match(row, /Running tool script/, "running without a comment shows the fallback label for " + JSON.stringify(code));
+      assert.doesNotMatch(row, /· Running/, "the progressive verb replaces the Running suffix");
     }
     const commented = s.renderer("codemode").renderCall({ code: "// Check https://user:pw@h/x\nconst x = 1;" }, theme, { args: {}, state: {}, expanded: false, isPartial: true, isError: false }).render(200).join("\n");
-    assert.match(commented, /Check https:\/\/<redacted>/);
+    assert.match(commented, /Checking https:\/\/<redacted>/, "a leading comment becomes the progressive verb label");
     assert.doesNotMatch(commented, /user:pw/);
   } finally { s.shutdown(); }
 });
@@ -482,6 +483,38 @@ test("expanding a collapsed tool row does not hand our component to the built-in
   } finally { s.shutdown(); }
 });
 
+test("a collapsed row bolds only its leading verb, progressive while running and past when done", () => {
+  const s = session();
+  try {
+    const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: (text) => `**${text}**` };
+    const context = (args, extra = {}) => ({ args, toolCallId: "v", invalidate() {}, state: { writeSettled: true }, cwd: tmpdir(),
+      executionStarted: true, argsComplete: true, isPartial: true, expanded: false, showImages: false, isError: false, outputPad: 1, ...extra });
+    const row = (tool, args, extra) => s.renderer(tool).renderCall(args, theme, context(args, extra)).render(200).join("\n");
+    const edit = { path: "/r/src/lib.rs", edits: [{ oldText: "a", newText: "b" }] };
+    assert.match(row("edit", edit), /\*\*Editing\*\* \S*src\/lib\.rs/);
+    assert.match(row("edit", edit, { isPartial: false }), /\*\*Edited\*\* \S*src\/lib\.rs/, "a mutation persists when done, in past tense");
+    assert.match(row("read", { path: "/r/README.md" }), /\*\*Reading\*\* \(\S*README\.md\)/, "a read shows while it runs");
+    assert.deepEqual(row("read", { path: "/r/README.md" }, { isPartial: false }), "", "a finished read is a probe and folds away");
+    assert.match(row("write", { path: "/r/new.txt", content: "x" }), /\*\*Writing\*\* \(\S*new\.txt\)/);
+    assert.match(row("write", { path: "/r/new.txt", content: "x" }, { isPartial: false }), /\*\*Wrote\*\* \(\S*new\.txt\) \(1 line\)/);
+    const bash = { command: "sleep 1", description: "Explore the test layout" };
+    assert.match(row("bash", bash), /\*\*Exploring\*\* the test layout/);
+    assert.match(row("bash", { ...bash, description: "Run the test suite" }), /\*\*Running\*\* the test suite/);
+    assert.match(row("bash", { ...bash, description: "Stop the server" }), /\*\*Stopping\*\* the server/, "a known verb takes its progressive form");
+    // No rule-based guessing: a verb outside the table stays exactly as written.
+    assert.match(row("bash", { ...bash, description: "Open the config" }), /\*\*Open\*\* the config/, "never 'Openning'");
+    assert.match(row("bash", { ...bash, description: "Monitor the logs" }), /\*\*Monitor\*\* the logs/, "never 'Monitorring'");
+    assert.match(row("bash", { ...bash, description: "constructor checks" }), /\*\*constructor\*\* checks/, "an inherited property is not a verb form");
+    // A tool without a label keeps its name while running; never a blank row.
+    assert.match(row("mcp__svc__do_thing", {}), /\*\*svc\*\* do thing\n\s+⎿ mcp__svc__do_thing$/, "an unknown tool shows its name while running, never a blank row");
+    assert.doesNotMatch(row("bash", bash), /\*\*the test layout\*\*/, "the object of the verb stays normal weight");
+    assert.doesNotMatch(row("bash", bash), /· Running/, "the progressive verb replaces the Running suffix");
+    // A finished row keeps the author's words: pi cannot inflect arbitrary past tense.
+    // A failed bash row persists, so it is where a done-state label is observable.
+    assert.deepEqual(row("bash", { ...bash, command: "python3 check.py" }, { isPartial: false, isError: true }), "✗ **Explore** the test layout", "no invented past tense");
+  } finally { s.shutdown(); }
+});
+
 test("a collapsed edit row shows a path in the footer's worktree relative to it", () => {
   const s = session();
   const current = Symbol.for("pi.worktree-status.current");
@@ -491,14 +524,14 @@ test("a collapsed edit row shows a path in the footer's worktree relative to it"
     const component = (tool, args) => s.renderer(tool).renderCall(args, theme, { args, toolCallId: "e2", invalidate() {}, state: {}, cwd: tmpdir(),
       executionStarted: true, argsComplete: true, isPartial: true, expanded: false, showImages: false, isError: false, outputPad: 1 });
     const row = (path) => component("edit", { path, edits: [{ oldText: "a", newText: "b" }] }).render(200).join("\n");
-    assert.match(row("/r/.agents/worktrees/fix-a/src/lib.rs"), /Update src\/lib\.rs/);
-    assert.match(row("/r/.agents/worktrees/fix-b/src/lib.rs"), /Update ⎇ fix-b\/src\/lib\.rs/);
-    assert.match(component("read", { path: "/r/.agents/worktrees/fix-a/README.md" }).render(200).join("\n"), /Read \(README\.md\)/);
-    assert.match(component("write", { path: "/r/.agents/worktrees/fix-a/new.txt", content: "x" }).render(200).join("\n"), /Write \(new\.txt\)/);
+    assert.match(row("/r/.agents/worktrees/fix-a/src/lib.rs"), /Editing src\/lib\.rs/, "a running call reads progressively");
+    assert.match(row("/r/.agents/worktrees/fix-b/src/lib.rs"), /Editing ⎇ fix-b\/src\/lib\.rs/);
+    assert.match(component("read", { path: "/r/.agents/worktrees/fix-a/README.md" }).render(200).join("\n"), /Reading \(README\.md\)/);
+    assert.match(component("write", { path: "/r/.agents/worktrees/fix-a/new.txt", content: "x" }).render(200).join("\n"), /Writing \(new\.txt\)/);
     // A drawn row follows the footer: after a switch it must not read as a path in the new worktree.
     const drawn = component("edit", { path: "/r/.agents/worktrees/fix-a/src/lib.rs", edits: [{ oldText: "a", newText: "b" }] });
     globalThis[current] = "/r/.agents/worktrees/fix-b";
-    assert.match(drawn.render(200).join("\n"), /Update ⎇ fix-a\/src\/lib\.rs/);
+    assert.match(drawn.render(200).join("\n"), /Editing ⎇ fix-a\/src\/lib\.rs/);
   } finally {
     delete globalThis[current];
     s.shutdown();
@@ -515,7 +548,7 @@ test("a collapsed error row names the file the way the heading does, and the too
     const result = { content: [{ type: "text", text: `Could not find the exact text in /r/.agents/worktrees/fix-a/src/lib.rs. The old text must match exactly including all whitespace and newlines.` }] };
     const context = { args, toolCallId: "e3", invalidate() {}, state: { detailsCollapsed: true }, cwd: tmpdir(), executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: false, isError: true, outputPad: 1 };
     const row = s.renderer("edit").renderResult(result, { expanded: false, isPartial: false }, theme, context).render(200).join("\n");
-    assert.match(row, /^✗ Update src\/lib\.rs: Could not find the exact text in src\/lib\.rs\./);
+    assert.match(row, /^✗ Edited src\/lib\.rs: Could not find the exact text in src\/lib\.rs\./);
     assert.doesNotMatch(row, /\/r\/\.agents/);
   } finally {
     delete globalThis[current];
@@ -572,7 +605,7 @@ test("a line that names its own failure outranks a retry note that says could no
     const result = { content: [{ type: "text", text: "Retrying: could not connect to host\nError: permission denied for key" }] };
     const context = { args, toolCallId: "e4", invalidate() {}, state: { detailsCollapsed: true }, cwd: tmpdir(), executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: false, isError: true, outputPad: 1 };
     const row = s.renderer("edit").renderResult(result, { expanded: false, isPartial: false }, theme, context).render(200).join("\n");
-    assert.match(row, /✗ Update src\/lib\.rs: Error: permission denied for key/);
+    assert.match(row, /✗ Edited src\/lib\.rs: Error: permission denied for key/);
     assert.doesNotMatch(row, /Retrying/);
   } finally {
     delete globalThis[current];
@@ -591,7 +624,7 @@ test("a drawn error row follows the footer's worktree after a switch", () => {
     const context = { args, toolCallId: "e5", invalidate() {}, state: { detailsCollapsed: true }, cwd: tmpdir(), executionStarted: true, argsComplete: true, isPartial: false, expanded: false, showImages: false, isError: true, outputPad: 1 };
     const component = s.renderer("edit").renderResult(result, { expanded: false, isPartial: false }, theme, context);
     globalThis[current] = "/r/.agents/worktrees/fix-b";
-    assert.match(component.render(200).join("\n"), /✗ Update ⎇ fix-a\/src\/lib\.rs: Could not find the exact text in ⎇ fix-a\/src\/lib\.rs\./);
+    assert.match(component.render(200).join("\n"), /✗ Edited ⎇ fix-a\/src\/lib\.rs: Could not find the exact text in ⎇ fix-a\/src\/lib\.rs\./);
   } finally {
     delete globalThis[current];
     s.shutdown();
@@ -653,6 +686,119 @@ test("ctrl+b detaches every running foreground call, reports real wall time, and
     s.shutdown();
   }
 });
+
+test("a detached task that finishes on its own reports its real outcome, never 'failed with exit code null'", async () => {
+  const s = session(); s.startTui();
+  try {
+    const marker = join(tmpdir(), `bg-handoff-ok-${process.pid}-${Date.now()}`);
+    const release = `${marker}.release`;
+    // The command waits for the test's release file, so the detach certainly happens while it runs.
+    const command = `while [ ! -e '${release}' ]; do sleep 0.05; done; echo handoff-done`;
+    const done = s.tool("bash").execute("c1", { command, description: "Run then finish" }, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
+    await sleep(300);
+    assert.equal(s.key("\x02")?.consume, true, "ctrl+b detaches the running call");
+    const result = await done;
+    const id = String(result.structuredContent.output).match(/bg-\d+/)?.[0];
+    assert.ok(id, "the handoff result names the task");
+    assert.match(await s.call("bg_status", {}), new RegExp(`${id}\\s+running`), "it is running after the handoff");
+    // Let the command exit 0 and wait for the task to settle.
+    writeFileSync(release, "");
+    await s.finish(id);
+    const status = await s.call("bg_status", {});
+    assert.match(status, new RegExp(`${id}\\s+completed`), `a command that exited 0 is completed:\n${status}`);
+    assert.doesNotMatch(status, /exit code null|exit null/);
+    const notices = s.sent.filter((entry) => entry.message.customType === "bg-task-notification" && entry.message.details?.id === id);
+    assert.equal(notices.length, 1, "exactly one completion notice for the detached task");
+    assert.equal(notices[0].message.details.state, "completed");
+    assert.match(String(notices[0].message.content), /handoff-done/, "the notice carries the task's real tail");
+    assert.doesNotMatch(JSON.stringify(notices[0].message), /exit code null/, "no fabricated null exit code");
+  } finally {
+    s.shutdown();
+  }
+});
+
+test("a detached task reports its real exit code and timeout, and bg_kill before the pid is known still ends it", async () => {
+  const s = session(); s.startTui();
+  const exec = (command, description, extra = {}) => s.tool("bash").execute(`c${Math.random()}`, { command, description, ...extra }, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
+  const id = (result) => String(result.structuredContent.output).match(/bg-\d+/)?.[0];
+  const noticesFor = (taskId) => s.sent.filter((entry) => entry.message.customType === "bg-task-notification" && entry.message.details?.id === taskId);
+  const status = async () => s.call("bg_status", {});
+  const gate = join(tmpdir(), `bg-handoff-gate-${process.pid}-${Date.now()}`);
+  try {
+    // The command waits for the gate, so the handoff cannot lose the race against its exit.
+    const failedDone = exec(`while [ ! -e '${gate}' ]; do sleep 0.05; done; echo late-output; exit 7`, "Run then fail");
+    await sleep(300);
+    assert.equal(s.key("\x02")?.consume, true, "ctrl+b detaches the running call");
+    const failed = id(await failedDone);
+    assert.match(await status(), new RegExp(`${failed}\\s+running`), "running after the handoff");
+    writeFileSync(gate, "");
+    await s.finish(failed);
+    assert.match(await status(), new RegExp(`${failed}\\s+failed\\s+\\d+s\\s+\\d+B\\s+exit 7`), `exit code 7 is kept:\n${await status()}`);
+    const notices = noticesFor(failed);
+    assert.equal(notices.length, 1, "one notice for the task");
+    assert.equal(notices[0].message.details.state, "failed");
+    assert.match(String(notices[0].message.content), /exit code 7[\s\S]*late-output/, "the notice carries the real code and the output written after the handoff");
+
+    // A detached timeout keeps its timeout reason. Two seconds clears the handoff and fits the poll limit.
+    const timedOut = id(await (async () => {
+      const done = exec("sleep 30; echo never", "Run past the deadline", { timeout: 2 });
+      await sleep(300);
+      assert.equal(s.key("\x02")?.consume, true, "ctrl+b detaches the running call");
+      return done;
+    })());
+    await s.finish(timedOut);
+    assert.match(await status(), new RegExp(`${timedOut}\\s+failed`));
+    assert.match(String(noticesFor(timedOut)[0].message.content), /exceeded its 2s timeout/, "the timeout reason survives the handoff");
+
+    // bg_kill straight after the handoff, before the shell has written its pid.
+    const earlyDone = exec("sleep 30; echo never", "Run then be stopped early");
+    assert.equal(s.key("\x02")?.consume, true, "ctrl+b lands before the command starts");
+    const earlyId = id(await earlyDone);
+    assert.match(await s.call("bg_kill", { id: earlyId }), /SIGTERM/, "the kill is accepted while the pid is unknown");
+    await s.finish(earlyId);
+    assert.match(await status(), new RegExp(`${earlyId}\\s+killed`), `a kill before the pid is known ends the task as killed:\n${await status()}`);
+    assert.equal(noticesFor(earlyId)[0].message.details.state, "killed", "its notice says killed, not failed");
+  } finally {
+    rmSync(gate, { force: true });
+    s.shutdown();
+  }
+});
+
+test("bg_kill ends a handoff task as killed and leaves no process behind", async () => {
+  const s = session(); s.startTui();
+  try {
+    const marker = join(tmpdir(), `bg-handoff-kill-${process.pid}-${Date.now()}`);
+    const done = s.tool("bash").execute("c1", { command: `ps -o pgid= -p $$ | tr -d ' ' > '${marker}'; sleep 30`, description: "Run then be stopped" }, undefined, undefined, { cwd: tmpdir(), sessionManager: { getSessionId: () => "test", getSessionFile: () => undefined } });
+    await sleep(300);
+    assert.equal(s.key("\x02")?.consume, true, "ctrl+b detaches the running call");
+    const id = String((await done).structuredContent.output).match(/bg-\d+/)?.[0];
+    assert.ok(id, "the handoff result names the task");
+    assert.match(await s.call("bg_status", {}), new RegExp(`${id}\\s+running`), "it is running after the handoff");
+    // The command itself reports its process group, independent of the extension.
+    const pgid = Number(readFileSync(marker, "utf8").trim());
+    rmSync(marker, { force: true });
+    assert.ok(Number.isSafeInteger(pgid) && pgid > 0, `the command reported its process group (got ${pgid})`);
+    assert.equal(groupAlive(pgid), true, "the detached process group is alive before the kill");
+    const killed = await s.call("bg_kill", { id });
+    assert.match(killed, /SIGTERM/, "the kill reaches the detached process");
+    await s.finish(id);
+    const status = await s.call("bg_status", {});
+    assert.match(status, new RegExp(`${id}\\s+killed`), `a stopped handoff task is killed, not failed:\n${status}`);
+    assert.doesNotMatch(status, /exit code null/);
+    const notices = s.sent.filter((entry) => entry.message.customType === "bg-task-notification" && entry.message.details?.id === id);
+    assert.equal(notices.length, 1, "one notice for the stopped task");
+    assert.equal(notices[0].message.details.state, "killed");
+    assert.doesNotMatch(JSON.stringify(notices[0].message), /exit code null/);
+    await sleep(5200); // killTree's TERM-then-KILL grace is 5s.
+    assert.equal(groupAlive(pgid), false, "the process group is gone, not orphaned");
+  } finally {
+    s.shutdown();
+  }
+});
+
+function groupAlive(pgid) {
+  try { process.kill(-pgid, 0); return true; } catch (error) { return error.code === "EPERM"; }
+}
 
 test("ctrl+shift+b goes through the registered shortcut", async () => {
   const s = session(); s.startTui();
