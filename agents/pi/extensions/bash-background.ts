@@ -1989,7 +1989,6 @@ function taskElapsed(task: BgTask): string {
 	// The dock: footer-model-prefix renders one footer line per entry of the
 	// published snapshot; setStatus carries no text and is only the render
 	// heartbeat that keeps the seconds ticking while pi is otherwise idle.
-	// Only the pinned task is published: unpinned running tasks cost no space.
 	let dockTimer: ReturnType<typeof setInterval> | undefined;
 	pi.on("session_start", (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
@@ -1997,7 +1996,7 @@ function taskElapsed(task: BgTask): string {
 		if (dockTimer !== undefined) clearInterval(dockTimer);
 		let published = false;
 		const timer = setInterval(() => {
-			const running = [...tasks.values()].filter((task) => task.processAlive && task.id === pinnedTask).map(dockTask);
+			const running = [...tasks.values()].filter((task) => task.processAlive).map(dockTask);
 			(globalThis as unknown as SharedRunning)[runningKey] = running;
 			if (running.length > 0 || published) {
 				published = running.length > 0;
@@ -2021,8 +2020,8 @@ function taskElapsed(task: BgTask): string {
 
 	// The live widget above the editor is pinned-only: `/bg <id>` shows that
 	// one task's tail until it finishes, and nothing else occupies the space.
-	// Unpinned running tasks stay visible through notifications, the `/bg`
-	// listing, and the agent-facing tools.
+	// Unpinned running tasks stay visible in the footer dock, through
+	// notifications, the `/bg` listing, and the agent-facing tools.
 	const PINNED_TAIL_LINES = 10;
 	let pinnedTask: string | undefined;
 	let widgetTimer: ReturnType<typeof setInterval> | undefined;
