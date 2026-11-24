@@ -765,7 +765,8 @@ export default function bashBackground(pi: ExtensionAPI) {
 		expanded = false,
 		cwd?: string,
 		manualHint = false,
-		running = false,
+		// undefined leaves the description as written; see tenseVerb.
+		running?: boolean,
 	): Component {
 		const description = tenseVerb(redactSecrets(typeof args.description === "string" ? args.description : "bash").replace(/\s+/g, " ").trim(), running);
 		const command = redactSecrets(typeof args.command === "string" ? args.command : "");
@@ -1108,26 +1109,49 @@ function taskElapsed(task: BgTask): string {
 	// Mutation-shaped names keep a row even for tools this extension has
 	// never seen: an mcp create/delete/write is a state change, not a probe.
 	const MUTATION_NAME = /write|create|update|delete|remove|edit|put|post|patch|apply|save|upload|send|kill|move|copy|deploy|publish|merge|approve|submit/i;
-	// A model-written label is an imperative ("Run the tests"). While the call
-	// runs its leading verb becomes progressive, but only for verbs whose form
-	// is known: English has no rule that survives "Open", "Monitor" or "Set up".
-	// Any other label, and every finished label, stays as written.
-	const PROGRESSIVE: Record<string, string> = {
-		run: "Running", read: "Reading", write: "Writing", edit: "Editing", build: "Building", make: "Making",
-		find: "Finding", search: "Searching", list: "Listing", check: "Checking", verify: "Verifying",
-		test: "Testing", explore: "Exploring", inspect: "Inspecting", review: "Reviewing", stop: "Stopping",
-		start: "Starting", install: "Installing", update: "Updating", apply: "Applying", wait: "Waiting",
-		watch: "Watching", fetch: "Fetching", show: "Showing", print: "Printing", count: "Counting",
-		compare: "Comparing", measure: "Measuring", probe: "Probing", retry: "Retrying", compile: "Compiling",
+	// A model-written label is an imperative ("Run the tests"). Its leading verb
+	// takes the progressive form while the call runs and the past tense once
+	// done, but only for verbs whose forms are known: English has no rule that
+	// survives "Open", "Monitor" or "Set up", and a wrong guess reads worse
+	// than the imperative. Any other label stays as written.
+	// [past, progressive] per verb; the label keeps the author's noun phrase.
+	const VERB_FORMS: Record<string, [string, string]> = {
+		run: ["Ran", "Running"], read: ["Read", "Reading"], write: ["Wrote", "Writing"], edit: ["Edited", "Editing"],
+		build: ["Built", "Building"], make: ["Made", "Making"], find: ["Found", "Finding"], search: ["Searched", "Searching"],
+		list: ["Listed", "Listing"], check: ["Checked", "Checking"], verify: ["Verified", "Verifying"], test: ["Tested", "Testing"],
+		explore: ["Explored", "Exploring"], inspect: ["Inspected", "Inspecting"], review: ["Reviewed", "Reviewing"],
+		stop: ["Stopped", "Stopping"], start: ["Started", "Starting"], install: ["Installed", "Installing"],
+		update: ["Updated", "Updating"], apply: ["Applied", "Applying"], wait: ["Waited", "Waiting"],
+		watch: ["Watched", "Watching"], fetch: ["Fetched", "Fetching"], show: ["Showed", "Showing"],
+		print: ["Printed", "Printing"], count: ["Counted", "Counting"], compare: ["Compared", "Comparing"],
+		measure: ["Measured", "Measuring"], probe: ["Probed", "Probing"], retry: ["Retried", "Retrying"],
+		compile: ["Compiled", "Compiling"],
+		post: ["Posted", "Posting"], push: ["Pushed", "Pushing"], pull: ["Pulled", "Pulling"],
+		deploy: ["Deployed", "Deploying"], publish: ["Published", "Publishing"], merge: ["Merged", "Merging"],
+		commit: ["Committed", "Committing"], sign: ["Signed", "Signing"], upload: ["Uploaded", "Uploading"],
+		send: ["Sent", "Sending"], delete: ["Deleted", "Deleting"], remove: ["Removed", "Removing"],
+		copy: ["Copied", "Copying"], move: ["Moved", "Moving"], rename: ["Renamed", "Renaming"],
+		create: ["Created", "Creating"], generate: ["Generated", "Generating"], fix: ["Fixed", "Fixing"],
+		add: ["Added", "Adding"], clean: ["Cleaned", "Cleaning"], load: ["Loaded", "Loading"],
+		close: ["Closed", "Closing"], scan: ["Scanned", "Scanning"],
+		parse: ["Parsed", "Parsing"], render: ["Rendered", "Rendering"], collect: ["Collected", "Collecting"],
+		download: ["Downloaded", "Downloading"], clone: ["Cloned", "Cloning"], rebase: ["Rebased", "Rebasing"],
+		format: ["Formatted", "Formatting"], lint: ["Linted", "Linting"], bench: ["Benched", "Benching"],
+		ask: ["Asked", "Asking"], answer: ["Answered", "Answering"], summarize: ["Summarized", "Summarizing"],
+		trim: ["Trimmed", "Trimming"], plan: ["Planned", "Planning"], map: ["Mapped", "Mapping"],
 	};
-	function tenseVerb(phrase: string, running: boolean): string {
-		if (!running) return phrase;
+	// `running` is undefined for a label that is never tensed: the background
+	// task header names its own state with a spinner or an exit, so tensing its
+	// description would read "Waited then fail · Failed".
+	function tenseVerb(phrase: string, running: boolean | undefined): string {
+		if (running === undefined) return phrase;
 		const [verb, ...rest] = phrase.split(/\s+/);
 		// Own properties only: a label such as "constructor checks" must not
 		// resolve to Object.prototype.constructor.
 		const key = verb.toLowerCase();
-		const doing = Object.hasOwn(PROGRESSIVE, key) ? PROGRESSIVE[key] : undefined;
-		return doing ? [doing, ...rest].join(" ") : phrase;
+		const forms = Object.hasOwn(VERB_FORMS, key) ? VERB_FORMS[key] : undefined;
+		if (!forms) return phrase;
+		return [running ? forms[1] : forms[0], ...rest].join(" ");
 	}
 	function boldVerb(theme: { bold: (text: string) => string }, label: string): string {
 		return label.replace(/^[^\s(:]+/, word => theme.bold(word));
@@ -1157,9 +1181,11 @@ function taskElapsed(task: BgTask): string {
 					return new Container();
 				}
 				if (!context.expanded && context.state?.causal) {
-					const name = redactSecrets(typeof input.description === "string" && input.description.trim()
+					// A background task's row keeps the imperative, like its header.
+					const task = context.toolCallId ? backgroundTimings.get(context.toolCallId) : undefined;
+					const name = tenseVerb(redactSecrets(typeof input.description === "string" && input.description.trim()
 						? input.description.trim()
-						: "bash");
+						: "bash").replace(/\s+/g, " "), task ? undefined : context.isPartial === true);
 					const hint = redactSecrets(String(input.command ?? "").split(/\r?\n/).find(line => line.trim()) ?? "").trim();
 					return {
 						render(width) {
@@ -1174,7 +1200,12 @@ function taskElapsed(task: BgTask): string {
 				}
 				const call = context.toolCallId ? active.get(context.toolCallId) : undefined;
 				const hintRequested = call?.state === "foreground" && call.hintRequested;
-				return operationHeader(renderBashCall(input, theme, context.expanded, context.cwd, hintRequested, context.isPartial === true), theme, context);
+				// A background task's row keeps the imperative: its spinner and exit
+				// words say the state. A foreground call is progressive while it runs
+				// and past once it is done.
+				const task = context.toolCallId ? backgroundTimings.get(context.toolCallId) : undefined;
+				const tensed = task ? undefined : context.isPartial === true;
+				return operationHeader(renderBashCall(input, theme, context.expanded, context.cwd, hintRequested, tensed), theme, context);
 			}
 			if (context.expanded) return (next() ?? builtInRenderers[toolName])?.renderCall?.(args, theme, forDelegate(context)) ?? new Text(`${toolName}\n${JSON.stringify(args, null, 2)}`, 0, 0);
 			const input = args as Record<string, unknown>;
@@ -1331,8 +1362,11 @@ function taskElapsed(task: BgTask): string {
 						// The same relative form the call heading shows: an absolute path here would
 						// name the worktree the footer already names, twice.
 						const relPath = rawPath ? worktreePath(rawPath) : "";
-						const label = context.state?.detailsCollapsed && typeof args?.description === "string" && args.description.trim()
-							? tenseVerb(redactSecrets(args.description.trim()).replace(/\s+/g, " "), options.isPartial === true)
+						// A background task's row keeps the imperative, like its header.
+						const task = context.toolCallId ? backgroundTimings.get(context.toolCallId) : undefined;
+						const failedLabel = typeof args?.description === "string" && args.description.trim()
+							? tenseVerb(redactSecrets(args.description.trim()).replace(/\s+/g, " "), task ? undefined : options.isPartial === true) : "";
+						const label = context.state?.detailsCollapsed && failedLabel ? failedLabel
 							: context.state?.detailsCollapsed && relPath ? `${verbs[toolName] ?? toolName} ${relPath}` : verbs[toolName] ?? toolName;
 						// The tool's own message embeds the path it was given; show it the way the
 						// row names it, so one screen does not carry both forms.
@@ -1444,7 +1478,9 @@ function taskElapsed(task: BgTask): string {
 		parameters,
 		description: `${original.description} Commands that run past ${Math.round(BUDGET_MS / 1000)}s move to the background automatically (the call returns a task id and a completion notification arrives later); Ctrl+B or Ctrl+Shift+B converts the running command by hand. Pass run_in_background: true to start in the background from the beginning.`,
 		renderCall(args, theme, context) {
-			return renderBashCall(args, theme, context.expanded, context.cwd, false, context.isPartial === true);
+			// A task row: its spinner and exit words say the state, so the description
+			// keeps the author's imperative.
+			return renderBashCall(args, theme, context.expanded, context.cwd, false);
 		},
 		async execute(toolCallId, input, signal, onUpdate, ctx): Promise<{ content: unknown[]; structuredContent?: unknown; isError?: boolean }> {
 			const { description, run_in_background, ...rest } = input as typeof input & {

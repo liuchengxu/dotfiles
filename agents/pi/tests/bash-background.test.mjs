@@ -404,7 +404,7 @@ test("causal names and dock labels redact credentials, including ghp_ tokens", (
     const args = { command: "python3 check.py", description: `Check endpoint ${secret}` };
     const causal = s.renderer("bash").renderCall(args, theme, { args, state: { causal: true }, expanded: false, isPartial: false, isError: false }).render(200).join("\n");
     assert.doesNotMatch(causal, /password|ghp_[0-9A-Za-z]+/);
-    assert.match(causal, /Check endpoint https:\/\/<redacted>/);
+    assert.match(causal, /Checked endpoint https:\/\/<redacted>/, "a finished foreground causal row reads as done");
     const dock = dockTask({ id: "bg-1", command: `curl '${secret}'`, description: `Watch ${secret}`, startedAt: 0, state: "running" });
     assert.doesNotMatch(dock.label, /password|ghp_[0-9A-Za-z]+/);
     assert.match(dock.label, /Watch https:\/\/<redacted>/);
@@ -509,9 +509,26 @@ test("a collapsed row bolds only its leading verb, progressive while running and
     assert.match(row("mcp__svc__do_thing", {}), /\*\*svc\*\* do thing\n\s+⎿ mcp__svc__do_thing$/, "an unknown tool shows its name while running, never a blank row");
     assert.doesNotMatch(row("bash", bash), /\*\*the test layout\*\*/, "the object of the verb stays normal weight");
     assert.doesNotMatch(row("bash", bash), /· Running/, "the progressive verb replaces the Running suffix");
-    // A finished row keeps the author's words: pi cannot inflect arbitrary past tense.
+    // A finished row takes the past tense for a known verb, and keeps the
+    // author's words for any other verb: pi cannot inflect arbitrary past tense.
     // A failed bash row persists, so it is where a done-state label is observable.
-    assert.deepEqual(row("bash", { ...bash, command: "python3 check.py" }, { isPartial: false, isError: true }), "✗ **Explore** the test layout", "no invented past tense");
+    const failed = (description) => row("bash", { ...bash, command: "python3 check.py", description }, { isPartial: false, isError: true });
+    assert.deepEqual(failed("Explore the test layout"), "✗ **Explored** the test layout");
+    assert.deepEqual(failed("Open the config"), "✗ **Open** the config", "no invented past tense for a verb outside the table");
+    // Mutation verbs read the same way: Posting while it runs, Posted once it is done.
+    assert.match(row("bash", { ...bash, description: "Post the review replies" }), /\*\*Posting\*\* the review replies/);
+    assert.deepEqual(failed("Post the review replies"), "✗ **Posted** the review replies");
+    // A successful foreground mutation persists too, and reads as done.
+    assert.match(row("bash", { ...bash, command: "git push", description: "Push the branch" }, { isPartial: false }), /^⏺ \*\*Pushed\*\* the branch$/);
+    // The same two states hold for every model-written label, not only bash: a
+    // mutation-shaped mcp call persists when done, so it is where the done
+    // state is observable.
+    const post = { instruction: "Post the review replies" };
+    assert.match(row("mcp__svc__post", post), /\*\*Posting\*\* the review replies/, "running: progressive");
+    assert.match(row("mcp__svc__post", post, { isPartial: false }), /^⏺ \*\*Posted\*\* the review replies\n\s+⎿ mcp__svc__post$/, "done: past tense");
+    assert.match(row("mcp__svc__post", post, { isPartial: false, isError: true }), /^✗ \*\*Posted\*\* the review replies\b/, "failed: past tense");
+    // A verb outside the table keeps the author's words in both states.
+    assert.match(row("bash", { ...bash, description: "Set up the cluster" }), /\*\*Set\*\* up the cluster/);
   } finally { s.shutdown(); }
 });
 
@@ -647,6 +664,7 @@ test("a background task is one row: the header carries its id, time, and exit", 
     const handoff = (state = {}) => renderer.renderResult({ content: [{ type: "text", text: "" }], details: { handoff: `started ${id}` } }, { expanded: false, isPartial: false }, theme, { ...context, state }).render(120);
     assert.match(header(), new RegExp(`Wait then fail · ${id} · \\d+s$`));
     assert.doesNotMatch(header(), /Running/, "the spinner says it");
+    assert.match(renderer.renderCall(args, theme, { ...context, state: { causal: true } }).render(120)[0], /^└ Wait then fail · while /, "a causal task row keeps the imperative");
     assert.deepEqual(handoff(), [], "no second row while the header is visible");
     assert.match(handoff({ causal: true })[0], new RegExp(`^↳ Wait then fail · ${id} · Running · \\d+s$`), "a row without the spinner says Running");
     writeFileSync(release, "");
@@ -655,6 +673,8 @@ test("a background task is one row: the header carries its id, time, and exit", 
     assert.deepEqual(handoff(), []);
     assert.match(renderer.renderCall(args, theme, context).render(40)[0], /Failed \(exit code 2\)/, "a narrow row cuts the time, not the exit code");
     assert.match(handoff({ causal: true })[0], new RegExp(`^↳ Wait then fail · ${id} · Failed \\(exit code 2\\) · \\d+s$`), "a hidden header leaves one named row");
+    // The failed task's collapsed error row keeps the imperative too.
+    assert.equal(renderer.renderResult({ content: [{ type: "text", text: "Command failed with exit code 2" }], details: {} }, { expanded: false, isPartial: false }, theme, { ...context, isError: true, state: { detailsCollapsed: true } }).render(120)[0], "✗ Wait then fail: Command failed with exit code 2");
   } finally {
     rmSync(release, { force: true });
     s.shutdown();
