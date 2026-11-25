@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { closeSync, fstatSync, openSync, readdirSync, readSync, statSync } from "node:fs";
+import { closeSync, fstatSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { applyComplete, applyStarted, clearRegistry, lastToolLine, prune, recordLaunch, visibleRows, workflowLabel, type SubagentRow } from "./lib/subagent-runs.ts";
+import { applyComplete, applyStarted, clearRegistry, lastToolLine, prune, recordLaunch, visibleRows, workflowGoal, workflowLabel, type SubagentRow } from "./lib/subagent-runs.ts";
 import { dockLabel } from "./bash-background.ts";
 
 /** A raw tool line says what was typed, not what it means; a small model
@@ -87,29 +87,64 @@ function latestSessionFile(dir: string): string | undefined {
 	return best;
 }
 
+/** The newest tool activity in a transcript's tail. */
+function newestActivity(file: string): string | undefined {
+	const fd = openSync(file, "r");
+	try {
+		const size = fstatSync(fd).size;
+		const length = Math.min(size, TAIL_BYTES);
+		const buffer = Buffer.alloc(length);
+		readSync(fd, buffer, 0, length, Math.max(0, size - length));
+		let tail = buffer.toString("utf8");
+		if (size > length) tail = tail.slice(tail.indexOf("\n") + 1); // drop the torn head
+		return lastToolLine(tail);
+	} finally { closeSync(fd); }
+}
+
+function stamp(row: SubagentRow, next: string | undefined): void {
+	if (next !== row.progress) row.brief = undefined; // the old brief no longer describes this
+	row.progress = next;
+}
+
 /** Reads each running row's transcript tail and stamps its newest tool
  * activity onto the row. Read-only; any miss just leaves the goal alone. */
 export function refreshRunProgress(sessionsRoot: string, rows: SubagentRow[]): void {
 	for (const row of rows) {
 		if (row.state !== "running") continue;
 		try {
+			if (row.children?.length) { readWorkflow(row); continue; }
 			const dir = resolveRunDir(sessionsRoot, row.id);
 			const file = dir ? latestSessionFile(dir) : undefined;
-			if (!file) continue;
-			const fd = openSync(file, "r");
-			try {
-				const size = fstatSync(fd).size;
-				const length = Math.min(size, TAIL_BYTES);
-				const buffer = Buffer.alloc(length);
-				readSync(fd, buffer, 0, length, Math.max(0, size - length));
-				let tail = buffer.toString("utf8");
-				if (size > length) tail = tail.slice(tail.indexOf("\n") + 1); // drop the torn head
-				const next = lastToolLine(tail);
-				if (next !== row.progress) row.brief = undefined; // the old brief no longer describes this
-				row.progress = next;
-			} finally { closeSync(fd); }
+			if (file) stamp(row, newestActivity(file));
 		} catch { /* unreadable transcript: the row keeps its goal */ }
 	}
+}
+
+/** A workflow's own transcript is empty: each step's run holds the work, and
+ * the runner's status file for that run names the step and its transcript.
+ * The file appears at spawn, so one that cannot be read yet is read again on
+ * the next tick. */
+function readWorkflow(row: SubagentRow): void {
+	const labels: string[] = [];
+	const activity: string[] = [];
+	for (const child of row.children ?? []) {
+		if (!child.sessionFile && child.asyncDir) {
+			try {
+				const steps = JSON.parse(readFileSync(join(child.asyncDir, "status.json"), "utf-8"))?.steps;
+				const step = Array.isArray(steps) ? steps.find((item) => item?.status === "running") ?? steps[0] : undefined;
+				if (typeof step?.label === "string") child.label = dockLabel(step.label);
+				if (typeof step?.sessionFile === "string") child.sessionFile = step.sessionFile;
+			} catch { /* not written yet */ }
+		}
+		if (child.label) labels.push(child.label);
+		if (!child.sessionFile) continue;
+		try {
+			const line = newestActivity(child.sessionFile);
+			if (line) activity.push(line);
+		} catch { /* transcript not written yet */ }
+	}
+	if (labels.length > 0) row.goal = workflowGoal(labels);
+	stamp(row, activity.length > 0 ? activity.join(" | ") : undefined);
 }
 
 /**

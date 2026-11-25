@@ -12,7 +12,7 @@ const jiti = createJiti(import.meta.url, { alias: {
 	"@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
 	"@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
-const { applyComplete, applyStarted, clearRegistry, lastToolLine, prune, recordLaunch, subagentLines, visibleRows, workflowLabel, LINGER_MS, MAX_ROWS } = await jiti.import(new URL("../extensions/lib/subagent-runs.ts", import.meta.url).pathname);
+const { applyComplete, applyStarted, clearRegistry, lastToolLine, prune, recordLaunch, subagentLines, visibleRows, workflowGoal, workflowLabel, LINGER_MS, MAX_ROWS } = await jiti.import(new URL("../extensions/lib/subagent-runs.ts", import.meta.url).pathname);
 const { refreshRunProgress, maybeBrief } = await jiti.import(new URL("../extensions/subagent-dock.ts", import.meta.url).pathname);
 const { stripVTControlCharacters } = await import("node:util");
 
@@ -194,6 +194,36 @@ test("refreshRunProgress resolves a run tree read-only and stamps its newest cal
 		assert.equal(running.progress, "read 40 lines");
 		assert.equal(running.brief, undefined, "a changed activity retires its stale brief");
 	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("a workflow is named by its steps' labels", () => {
+	assert.equal(workflowGoal(["Scout"]), "Scout");
+	assert.equal(workflowGoal(["Build history", "Build the Ended group", "Review"]), "Build history + Build the Ended group +1");
+});
+
+test("a workflow row takes its step's label and activity from the run it spawned", () => {
+	const root = mkdtempSync(join(tmpdir(), "sa-wf-"));
+	try {
+		clearRegistry();
+		applyStarted({ id: "wf-1", agent: "workflow" });
+		assert.equal(visibleRows()[0].goal, "unlabelled", "before the first step starts, nothing names it");
+		const asyncDir = join(root, "async-child-1");
+		mkdirSync(asyncDir, { recursive: true });
+		const sessionFile = join(root, "child-1.jsonl");
+		writeFileSync(sessionFile, JSON.stringify({ type: "message", message: { role: "assistant", content: [
+			{ type: "toolCall", name: "read", arguments: { path: "/w/src/collect.mjs" } } ] } }) + "\n");
+		applyStarted({ id: "child-1", agent: "worker", parentWorkflowRunId: "wf-1", asyncDir });
+		assert.equal(visibleRows().length, 1, "the step's run still earns no row of its own");
+		refreshRunProgress(root, visibleRows());
+		assert.equal(visibleRows()[0].goal, "unlabelled", "no status file yet: the next tick reads again");
+		writeFileSync(join(asyncDir, "status.json"), JSON.stringify({ steps: [{ status: "running", label: "Add Antigravity CLI sessions to the dashboard", sessionFile }] }));
+		refreshRunProgress(root, visibleRows());
+		const line = subagentLines(visibleRows(), 160, theme)[0];
+		assert.match(line, /^workflow ◆ Add Antigravity CLI sessions to the dashboard · read \/w\/src\/collect\.mjs \d+s$/);
+	} finally {
+		clearRegistry();
 		rmSync(root, { recursive: true, force: true });
 	}
 });

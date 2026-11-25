@@ -20,6 +20,17 @@ export interface SubagentRow {
 	startedAt: number;
 	endedAt?: number;
 	state: "running" | "done" | "failed" | "stopped";
+	/** The runs a workflow spawned: one per step, each holding that step's work. */
+	children?: ChildRun[];
+}
+
+export interface ChildRun {
+	id: string;
+	agent: string;
+	/** The runner's directory for the run; status.json names the step once it has spawned. */
+	asyncDir?: string;
+	label?: string;
+	sessionFile?: string;
 }
 
 interface Registry {
@@ -63,6 +74,7 @@ interface StartedEvent {
 	chainStepCount?: number;
 	workflowGraph?: { phases?: Array<{ title?: string }> };
 	parentWorkflowRunId?: unknown;
+	asyncDir?: string;
 }
 
 /** What the row says the run is doing. A workflow's own name says nothing, so
@@ -85,14 +97,24 @@ function startedGoal(event: StartedEvent, launchGoal: string | undefined, agent:
 	return agent === "workflow" ? "unlabelled" : agent;
 }
 
+/** A workflow is named by its steps' labels once they are known. */
+export function workflowGoal(labels: string[]): string {
+	return labels.slice(0, 2).join(" + ") + (labels.length > 2 ? ` +${labels.length - 2}` : "");
+}
+
 export function applyStarted(event: StartedEvent): void {
 	const id = typeof event.id === "string" && event.id ? event.id : undefined;
 	if (!id) return;
 	// A child spawned by a workflow is an internal step: its completion is
 	// skipped below (awaitedByWorkflow), so giving it a row would leave it
-	// running forever. The workflow's own root row carries the run.
-	if (typeof event.parentWorkflowRunId === "string" && event.parentWorkflowRunId) return;
+	// running forever. The workflow's row carries the run and reads this
+	// child's label and transcript.
 	const current = registry();
+	if (typeof event.parentWorkflowRunId === "string" && event.parentWorkflowRunId) {
+		const parent = current.rows.get(event.parentWorkflowRunId);
+		if (parent) (parent.children ??= []).push({ id, agent: event.agent ?? "", ...(event.asyncDir ? { asyncDir: event.asyncDir } : {}) });
+		return;
+	}
 	const launch = event.toolCallId ? current.launches.get(event.toolCallId) : undefined;
 	const agent = launch?.agent ?? (typeof event.agent === "string" && event.agent ? event.agent : "agent");
 	current.rows.set(id, {
