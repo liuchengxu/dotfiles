@@ -1,7 +1,7 @@
 #!/bin/bash
 # Store the YubiKey FIDO2 PIN in the login keychain so signing needs only a
 # consent click plus the tap. Run from a terminal in the logged-in GUI session.
-# The PIN is typed into Apple's hidden prompt and never appears on the command
+# The PIN is typed at a hidden terminal prompt and never appears on the command
 # line, in this script, or in shell history.
 set -euo pipefail
 SERVICE="yubikey-fido-pin"
@@ -12,15 +12,10 @@ if ! /usr/bin/security show-keychain-info "$KEYCHAIN" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "A dialog asks for your Mac LOGIN password: it lets 'security' read the item without prompting."
-login_password=$(/usr/bin/osascript -e 'display dialog "Keychain access for signing: type your Mac login password" default answer "" with hidden answer buttons {"Cancel", "OK"} default button "OK" cancel button "Cancel" -e "text returned of result"' 2>&1) || { echo "dialog failed or was cancelled: $login_password" >&2; exit 1; }
-/usr/bin/security set-generic-password-partition-list -S security -k "$login_password" "$KEYCHAIN" >/dev/null || { echo "could not update the keychain partition list" >&2; exit 1; }
-unset login_password
-
 /usr/bin/security delete-generic-password -a "$USER" -s "$SERVICE" >/dev/null 2>&1 || true
-echo "Now type the YUBIKEY PIN:"
+echo "Type the YubiKey PIN at the next two prompts (not echoed):"
 /usr/bin/security add-generic-password -a "$USER" -s "$SERVICE" -U -w
 
-echo "--- trusted applications for the item:"
-/usr/bin/security find-generic-password -a "$USER" -s "$SERVICE" -g 2>&1 | grep -v '^password' || true
+echo "--- keychain item (the PIN itself is not read or printed):"
+/usr/bin/security find-generic-password -a "$USER" -s "$SERVICE" 2>&1 | grep -E '"acct"|"svce"|keychain:' || true
 echo "done"

@@ -14,10 +14,10 @@ from pathlib import Path
 
 SSH = "/usr/bin/ssh"
 SSH_KEYGEN = "/usr/bin/ssh-keygen"
-SSH_ALIAS = "macbook-yubikey-sign"
+SSH_ALIAS = "work-macbook-yubikey-sign"
 REMOTE_COMMAND = "babylon-git-sign-v1"
 EXPECTED_KEY = "/Users/xlc/.ssh/yubikey-primary.pub"
-SCOPE_ROOT = "/Users/xlc/src/github.com/babylonlabs-io"
+SCOPE_ROOT = str(Path.home() / "src/github.com/babylonlabs-io")
 MAX_PAYLOAD = 1024 * 1024
 MAX_SIGNATURE = 64 * 1024
 MAX_RESPONSE = 128 * 1024
@@ -105,10 +105,14 @@ def repository_context():
         raise SigningError("repository is outside the babylonlabs-io signing scope")
 
     top_level = os.path.realpath(git_output("rev-parse", "--show-toplevel"))
-    branch = git_output("rev-parse", "--abbrev-ref", "HEAD")
+    try:
+        branch = git_output("rev-parse", "--abbrev-ref", "HEAD")
+    except SigningError:
+        # An unborn HEAD has no branch name yet; this is the repository's first commit.
+        branch = "(unborn)"
     return {
         "origin": sanitize_context(
-            f"Mac Studio (reported): {socket.gethostname()}", CONTEXT_LIMITS["origin"]
+            f"remote origin (reported): {socket.gethostname()}", CONTEXT_LIMITS["origin"]
         ),
         "path": sanitize_context(top_level, CONTEXT_LIMITS["path"]),
         "repo": sanitize_context(os.path.basename(top_level), CONTEXT_LIMITS["repo"]),

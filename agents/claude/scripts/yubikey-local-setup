@@ -1,0 +1,49 @@
+#!/bin/bash
+# Prepare this Mac to sign git commits with the YubiKey plugged into it:
+# download the key handle, point the babylonlabs scope at the local gate, and
+# prove one signature. Run it from a Terminal window: the PIN prompt needs it.
+set -euo pipefail
+KEYGEN=/opt/homebrew/opt/openssh/bin/ssh-keygen
+GATE=$HOME/.local/bin/yubikey-sign
+PUB=$HOME/.ssh/yubikey-primary.pub
+HANDLE=$HOME/.ssh/yubikey-primary
+CONFIG=$HOME/.gitconfig-babylonlabs
+
+[ -x "$GATE" ] && [ -x "$HOME/.local/bin/ssh-askpass" ] || { echo "gate scripts missing in ~/.local/bin" >&2; exit 1; }
+[ -e "$HANDLE" ] && { echo "$HANDLE already exists; not overwriting it" >&2; exit 1; }
+cd "$HOME/.ssh"
+if ls id_*_sk_rk* >/dev/null 2>&1; then
+	echo "old key downloads are in $HOME/.ssh; move them away first:" >&2
+	ls id_*_sk_rk* >&2
+	exit 1
+fi
+
+echo "Download the key handle: type the YubiKey PIN (not echoed), tap the key, then press Enter twice for 'no passphrase'."
+"$KEYGEN" -K
+# ssh-keygen names a downloaded key id_<type>_rk or id_<type>_rk_<id> and
+# may or may not write a .pub beside it, so match by fingerprint.
+want=$("$KEYGEN" -lf "$PUB" | awk '{print $2}')
+match=""
+for f in id_*_sk_rk*; do
+	case "$f" in *.pub) continue ;; esac
+	[ "$("$KEYGEN" -lf "$f" </dev/null 2>/dev/null | awk '{print $2}')" = "$want" ] && match=$f
+done
+[ -n "$match" ] || { echo "no downloaded key matches $PUB:" >&2; ls id_*_sk_rk* >&2; exit 1; }
+mv "$match" "$HANDLE"
+chmod 600 "$HANDLE"
+rm -f id_*_sk_rk*
+echo "Installed the handle as $HANDLE."
+
+backup="$CONFIG.bak-remote-program-$(date +%Y%m%d-%H%M%S)"
+cp -p "$CONFIG" "$backup"
+sed -i '' 's#^\([[:space:]]*program[[:space:]]*=[[:space:]]*\).*#\1~/.local/bin/yubikey-sign#' "$CONFIG"
+echo "Signing program for ~/src/github.com/babylonlabs-io is now the local gate. Backup of the remote setting: $backup"
+
+echo "Prove one signature: a dialog opens; type the PIN in it, or click Sign when the keychain holds it, then tap the key."
+check=$(mktemp -d)
+echo "yubikey local signing check $(date -u +%FT%TZ)" > "$check/msg"
+"$GATE" -Y sign -n git -f "$PUB" "$check/msg"
+printf 'check %s\n' "$want" > "$check/allowed_signers"
+"$KEYGEN" -Y verify -f "$check/allowed_signers" -I check -n git -s "$check/msg.sig" "$check/msg"
+rm -rf "$check"
+echo "Local signing is ready. Run yubikey-pin-store once to keep the PIN in the login keychain, so that later signatures need only a click and a tap."

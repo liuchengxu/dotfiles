@@ -14,8 +14,8 @@ from pathlib import Path
 
 
 EXPECTED_COMMAND = "babylon-git-sign-v1"
-SIGNING_GATE = "/Users/xuliucheng/.local/bin/yubikey-sign"
-EXPECTED_KEY = "/Users/xuliucheng/.ssh/yubikey-primary.pub"
+SIGNING_GATE = str(Path.home() / ".local/bin/yubikey-sign")
+EXPECTED_KEY = str(Path.home() / ".ssh/yubikey-primary.pub")
 MAX_PAYLOAD = 1024 * 1024
 MAX_REQUEST = 1536 * 1024
 MAX_SIGNATURE = 64 * 1024
@@ -109,11 +109,12 @@ def sign_payload(payload, context):
         payload_file = Path(directory, "payload")
         payload_file.write_bytes(payload)
         os.chmod(payload_file, 0o600)
+        user = Path.home().name
         environment = {
-            "HOME": "/Users/xuliucheng",
-            "LOGNAME": "xuliucheng",
+            "HOME": str(Path.home()),
+            "LOGNAME": user,
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin",
-            "USER": "xuliucheng",
+            "USER": user,
             "SSH_ASKPASS_ORIGIN": context["origin"],
             "SSH_ASKPASS_ORIGIN_PATH": context["path"],
             "SSH_ASKPASS_ORIGIN_REPO": context["repo"],

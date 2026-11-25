@@ -1,0 +1,29 @@
+#!/bin/bash
+# Hold the reverse tunnel that lets Studio request YubiKey signatures from this
+# laptop. Run it from a laptop terminal while you commit on Studio; it stops
+# with the terminal. Studio dials the forward through the alias
+# work-macbook-yubikey-sign and can only run yubikey-sign-server here.
+set -euo pipefail
+STUDIO="${SIGNING_TUNNEL_STUDIO:-xlc@100.75.4.22}"
+PORT="${SIGNING_TUNNEL_PORT:-2222}"
+for file in "$HOME/.ssh/id_ed25519_tunnel" "$HOME/.ssh/known_hosts_studio_signing"; do
+	[ -r "$file" ] || { echo "signing-tunnel runs on the work laptop: $file is missing on $(hostname -s)" >&2; exit 1; }
+done
+printf 'Opening signing tunnel to %s. Unless an error follows, Studio reaches this laptop on 127.0.0.1:%s. Ctrl+C stops it.\n' "$STUDIO" "$PORT"
+# -F /dev/null keeps the laptop's ssh config out of the connection. The obvious
+# ClearAllForwardings option would also cancel the -R given here.
+exec /usr/bin/ssh -N \
+  -F /dev/null \
+  -o BatchMode=yes \
+  -o ConnectTimeout=10 \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=yes \
+  -o HostKeyAlias=studio-signing-tunnel \
+  -o "UserKnownHostsFile=$HOME/.ssh/known_hosts_studio_signing" \
+  -o "IdentityFile=$HOME/.ssh/id_ed25519_tunnel" \
+  -o IdentitiesOnly=yes \
+  -o IdentityAgent=none \
+  -R "127.0.0.1:${PORT}:localhost:22" \
+  "$STUDIO"

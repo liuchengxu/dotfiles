@@ -94,7 +94,7 @@ class ClientScopeTests(unittest.TestCase):
         with mock.patch.object(client.socket, "gethostname", return_value="studio"):
             context = self.context_for(common_dir)
         self.assertEqual(context["branch"], "main")
-        self.assertEqual(context["origin"], "Mac Studio (reported): studio")
+        self.assertEqual(context["origin"], "remote origin (reported): studio")
 
     def test_allows_linked_worktree_by_common_dir(self):
         common_dir = self.scope / "repo" / ".git"
@@ -105,6 +105,15 @@ class ClientScopeTests(unittest.TestCase):
             self.context_for(common_dir, outside_worktree)["path"],
             os.path.realpath(outside_worktree),
         )
+
+    def test_reports_unborn_head_for_a_first_commit(self):
+        common_dir = self.scope / "repo" / ".git"
+        common_dir.mkdir(parents=True)
+        outputs = [str(common_dir), str(Path(self.temporary.name, "repo")), client.SigningError("unborn")]
+        with mock.patch.object(client, "SCOPE_ROOT", str(self.scope)):
+            with mock.patch.object(client, "git_output", side_effect=outputs):
+                self.assertEqual(client.repository_context()["branch"], "(unborn)")
+        self.assertEqual(outputs[0], str(common_dir))
 
     def test_rejects_outside_and_prefix_sibling(self):
         for common_dir in [
@@ -314,10 +323,18 @@ class ServerSigningTests(unittest.TestCase):
             self.assertEqual(server.sign_payload(b"payload", self.context()), b"signature")
         self.assertEqual(process.command[0], server.SIGNING_GATE)
         self.assertEqual(process.command[1:7], ["-Y", "sign", "-f", server.EXPECTED_KEY, "-n", "git"])
-        self.assertEqual(process.kwargs["env"]["SSH_ASKPASS_ORIGIN_REPO"], "repo")
+        # Paths and identity follow the invoking user; a hardcoded home would
+        # break the server on any other machine.
+        self.assertEqual(process.command[0], str(Path.home() / ".local/bin/yubikey-sign"))
+        self.assertEqual(process.command[4], str(Path.home() / ".ssh/yubikey-primary.pub"))
+        environment = process.kwargs["env"]
+        self.assertEqual(
+            (environment["HOME"], environment["USER"], environment["LOGNAME"]),
+            (str(Path.home()), Path.home().name, Path.home().name),
+        )
+        self.assertEqual(environment["SSH_ASKPASS_ORIGIN_REPO"], "repo")
         self.assertNotIn("SSH_ORIGINAL_COMMAND", process.kwargs["env"])
         self.assertTrue(process.kwargs["start_new_session"])
-
     def test_cancellation_and_gate_error_do_not_retry(self):
         for returncode, stderr, message in [
             (server.EXIT_CANCELLED, b"", "YUBIKEY_SIGNING_CANCELLED"),
