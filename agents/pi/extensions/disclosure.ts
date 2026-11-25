@@ -2,7 +2,7 @@ import {
   AssistantMessageComponent, BashExecutionComponent, CustomMessageComponent,
   InteractiveMode, ToolExecutionComponent, UserMessageComponent, type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Text, truncateToWidth, type Component } from "@earendil-works/pi-tui";
+import { Container, Markdown, Spacer, Text, truncateToWidth, type Component } from "@earendil-works/pi-tui";
 
 const patchKey = Symbol.for("pi.disclosure.v1");
 const expandedKey = Symbol.for("pi.disclosure.assistant-expanded");
@@ -198,6 +198,20 @@ function collapseCode(text: string, state: CodeState): string {
 
 export function collapseCodeBlocks(text: string): string { return collapseCode(text, {}); }
 
+const INTERIM_LINES = 2;
+// A bold span closes with SGR 22, which would also end the dim.
+const dim = (text: string): string => `\x1b[2m${text.replace(/\x1b\[(?:0|22)m/g, "$&\x1b[2m")}\x1b[22m`;
+
+/** A note keeps its first lines in dim and counts the rest; the expand key shows them. */
+export function interimLines(lines: string[], width: number): string[] {
+  const text = lines.filter((line) => line.trim() !== "");
+  const shown = text.slice(0, INTERIM_LINES).map(dim);
+  const hidden = text.length - shown.length;
+  return hidden > 0
+    ? [...shown, dim(truncateToWidth(`  … +${hidden} line${hidden === 1 ? "" : "s"} · Ctrl+O for details`, Math.max(1, width), ""))]
+    : shown;
+}
+
 function patchAssistant(): void {
   const proto = AssistantMessageComponent.prototype as any;
   if (proto[patchKey]) return;
@@ -208,6 +222,8 @@ function patchAssistant(): void {
   };
   proto.updateContent = function (message: any, ...args: unknown[]) {
     const expanded = Boolean(this[expandedKey]);
+    // A message that ends in tool calls is a note between tool rows, not the reply.
+    const interim = message.stopReason === "toolUse";
     const state: CodeState = {};
     const content = expanded ? message.content : message.content.filter((block: any) => block.type !== "thinking").map((block: any) => {
       if (block.type !== "text") return block;
@@ -223,16 +239,21 @@ function patchAssistant(): void {
       error.setExpanded(expanded);
       container.addChild(error);
     }
+    let noted = false;
     for (const [index, child] of [...container.children].entries()) {
       if (!(child instanceof Markdown)) continue;
+      noted = true;
       container.children[index] = {
         render(width) {
           if (width < 3) return child.render(width).map(line => truncateToWidth(line, Math.max(1, width), ""));
-          return child.render(width - 2).map((line, index) => truncateToWidth(`${index === 0 ? "⏺ " : "  "}${line}`, width, ""));
+          const lines = child.render(width - 2).map((line, index) => truncateToWidth(`${index === 0 ? "⏺ " : "  "}${line}`, width, ""));
+          return interim && !expanded ? interimLines(lines, width) : lines;
         },
         invalidate() { child.invalidate(); },
       };
     }
+    // Pi sets a blank line above a message's first visible block; a note joins the rows it sits between.
+    if (interim && noted && container.children[0] instanceof Spacer) container.children.shift();
   };
   proto[patchKey] = true;
 }
