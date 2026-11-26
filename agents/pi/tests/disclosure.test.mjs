@@ -11,10 +11,11 @@ const jiti = createJiti(import.meta.url, { alias: {
 	"@earendil-works/pi-coding-agent": join(root, "dist/index.js"),
 	"@earendil-works/pi-tui": join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"),
 } });
-const { collapseCodeBlocks } = await jiti.import(new URL("../extensions/disclosure.ts", import.meta.url).pathname);
+const { collapseCodeBlocks, linkRows } = await jiti.import(new URL("../extensions/disclosure.ts", import.meta.url).pathname);
 const { default: disclosure } = await jiti.import(new URL("../extensions/disclosure.ts", import.meta.url).pathname);
-const { AssistantMessageComponent } = await jiti.import(join(root, "dist/index.js"));
-const { stripTerminalSequences } = await jiti.import(join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"));
+const { AssistantMessageComponent, ToolExecutionComponent, UserMessageComponent, initTheme } = await jiti.import(join(root, "dist/index.js"));
+const { Container, stripTerminalSequences } = await jiti.import(join(root, "node_modules/@earendil-works/pi-tui/dist/index.js"));
+initTheme();
 disclosure({});
 
 const NOTE = "Yes — and now that the ask bar has a line of its own, the two controls at its far right are the odd part: a clean input reads better, and model and thinking are set once and rarely touched.";
@@ -34,22 +35,42 @@ test("a dump and a workflow script are summarized", () => {
 	assert.equal(collapseCodeBlocks(block("js workflow", 3)), "Agent workflow · Ctrl+O for details");
 });
 
-test("a note between tool rows stays two dim lines until expanded", () => {
-	const component = new AssistantMessageComponent({ ...interim(NOTE), stopReason: undefined });
-	const streaming = plain(component.render(80));
-	assert.ok(streaming.length > 3, "while streaming, before the tool calls are known, the text shows in full");
-	component.updateContent(interim(NOTE));
-	const note = component.render(80);
-	assert.equal(note.length, 3, "two lines plus the count, and no blank line above");
-	assert.ok(note[0].startsWith("\x1b[2m⏺ "), "dim, and still one marked block");
-	assert.match(plain(note)[2], /^  … \+\d+ lines? · Ctrl\+O for details$/);
-	assert.deepEqual(plain(note).slice(0, 2), streaming.slice(1, 3), "the first two lines as written");
-	component.setExpanded(true);
-	const expanded = component.render(80);
-	assert.deepEqual(plain(expanded), streaming.slice(1), "expanded: every line at full length, still tight between the rows");
-	assert.ok(!expanded.some((line) => line.startsWith("\x1b[2m")), "at normal weight once expanded");
-	component.setExpanded(false);
-	assert.equal(component.render(80).length, 3, "collapsing returns to the note");
+test("a note between tool rows reads like any reply", () => {
+	const lines = new AssistantMessageComponent(interim(NOTE)).render(80);
+	assert.equal(stripTerminalSequences(lines[0]), "", "the blank line above it stays");
+	assert.ok(plain(lines).length > 3, "and all of its lines");
+	assert.ok(!lines.some((line) => line.startsWith("\x1b[2m")), "at normal weight");
+});
+
+const row = (id, lines) => new ToolExecutionComponent("bash", id, {}, {},
+	{ renderShell: "self", renderCall: () => ({ render: () => lines, invalidate() {} }) }, { requestRender() {} }, process.cwd());
+const prompt = () => new UserMessageComponent("the question");
+
+test("a tool row sits tight under the visible row before it", () => {
+	const chat = new Container();
+	const step = { role: "assistant", stopReason: "toolUse", content: [{ type: "toolCall", id: "c9", name: "bash", arguments: {} }] };
+	for (const child of [prompt(), new AssistantMessageComponent(interim(NOTE)), row("c1", ["ROW 1"]), row("c2", []),
+		new AssistantMessageComponent(step), row("c3", ["ROW 2"])]) chat.addChild(child);
+	linkRows(chat);
+	assert.deepEqual(plain(chat.render(80)).slice(-3), ["", "ROW 1", "ROW 2"], "a vanished row or a step without text opens no gap");
+});
+
+test("a tool row keeps Pi's blank line after a note or the prompt", () => {
+	for (const head of [[prompt(), new AssistantMessageComponent(interim(NOTE))], [prompt()]]) {
+		const chat = new Container();
+		for (const child of [...head, row("c1", ["ROW 1"])]) chat.addChild(child);
+		linkRows(chat);
+		assert.deepEqual(plain(chat.render(80)).slice(-2), ["", "ROW 1"]);
+	}
+});
+
+test("a tool row keeps Pi's blank line when expanded", () => {
+	const chat = new Container();
+	const last = row("c3", ["ROW 2"]);
+	for (const child of [prompt(), new AssistantMessageComponent(interim(NOTE)), row("c1", ["ROW 1"]), last]) chat.addChild(child);
+	linkRows(chat);
+	last.setExpanded(true);
+	assert.deepEqual(plain(chat.render(80)).slice(-2), ["", "ROW 2"]);
 });
 
 test("a final reply and a tool-only step render as before", () => {

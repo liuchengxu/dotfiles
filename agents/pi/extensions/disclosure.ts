@@ -2,7 +2,7 @@ import {
   AssistantMessageComponent, BashExecutionComponent, CustomMessageComponent,
   InteractiveMode, ToolExecutionComponent, UserMessageComponent, type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Spacer, Text, truncateToWidth, type Component } from "@earendil-works/pi-tui";
+import { Container, Markdown, Text, truncateToWidth, type Component } from "@earendil-works/pi-tui";
 
 const patchKey = Symbol.for("pi.disclosure.v1");
 const expandedKey = Symbol.for("pi.disclosure.assistant-expanded");
@@ -103,6 +103,36 @@ function toolFallback(row: any, error?: unknown): Disclosure {
   return view;
 }
 
+const vanishedKey = Symbol.for("pi.disclosure.vanished");
+const linkedKey = Symbol.for("pi.disclosure.linked");
+
+// The closest sibling that draws something decides: a visible row joins; a
+// note, the prompt, a notice or nothing keeps Pi's blank line.
+function joinsRow(row: any): boolean {
+  for (let previous = row.predecessor; previous; previous = previous.predecessor) {
+    if (previous instanceof ToolExecutionComponent) {
+      if (!previous[vanishedKey]) return true;
+    } else {
+      const note = previous instanceof AssistantMessageComponent
+        && (previous.lastMessage?.content ?? []).some((block: any) => block.type === "text" && block.text.trim());
+      if (note || !(previous instanceof AssistantMessageComponent)) return false;
+    }
+  }
+  return false;
+}
+
+// pi-tui children cannot see their siblings; each frame tells a row which comes before it.
+export function linkRows(chat: Container): void {
+  if ((chat as any)[linkedKey]) return;
+  (chat as any)[linkedKey] = true;
+  const render = chat.render.bind(chat);
+  chat.render = (width: number) => {
+    const { children } = chat;
+    for (let index = 1; index < children.length; index++) (children[index] as any).predecessor = children[index - 1];
+    return render(width);
+  };
+}
+
 function patchTools(): void {
   const proto = ToolExecutionComponent.prototype as any;
   if (proto[patchKey]) return;
@@ -132,6 +162,13 @@ function patchTools(): void {
     if (!this.expanded) this.showImages = false;
     try { updateDisplay.call(this); }
     finally { this.showImages = showImages; }
+  };
+  // Pi draws a blank line above every row; a row that joins what precedes it drops that line.
+  const render = proto.render;
+  proto.render = function (width: number) {
+    const lines = render.call(this, width);
+    this[vanishedKey] = lines.length === 0;
+    return !this.expanded && lines[0] === "" && joinsRow(this) ? lines.slice(1) : lines;
   };
   proto[patchKey] = true;
 }
@@ -198,20 +235,6 @@ function collapseCode(text: string, state: CodeState): string {
 
 export function collapseCodeBlocks(text: string): string { return collapseCode(text, {}); }
 
-const INTERIM_LINES = 2;
-// A bold span closes with SGR 22, which would also end the dim.
-const dim = (text: string): string => `\x1b[2m${text.replace(/\x1b\[(?:0|22)m/g, "$&\x1b[2m")}\x1b[22m`;
-
-/** A note keeps its first lines in dim and counts the rest; the expand key shows them. */
-export function interimLines(lines: string[], width: number): string[] {
-  const text = lines.filter((line) => line.trim() !== "");
-  const shown = text.slice(0, INTERIM_LINES).map(dim);
-  const hidden = text.length - shown.length;
-  return hidden > 0
-    ? [...shown, dim(truncateToWidth(`  … +${hidden} line${hidden === 1 ? "" : "s"} · Ctrl+O for details`, Math.max(1, width), ""))]
-    : shown;
-}
-
 function patchAssistant(): void {
   const proto = AssistantMessageComponent.prototype as any;
   if (proto[patchKey]) return;
@@ -222,8 +245,6 @@ function patchAssistant(): void {
   };
   proto.updateContent = function (message: any, ...args: unknown[]) {
     const expanded = Boolean(this[expandedKey]);
-    // A message that ends in tool calls is a note between tool rows, not the reply.
-    const interim = message.stopReason === "toolUse";
     const state: CodeState = {};
     const content = expanded ? message.content : message.content.filter((block: any) => block.type !== "thinking").map((block: any) => {
       if (block.type !== "text") return block;
@@ -239,21 +260,16 @@ function patchAssistant(): void {
       error.setExpanded(expanded);
       container.addChild(error);
     }
-    let noted = false;
     for (const [index, child] of [...container.children].entries()) {
       if (!(child instanceof Markdown)) continue;
-      noted = true;
       container.children[index] = {
         render(width) {
           if (width < 3) return child.render(width).map(line => truncateToWidth(line, Math.max(1, width), ""));
-          const lines = child.render(width - 2).map((line, index) => truncateToWidth(`${index === 0 ? "⏺ " : "  "}${line}`, width, ""));
-          return interim && !expanded ? interimLines(lines, width) : lines;
+          return child.render(width - 2).map((line, index) => truncateToWidth(`${index === 0 ? "⏺ " : "  "}${line}`, width, ""));
         },
         invalidate() { child.invalidate(); },
       };
     }
-    // Pi sets a blank line above a message's first visible block; a note joins the rows it sits between.
-    if (interim && noted && container.children[0] instanceof Spacer) container.children.shift();
   };
   proto[patchKey] = true;
 }
@@ -365,6 +381,8 @@ function patchHost(): void {
   // so their renderers draw a muted causal line instead of vanishing.
   const causalKey = Symbol.for("pi.disclosure.causal");
   function collapseFinishedDetails(host: any) {
+    // Every turn boundary passes here, before the frame that shows the change.
+    linkRows(host.chatContainer);
     for (const child of host.chatContainer.children) {
       if (!(child instanceof ToolExecutionComponent) || !child.result || child.isPartial) continue;
       if (child.rendererState.detailsCollapsed) continue;
