@@ -146,12 +146,13 @@ export default function idleCompaction(pi: ExtensionAPI, controls: Controls = fi
           pi.appendEntry(ATTEMPT, { conversationKey: key });
           const current = { generation: epoch, sessionId, leafId: ctx.sessionManager.getLeafId() };
           attempt = current;
+          const started = Date.now();
           const finish = (success: boolean) => {
             if (attempt !== current) return;
             attempt = undefined;
             try {
               if (ctx.sessionManager.getSessionId() !== sessionId) return;
-              ctx.ui.notify(success ? "Idle compaction finished. Original transcript retained."
+              ctx.ui.notify(success ? `Idle compaction finished in ${Math.round((Date.now() - started) / 1000)} s. Original transcript retained.`
                 : "Idle compaction stopped or failed; no automatic retry for this conversation.", success ? "info" : "warning");
             } catch { /* The runtime may have been replaced while compaction completed. */ }
           };

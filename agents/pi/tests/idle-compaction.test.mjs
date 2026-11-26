@@ -71,13 +71,14 @@ function host(options = {}) {
 }
 
 test("one eligible idle attempt at exactly 45 minutes, with start/finish notices", (t) => {
+  let now = 0; t.mock.method(Date, "now", () => now);
   const c = clock(t), h = host(); h.emit("session_start");
   c.advance(IDLE_MS - 1); assert.equal(h.calls.length, 0);
   c.advance(1); assert.equal(h.calls.length, 1); assert.equal(h.hook(), undefined);
   assert.ok(h.entries.some(e => e.customType === "idle-compaction-attempt"));
-  h.calls[0].onComplete({});
+  now += 234_600; h.calls[0].onComplete({});
   assert.match(h.notices[0][0], /Compacting after 45/);
-  assert.match(h.notices[1][0], /finished/);
+  assert.match(h.notices[1][0], /finished in 235 s\. Original transcript retained\./);
   h.emit("agent_settled"); c.advance(IDLE_MS * 3); assert.equal(h.calls.length, 1);
 });
 
